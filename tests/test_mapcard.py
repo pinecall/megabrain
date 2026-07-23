@@ -314,6 +314,10 @@ def test_search_names_the_changelog_and_the_pinning_tests(tmp_path,
                     with_docs=True)
     docs = [d["file"] for d in res.get("related_docs", [])]
     assert "CHANGES.md" in docs
+    # the changelog carries a SPAN so it renders as a megabrain_read spec, not
+    # a bare filename the agent host-Reads for the entry format (jinja#2176)
+    cl = next(d for d in res["related_docs"] if d["file"] == "CHANGES.md")
+    assert cl.get("end_line") and cl.get("changelog")
     tests = [t["file"] for t in res.get("related_tests", [])]
     assert "tests/test_info_dict.py" in tests
     # the dedicated test file (named after the symbol) outranks the mention
@@ -321,5 +325,8 @@ def test_search_names_the_changelog_and_the_pinning_tests(tmp_path,
         < tests.index("tests/test_misc.py")
     from megabrain.retrieval.render import render_pruned
     out = render_pruned(res)
-    assert "the changelog: a behavior change adds an entry here" in out
+    # renders as a read spec (CHANGES.md:<start>-<end>), not a bare filename
+    import re as _re
+    assert _re.search(r"CHANGES\.md:\d+-\d+ ← the changelog", out)
+    assert "megabrain_read this span for the format" in out
     assert "tests/test_info_dict.py" in out

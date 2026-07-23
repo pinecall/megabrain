@@ -269,12 +269,13 @@ def render_pruned(res: dict, with_text: bool = True,
     # behavior — changing the mechanism above means reading them.
     if res.get("related_docs"):
         L.append("— docs that reference this mechanism (a feature fix updates "
-                 "them too — read/edit these, don't grep for them):")
+                 "them too — megabrain_read these, never host-Read/grep):")
         for d in res["related_docs"]:
             span = (f':{d["start_line"]}-{d["end_line"]}'
                     if d.get("end_line") else "")
             L.append(f'  {d["file"]}{span}'
-                     + (' ← the changelog: a behavior change adds an entry here'
+                     + (' ← the changelog: add your entry at the top; '
+                        'megabrain_read this span for the format'
                         if d.get("changelog") else
                         ' ← the relevant section; read this span, not the'
                         ' whole file' if span else ""))

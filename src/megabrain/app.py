@@ -165,14 +165,20 @@ def prune(root: Path, task: str, path_filter: str | None = None,
                 if not (Path(root) / name).is_file():
                     continue
                 if name not in listed:
+                    # carry a SPAN (the top, where entries go) so it renders as
+                    # a megabrain_read spec — without an end_line the render
+                    # printed a bare filename and the agent host-Read the file
+                    # to see the entry format (jinja#2176 run). The head of a
+                    # changelog is always the current/unreleased section.
                     res["related_docs"].append(
-                        {"file": name, "start_line": 1})
+                        {"file": name, "start_line": 1, "end_line": 40})
                 # flag by NAME, not by which path added it — when the docs
                 # pruner itself surfaces the changelog, the entry must still
-                # carry the label
+                # carry the label (and a span, so it's a read spec not a Read)
                 for d in res["related_docs"]:
                     if d["file"] == name:
                         d["changelog"] = True
+                        d.setdefault("end_line", 40)
                 break
             # Deterministic pinning-tests closure. The judge-dependent tests
             # bucket appears and disappears with the pool (field runs: the
