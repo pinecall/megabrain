@@ -7290,39 +7290,39 @@
      "_seen_chunks, _scope",
      null,
      423,
-     451,
+     459,
      "megabrain > megabrain/server/mcp.py > [_seen_chunks, _scope]",
-     "69ac2a9efdf6409478e3dd2f14bcd3d2188e1b30"
+     "df031cc05615145ff387c998bb400e521c343c21"
     ],
     [
      "block",
      "call_tool",
      "1/2",
-     452,
-     547,
-     "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict) -> str",
-     "0d08b7189095eee5699d22311cc7d740af5c1b57"
+     460,
+     560,
+     "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict, session: str | None=None) -> str",
+     "82091801594cb860c2a2480953912948cd94ba13"
     ],
     [
      "block",
      "call_tool",
      "2/2",
-     548,
-     602,
-     "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict) -> str",
+     561,
+     615,
+     "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict, session: str | None=None) -> str",
      "cbb5381aa7c55aa5fdcd394bd784b9e9d00d59c5"
     ],
     [
      "function",
      "main",
      null,
-     603,
-     645,
+     616,
+     663,
      "megabrain > megabrain/server/mcp.py > def main()",
-     "16e1a3005113960f1e0740cd3be36b7fce1e73a4"
+     "2e4832092f830667ff902bb165c5c0f052369381"
     ]
    ],
-   "skeleton_sha": "132f05d0c187ae41547842304d9edff03905ee8c",
+   "skeleton_sha": "fbaf8bf1c7a18ca4a8b523a82f2f067712b8507c",
    "symbols": [
     [
      "PROTOCOL",
@@ -7348,43 +7348,43 @@
     [
      "_SEEN_TTL",
      "constant",
-     430,
-     430,
+     438,
+     438,
      "_SEEN_TTL = 600"
     ],
     [
      "_seen",
      "constant",
-     431,
-     431,
-     "_seen: dict[str, tuple[float, set]] = {}"
+     439,
+     439,
+     "_seen: dict[tuple[str, str], tuple[float, set]] = {}"
     ],
     [
      "_seen_chunks",
      "function",
-     434,
-     441,
-     "def _seen_chunks(root: Path) -> set"
+     442,
+     449,
+     "def _seen_chunks(root: Path, session: str) -> set"
     ],
     [
      "_scope",
      "function",
-     444,
-     451,
+     452,
+     459,
      "def _scope(args: dict) -> tuple[Path, str | None]"
     ],
     [
      "call_tool",
      "function",
-     454,
-     602,
-     "def call_tool(name: str, args: dict) -> str"
+     462,
+     615,
+     "def call_tool(name: str, args: dict, session: str | None=None) -> str"
     ],
     [
      "main",
      "function",
-     605,
-     641,
+     618,
+     659,
      "def main()"
     ]
    ]
