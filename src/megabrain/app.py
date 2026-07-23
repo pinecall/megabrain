@@ -96,7 +96,8 @@ def prune(root: Path, task: str, path_filter: str | None = None,
           with_text: bool = True, include_pruned: bool = False,
           reindex: bool = True, llm_rerank: bool = False,
           docs: bool = False, expand: bool = False,
-          model: str | None = None, with_docs: bool = False) -> dict:
+          model: str | None = None, with_docs: bool = False,
+          closure: bool = False) -> dict:
     """No-LLM noise pruning -> flat ranked signal chunks, over the CODE;
     `docs=True` prunes the indexed markdown instead. `expand` runs the
     shared expander first (one cheap LLM call names the mechanism terms the
@@ -125,6 +126,14 @@ def prune(root: Path, task: str, path_filter: str | None = None,
             ex = expand_pool(st, task, res, model,
                              path_filter=path_filter, with_text=with_text, **cf)
             terms = (ex or {}).get("terms", []) or []
+        # SURFACE CLOSURE LOOP (closure.py) — the internal agent fan-out:
+        # plan facets → probe fan-out → deterministic resolution → verify
+        # critics, up to 30 fast-lane calls. Runs BEFORE the judge so the
+        # judge sees the closed pool; its additions are facet-tagged and the
+        # judge cannot silently drop them (set-aside guard).
+        if closure and not docs:
+            from .retrieval.closure import close_surface
+            close_surface(st, task, res, model)
         # the judge runs BEFORE the docs/tests closures so they read the
         # JUDGED surface (kept + set-aside), not the raw det order — on the
         # click aliases task Command.__init__ sat past det rank 12 but the

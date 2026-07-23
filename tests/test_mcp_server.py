@@ -39,8 +39,9 @@ def test_search_always_prunes_and_exposes_no_bundle_switch():
     assert "prune_noise" not in props
     assert "full" not in props
     assert props["bodies"]["default"] is True
+    assert props["agents"]["default"] is True   # the surface closure loop
     assert set(props) == {"repo_path", "task", "scope_path", "bodies",
-                          "rerank", "expand", "model", "docs"}
+                          "agents", "rerank", "expand", "model", "docs"}
 
 
 def test_search_takes_the_prune_path(monkeypatch):

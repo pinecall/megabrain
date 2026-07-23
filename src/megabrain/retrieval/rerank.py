@@ -314,10 +314,11 @@ def llm_rerank(res: dict, question: str, model: str | None = None) -> dict:
         setaside = [c for c in noise
                     if (float(c.get("score", 0)) >= floor
                         or det_rank[c["id"]] < 10
-                        # an anchor chunk holds a rare identifier the query
-                        # QUOTED — lexical evidence outranks the judge's
-                        # opinion; it never vanishes silently
-                        or c.get("anchors"))
+                        # an anchor/facet chunk carries deterministic
+                        # evidence (rare quoted identifier / closure-loop
+                        # probe) — evidence outranks the judge's opinion;
+                        # it never vanishes silently
+                        or c.get("anchors") or c.get("facet"))
                     and not _is_demo_path(c["file"])][:8]
         noise = [c for c in noise if c["id"] not in {s["id"] for s in setaside}]
         res["setaside"] = setaside

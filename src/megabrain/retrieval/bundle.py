@@ -312,6 +312,8 @@ def prune_search(st: SearchState, query: str, path_filter: str | None = None,
             # why this chunk is signal despite its rank: it holds a rare
             # identifier the query quoted (the lexical anchor floor)
             item["anchors"] = c["anchors"]
+        if c.get("facet"):
+            item["facet"] = c["facet"]
         if with_text:
             item["text"] = c["text"]
         return item

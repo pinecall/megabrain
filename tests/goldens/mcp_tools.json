@@ -40,6 +40,11 @@
   "description": "ONE call that returns a task's WHOLE surface, code included: relevance-ranked chunks WITH bodies (true line numbers, the `N\u2192` gutter), plus the set-aside sites a change must touch (constructor/declaration, serialization), the doc sections that describe the mechanism, the changelog, and the tests pinning the behavior. EVERY related file appears with its best span. The render IS your read: build megabrain_replace find/replace strings straight from it and NEVER re-fetch a span it already showed. megabrain_read is only for what rendered as a POINTER (omitted body, set-aside, doc section) \u2014 batch those in ONE call. Do not search again for facets of the same task. One boundary to know: retrieval ranks what EXISTS \u2014 when the bug is a MISSING call/flag/parameter, search shows you the site to inspect but cannot flag the absence. To PROVE an absence, megabrain_grep the identifier: zero matches over the indexed corpus, grouped by role, is the evidence.",
   "inputSchema": {
    "properties": {
+    "agents": {
+     "default": true,
+     "description": "default true: the surface closure loop \u2014 internal fast-lane agents decompose the task into facets, probe each one deterministically and verify the surface is complete before answering (up to 30 parallel internal calls, ~2-6s). false = single-pass retrieval.",
+     "type": "boolean"
+    },
     "bodies": {
      "default": true,
      "description": "default true: code bodies render inline \u2014 the result is your read. false = spans-only surface card (file:start-end + symbols), for when you only want the map of the mechanism.",

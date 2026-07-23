@@ -136,6 +136,15 @@ TOOLS = [
                 "task": {"type": "string", "description": "feature/question, natural language"},
                 "scope_path": {"type": "string",
                                "description": "optional repo-relative folder to scope the bundle to files under it; omit for the whole repo. Scoping EXCLUDES everything outside the folder from retrieval entirely — scope to the package/subsystem root (e.g. activejob, src/dispatch), never to its lib/ or src/ subfolder, or you cut away the package's tests, which are often the spec of the behavior you are searching for (the 'tests pinning this behavior' section can only show tests the scope let in)"},
+                "agents": {"type": "boolean", "default": True,
+                           "description": "default true: the surface closure "
+                                          "loop — internal fast-lane agents "
+                                          "decompose the task into facets, "
+                                          "probe each one deterministically "
+                                          "and verify the surface is complete "
+                                          "before answering (up to 30 "
+                                          "parallel internal calls, ~2-6s). "
+                                          "false = single-pass retrieval."},
                 "bodies": {"type": "boolean", "default": True,
                            "description": "default true: code bodies render inline — the "
                                           "result is your read. false = spans-only surface "
@@ -468,7 +477,8 @@ def call_tool(name: str, args: dict) -> str:
                         expand=bool(args.get("expand", True)),
                         model=args.get("model"),
                         docs=bool(args.get("docs")),
-                        with_docs=not bool(args.get("docs")))
+                        with_docs=not bool(args.get("docs")),
+                        closure=args.get("agents", True) is not False)
         return render_pruned(res, with_text=bodies,
                              seen_ids=_seen_chunks(root))
     if name == "megabrain_ask":

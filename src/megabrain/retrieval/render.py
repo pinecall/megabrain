@@ -192,6 +192,13 @@ def render_pruned(res: dict, with_text: bool = True,
         # the terms double as vocabulary hints for the reader, not just lanes
         L.insert(1, "expanded with mechanism terms: "
                     + ", ".join(res["expanded"]["terms"]))
+    if res.get("closure"):
+        cl = res["closure"]
+        L.insert(1, f'surface closure: {len(cl["facets"])} facets · '
+                    f'+{cl["added"]} probed chunks · '
+                    f'{"CLOSED" if cl["closed"] else "open"} in '
+                    f'{cl["rounds"]} round(s) · {cl["calls"]} internal calls '
+                    f'· {cl["ms"]}ms')
     if not with_text:
         # the surface card: every span in megabrain_read's spec form, no
         # bodies — the next step is ONE read, so say so where it gets read
@@ -208,6 +215,9 @@ def render_pruned(res: dict, with_text: bool = True,
         if c.get("anchors"):
             # names the rare query identifier that earned this chunk its slot
             retag += f' · anchor: {", ".join(c["anchors"][:3])}'
+        if c.get("facet"):
+            # why the closure loop pulled this chunk in (probe directive)
+            retag += f' · via {c["facet"]}'
         loc = (f'{c["file"]}:{c["start_line"]}-{c["end_line"]}' if not with_text
                else f'{c["file"]} L{c["start_line"]}-{c["end_line"]}')
         L.append(f'### {rank}. [{c["id"]}] {loc} · {label} · '

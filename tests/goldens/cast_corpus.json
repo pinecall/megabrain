@@ -80,27 +80,45 @@
     [
      "block",
      "prune",
-     "1/2",
+     "1/4",
      93,
-     117,
-     "megabrain > megabrain/app.py > def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False) -> dict",
-     "968cc194d5537e3490e7a35843cdce7ebe410e98"
+     118,
+     "megabrain > megabrain/app.py > def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False, closure: bool=False) -> dict",
+     "60c042ef73a5f824ab40ab09dc7e488a9dec9466"
     ],
     [
      "block",
      "prune",
-     "2/2",
-     118,
+     "2/4",
+     119,
+     227,
+     "megabrain > megabrain/app.py > def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False, closure: bool=False) -> dict",
+     "3353129d22cedece327e92d053b52ad944695d6c"
+    ],
+    [
+     "block",
+     "prune",
+     "3/4",
      228,
-     "megabrain > megabrain/app.py > def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False) -> dict",
-     "95f32035a95fd9a6484fee5b50b48e4da47bc574"
+     236,
+     "megabrain > megabrain/app.py > def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False, closure: bool=False) -> dict",
+     "733b56a328fe06184bf8e828a90138c61a777dd7"
+    ],
+    [
+     "block",
+     "prune",
+     "4/4",
+     237,
+     237,
+     "megabrain > megabrain/app.py > def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False, closure: bool=False) -> dict",
+     "9b1d7be743a903e4b70ca3d2ff671dae955f8fa4"
     ],
     [
      "module",
      "ask, graph, grep, get, chunks, index, scan, stats, flows_list",
      null,
-     229,
-     334,
+     238,
+     343,
      "megabrain > megabrain/app.py > [ask, graph, grep, get, chunks, index, scan, stats, flows_list]",
      "9fb9ea0fb3ddff86db26752855a6e69062e23242"
     ],
@@ -108,13 +126,13 @@
      "module",
      "flow_get, flow_delete, example_queries",
      null,
-     335,
-     387,
+     344,
+     396,
      "megabrain > megabrain/app.py > [flow_get, flow_delete, example_queries]",
      "4253ce7a0374ff18b3ce0d52fa93b30e50104c4e"
     ]
    ],
-   "skeleton_sha": "953948212e347a3b75b2aa8911e7e18dba448aa8",
+   "skeleton_sha": "852ad70f3ec811ef74647679b9aebe964d1c830c",
    "symbols": [
     [
      "resolve_scope",
@@ -169,91 +187,91 @@
      "prune",
      "function",
      95,
-     228,
-     "def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False) -> dict"
+     237,
+     "def prune(root: Path, task: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, reindex: bool=True, llm_rerank: bool=False, docs: bool=False, expand: bool=False, model: str | None=None, with_docs: bool=False, closure: bool=False) -> dict"
     ],
     [
      "ask",
      "function",
-     231,
-     243,
+     240,
+     252,
      "def ask(root: Path, question: str, path_filter: str | None=None, docs_only: bool=False, agents: Any=None, reindex: bool=True, model: str | None=None) -> dict"
     ],
     [
      "graph",
      "function",
-     246,
-     257,
+     255,
+     266,
      "def graph(root: Path, mode: str='map', node: str | None=None, source: str | None=None, target: str | None=None, path_filter: str | None=None, reindex: bool=True, label: bool=True) -> dict"
     ],
     [
      "grep",
      "function",
-     260,
-     270,
+     269,
+     279,
      "def grep(root: Path, pattern: str, regex: bool=False, ignore_case: bool=False, path_filter: str | None=None, reindex: bool=True) -> dict"
     ],
     [
      "get",
      "function",
-     273,
-     278,
+     282,
+     287,
      "def get(root: Path, sub: str | None, file: str, symbol: str | None=None) -> str"
     ],
     [
      "chunks",
      "function",
-     281,
-     287,
+     290,
+     296,
      "def chunks(root: Path, sub: str | None, file: str, query_str: str, path_filter: str | None=None, reindex: bool=True) -> dict"
     ],
     [
      "index",
      "function",
-     290,
-     295,
+     299,
+     304,
      "def index(root: Path, force: bool=False, exclude=(), scan_filters: bool=False) -> dict"
     ],
     [
      "scan",
      "function",
-     298,
      307,
+     316,
      "def scan(root: Path) -> dict"
     ],
     [
      "stats",
      "function",
-     310,
-     314,
+     319,
+     323,
      "def stats(root: Path) -> dict"
     ],
     [
      "flows_list",
      "function",
-     317,
-     334,
+     326,
+     343,
      "def flows_list(root: Path) -> dict"
     ],
     [
      "flow_get",
      "function",
-     337,
-     350,
+     346,
+     359,
      "def flow_get(root: Path, flow_id: int) -> dict"
     ],
     [
      "flow_delete",
      "function",
-     353,
-     358,
+     362,
+     367,
      "def flow_delete(root: Path, flow_id: int) -> dict"
     ],
     [
      "example_queries",
      "function",
-     361,
-     387,
+     370,
+     396,
      "def example_queries(root: Path, limit: int=6) -> dict"
     ]
    ]
@@ -4878,16 +4896,16 @@
      "prune_search, prune_search_root",
      null,
      285,
-     369,
+     371,
      "megabrain > megabrain/retrieval/bundle.py > [prune_search, prune_search_root]",
-     "4ebc7a94a5fb55a9d09497d4d369121d0f0eba39"
+     "98e37f8ed4213ecd607413ff0222743ad982d76c"
     ],
     [
      "function",
      "search_multi",
      null,
-     370,
-     407,
+     372,
+     409,
      "megabrain > megabrain/retrieval/bundle.py > def search_multi(roots: list[Path], query: str, path_filters: list[str | None] | None=None, only_docs: bool=False, exclude_docs: bool=False) -> dict",
      "b6b879fc0e9ace8e6ebaede5308cdb4bf13b6c94"
     ]
@@ -4954,22 +4972,196 @@
      "prune_search",
      "function",
      287,
-     360,
+     362,
      "def prune_search(st: SearchState, query: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, only_docs: bool=False, exclude_docs: bool=False) -> dict"
     ],
     [
      "prune_search_root",
      "function",
-     363,
-     369,
+     365,
+     371,
      "def prune_search_root(root: Path, query: str, path_filter: str | None=None, with_text: bool=True, include_pruned: bool=False, only_docs: bool=False, exclude_docs: bool=False) -> dict"
     ],
     [
      "search_multi",
      "function",
-     372,
-     407,
+     374,
+     409,
      "def search_multi(roots: list[Path], query: str, path_filters: list[str | None] | None=None, only_docs: bool=False, exclude_docs: bool=False) -> dict"
+    ]
+   ]
+  },
+  "megabrain/retrieval/closure.py": {
+   "chunks": [
+    [
+     "module",
+     "_json_of, _card, _Budget",
+     null,
+     1,
+     126,
+     "megabrain > megabrain/retrieval/closure.py > [_json_of, _card, _Budget]",
+     "9dac742045042bd0c402b1cc9983e8d94e7fda38"
+    ],
+    [
+     "function",
+     "_resolve",
+     null,
+     127,
+     184,
+     "megabrain > megabrain/retrieval/closure.py > def _resolve(st, metas, fused, directives: dict, have: set) -> list[tuple[int, str]]",
+     "a4d97c53ae869cf9bcaab8fa647fd3607ce9db12"
+    ],
+    [
+     "function",
+     "close_surface",
+     null,
+     185,
+     281,
+     "megabrain > megabrain/retrieval/closure.py > def close_surface(st, query: str, res: dict, model: str | None=None) -> dict | None",
+     "825dc95448450a55ea04343be90e0d8ebbad3c30"
+    ]
+   ],
+   "skeleton_sha": "507996e85f2170ef854402a06096d85f250562e3",
+   "symbols": [
+    [
+     "log",
+     "constant",
+     43,
+     43,
+     "log = logging.getLogger(__name__)"
+    ],
+    [
+     "MAX_FACETS",
+     "constant",
+     45,
+     45,
+     "MAX_FACETS = 8"
+    ],
+    [
+     "VERIFIERS",
+     "constant",
+     46,
+     46,
+     "VERIFIERS = 3"
+    ],
+    [
+     "MAX_ROUNDS",
+     "constant",
+     47,
+     47,
+     "MAX_ROUNDS = 2"
+    ],
+    [
+     "CALL_CAP",
+     "constant",
+     48,
+     48,
+     "CALL_CAP = 30"
+    ],
+    [
+     "CARD_LINES",
+     "constant",
+     49,
+     49,
+     "CARD_LINES = 90"
+    ],
+    [
+     "GREP_DF_CAP",
+     "constant",
+     50,
+     50,
+     "GREP_DF_CAP = 20"
+    ],
+    [
+     "PER_DIRECTIVE_CAP",
+     "constant",
+     51,
+     51,
+     "PER_DIRECTIVE_CAP = 4"
+    ],
+    [
+     "ADD_CAP",
+     "constant",
+     52,
+     52,
+     "ADD_CAP = 24"
+    ],
+    [
+     "_IDENT",
+     "constant",
+     54,
+     54,
+     "_IDENT = re.compile('[A-Za-z_][A-Za-z0-9_]{2,}')"
+    ],
+    [
+     "_PLAN",
+     "constant",
+     56,
+     67,
+     "_PLAN = 'An engineer must FULFILL this request against a codebase:\\n\\n{query}\\n\\nCurrent retrieval surface (file:lines \u00b7"
+    ],
+    [
+     "_PROBE",
+     "constant",
+     69,
+     84,
+     "_PROBE = 'Request an engineer must fulfill:\\n\\n{query}\\n\\nThe facet YOU own: {facet}\\n\\nSurface retrieved so far (file:l"
+    ],
+    [
+     "_VERIFY",
+     "constant",
+     86,
+     97,
+     "_VERIFY = 'Request an engineer must fulfill:\\n\\n{query}\\n\\nRetrieved surface (file:lines \u00b7 symbols):\\n{card}\\n\\nCould a "
+    ],
+    [
+     "_json_of",
+     "function",
+     100,
+     105,
+     "def _json_of(reply: str)"
+    ],
+    [
+     "_card",
+     "function",
+     108,
+     115,
+     "def _card(chunks: list[dict]) -> str"
+    ],
+    [
+     "_Budget",
+     "class",
+     118,
+     126,
+     "class _Budget"
+    ],
+    [
+     "_Budget.__init__",
+     "method",
+     119,
+     120,
+     "def __init__(self, cap: int)"
+    ],
+    [
+     "_Budget.take",
+     "method",
+     122,
+     126,
+     "def take(self, n: int=1) -> bool"
+    ],
+    [
+     "_resolve",
+     "function",
+     129,
+     184,
+     "def _resolve(st, metas, fused, directives: dict, have: set) -> list[tuple[int, str]]"
+    ],
+    [
+     "close_surface",
+     "function",
+     187,
+     281,
+     "def close_surface(st, query: str, res: dict, model: str | None=None) -> dict | None"
     ]
    ]
   },
@@ -5716,25 +5908,25 @@
      "render_pruned",
      "1/3",
      158,
-     203,
+     210,
      "megabrain > megabrain/retrieval/render.py > def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str",
-     "968b9ed6bec13ca2aaba7d3ebbd26f5b37216b2e"
+     "c4dbd90d8680f1941f90254cbf9f8d1484a84c5e"
     ],
     [
      "block",
      "render_pruned",
      "2/3",
-     204,
-     299,
+     211,
+     309,
      "megabrain > megabrain/retrieval/render.py > def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str",
-     "f8240b5906ee444a804fadc4bfd96debe8725803"
+     "bfee8bd17a0418444482883ead45cadc28ee92d6"
     ],
     [
      "block",
      "render_pruned",
      "3/3",
-     300,
-     328,
+     310,
+     338,
      "megabrain > megabrain/retrieval/render.py > def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str",
      "9a2f39f415e43d12be2674d56e7bd0c2f8ececdf"
     ]
@@ -5794,7 +5986,7 @@
      "render_pruned",
      "function",
      160,
-     328,
+     338,
      "def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str"
     ]
    ]
@@ -5893,25 +6085,25 @@
      "llm_rerank",
      "2/4",
      236,
-     338,
+     337,
      "megabrain > megabrain/retrieval/rerank.py > def llm_rerank(res: dict, question: str, model: str | None=None) -> dict",
-     "248f2bbacb17810f772d149152507964531a1c1e"
+     "a9b78f3ac6539c455b4f7826fa284b3c3819a068"
     ],
     [
      "block",
      "llm_rerank",
      "3/4",
-     339,
-     343,
+     338,
+     344,
      "megabrain > megabrain/retrieval/rerank.py > def llm_rerank(res: dict, question: str, model: str | None=None) -> dict",
-     "7017b92855a1196e304816971e50cd362b2478f9"
+     "2c12786f6333596aa3c84451190c0ceba014458b"
     ],
     [
      "block",
      "llm_rerank",
      "4/4",
-     344,
-     344,
+     345,
+     345,
      "megabrain > megabrain/retrieval/rerank.py > def llm_rerank(res: dict, question: str, model: str | None=None) -> dict",
      "9b1d7be743a903e4b70ca3d2ff671dae955f8fa4"
     ]
@@ -6027,7 +6219,7 @@
      "llm_rerank",
      "function",
      221,
-     344,
+     345,
      "def llm_rerank(res: dict, question: str, model: str | None=None) -> dict"
     ]
    ]
@@ -7062,43 +7254,43 @@
      null,
      "1/4",
      69,
-     143,
+     145,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "bf215a3629d7851d97a07a1764a63a3f3dfc43c9"
+     "57b33e3dc92f30d4c2355c07d0f1c2b76bce6db6"
     ],
     [
      "block",
      null,
      "2/4",
-     144,
-     242,
+     146,
+     245,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "5f9e6a2ad9bc61b065187e06d8a47809855ec13a"
+     "c9d3ac4277c2418e1313d01386a5879b50a06399"
     ],
     [
      "block",
      null,
      "3/4",
-     243,
-     347,
+     246,
+     344,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "c89d87865fb17f5d4799fc92eaa5c9036f7e148a"
+     "b774e1277b238b8651c099a20125717ea623964f"
     ],
     [
      "block",
      null,
      "4/4",
-     348,
-     413,
+     345,
+     422,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "7ed676dab5fb1f2b2e118d85ea6e97ec733678f3"
+     "e455d03550b8e376ecca80f60360f6eb74812422"
     ],
     [
      "module",
      "_seen_chunks, _scope",
      null,
-     414,
-     442,
+     423,
+     451,
      "megabrain > megabrain/server/mcp.py > [_seen_chunks, _scope]",
      "69ac2a9efdf6409478e3dd2f14bcd3d2188e1b30"
     ],
@@ -7106,17 +7298,17 @@
      "block",
      "call_tool",
      "1/2",
-     443,
-     537,
+     452,
+     547,
      "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict) -> str",
-     "fe665cad73a172af8d33c2b6161030af383e816a"
+     "0d08b7189095eee5699d22311cc7d740af5c1b57"
     ],
     [
      "block",
      "call_tool",
      "2/2",
-     538,
-     592,
+     548,
+     602,
      "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict) -> str",
      "cbb5381aa7c55aa5fdcd394bd784b9e9d00d59c5"
     ],
@@ -7124,8 +7316,8 @@
      "function",
      "main",
      null,
-     593,
-     635,
+     603,
+     645,
      "megabrain > megabrain/server/mcp.py > def main()",
      "16e1a3005113960f1e0740cd3be36b7fce1e73a4"
     ]
@@ -7150,49 +7342,49 @@
      "TOOLS",
      "constant",
      70,
-     413,
+     422,
      "TOOLS = [{'name': 'megabrain_ask', 'description': 'THE primary tool for any how/where/why question about an indexed repo"
     ],
     [
      "_SEEN_TTL",
      "constant",
-     421,
-     421,
+     430,
+     430,
      "_SEEN_TTL = 600"
     ],
     [
      "_seen",
      "constant",
-     422,
-     422,
+     431,
+     431,
      "_seen: dict[str, tuple[float, set]] = {}"
     ],
     [
      "_seen_chunks",
      "function",
-     425,
-     432,
+     434,
+     441,
      "def _seen_chunks(root: Path) -> set"
     ],
     [
      "_scope",
      "function",
-     435,
-     442,
+     444,
+     451,
      "def _scope(args: dict) -> tuple[Path, str | None]"
     ],
     [
      "call_tool",
      "function",
-     445,
-     592,
+     454,
+     602,
      "def call_tool(name: str, args: dict) -> str"
     ],
     [
      "main",
      "function",
-     595,
-     631,
+     605,
+     641,
      "def main()"
     ]
    ]
