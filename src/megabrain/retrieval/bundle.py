@@ -11,13 +11,14 @@ chunks_for_file() are pure projections of it.
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
 import numpy as np
 
 from .params import DEFAULT_PARAMS
-from .scoring import _is_test_path, score_chunks, under_path
+from .scoring import _is_demo_path, _is_test_path, score_chunks, under_path
 from .state import SearchState, load_state
 
 # symbol kinds worth surfacing in the file outline (display only — not ranking).
@@ -25,6 +26,46 @@ from .state import SearchState, load_state
 OUTLINE_KINDS = ("class", "function", "async_function", "method", "async_method",
                  "constant", "const", "var", "interface", "type", "enum",
                  "module", "heading")
+
+
+# multiword identifiers only (snake_case / camelCase): a rare single word is
+# usually prose; a rare multiword identifier is a name the task QUOTED.
+_ANCHOR_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]{3,}")
+
+
+def _anchor_chunks(query: str, metas: list, fused: np.ndarray, p) -> dict[int, list[str]]:
+    """CHUNK-LEVEL LEXICAL RECALL FLOOR — the recall-floor doctrine one level
+    down. File fusion lifts every chunk of a matching file, so a monolithic
+    file's chunks near-tie and the per-file tier1_chunk_cap cuts an arbitrary
+    top-N of a flat distribution. Field case (attrs#1549): the capture site
+    `_CountingAttr.default` — holding the query's own rare identifier
+    `takes_self` — sat at in-file rank 16 of 27 near-tied chunks (0.990 vs
+    1.148 top) and the cap dropped it; neither raw dense (rank 22) nor the
+    file-level BM25 lane could rescue a CHUNK. What discriminates it is
+    lexical: a rare multiword identifier from the query lives verbatim in its
+    text (LARGER's lexically-anchored principle). Deterministic, no LLM:
+    identifiers from the query with document frequency <= anchor_df_cap over
+    the scored IMPLEMENTATION chunks grant their chunks a signal slot. Tests
+    and demos are excluded from both the count and the floor — they quote the
+    same identifiers by design (takes_self: df 11 with tests, 5 without) and
+    they already have their own sections/doctrine. PURE ADDITIONS — never
+    ranks, never displaces (same stance as the file recall floor); bundle
+    completeness can only rise. Returns {meta_index: [terms]}."""
+    terms = [t for t in dict.fromkeys(_ANCHOR_IDENT.findall(query))
+             if "_" in t or any(ch.isupper() for ch in t[1:])]
+    if not terms:
+        return {}
+    impl = [i for i, m in enumerate(metas)
+            if not _is_test_path(m.file) and not _is_demo_path(m.file)]
+    hits: dict[int, list[str]] = {}
+    for t in terms:
+        matched = [i for i in impl
+                   if t in (getattr(metas[i], "text", None) or "")]
+        if 0 < len(matched) <= p.anchor_df_cap:
+            for i in matched:
+                hits.setdefault(i, []).append(t)
+    ranked = sorted(hits, key=lambda i: (-len(hits[i]), -float(fused[i])))
+    return {i: hits[i] for i in ranked[:p.anchor_chunk_cap]}
 
 
 def search_with_state(st: SearchState, query: str,
@@ -150,8 +191,16 @@ def search_with_state(st: SearchState, query: str,
                 have.add(f)
                 adds += 1
 
+    # LEXICAL ANCHOR FLOOR (see _anchor_chunks) — computed over the full
+    # scored corpus, attached as pure additions; selection() appends them.
+    anchors_out = []
+    if p.anchor_chunk_cap:
+        for i, terms in _anchor_chunks(query, metas, fused, p).items():
+            anchors_out.append({**metas[i].to_dict(),
+                                "score": float(fused[i]), "anchors": terms})
+
     return {"query": query, "tier1": out_t1, "tier2": out_t2,
-            "flows": flows_out,
+            "flows": flows_out, "anchors": anchors_out,
             "repo": st.repo,
             "ms": int((time.time() - t0) * 1000)}
 
@@ -172,7 +221,8 @@ def search(root: Path, query: str, path_filter: str | None = None,
 def selection(res: dict) -> list[tuple[dict, float]]:
     """THE single definition of what retrieval SELECTED out of a bundle: every
     tier-1 chunk that survived the chunk_keep_ratio cut, plus each RELATED
-    file's best chunk — (chunk dict, relevance score), tier1 first, deduped.
+    file's best chunk, plus the lexical-anchor floor chunks (_anchor_chunks —
+    pure additions) — (chunk dict, relevance score), tier1 first, deduped.
     prune_search and chunks_for_file are both projections of this; keep the
     semantics here and nowhere else."""
     out: list[tuple[dict, float]] = []
@@ -187,6 +237,10 @@ def selection(res: dict) -> list[tuple[dict, float]]:
         if bc and bc["id"] not in seen:
             seen.add(bc["id"])
             out.append((bc, float(t["score"])))
+    for c in res.get("anchors") or []:
+        if c["id"] not in seen:
+            seen.add(c["id"])
+            out.append((c, float(c["score"])))
     return out
 
 
@@ -254,6 +308,10 @@ def prune_search(st: SearchState, query: str, path_filter: str | None = None,
         item = {"id": c["id"], "file": c["file"],
                 "start_line": c["start_line"], "end_line": c["end_line"],
                 "kind": c["kind"], "name": c["name"], "score": round(float(score), 4)}
+        if c.get("anchors"):
+            # why this chunk is signal despite its rank: it holds a rare
+            # identifier the query quoted (the lexical anchor floor)
+            item["anchors"] = c["anchors"]
         if with_text:
             item["text"] = c["text"]
         return item

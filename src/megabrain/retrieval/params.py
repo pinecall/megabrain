@@ -44,6 +44,10 @@ class RetrievalParams:
     chunk_keep_ratio: float = 0.8  # within a tier-1 file, keep chunks >= ratio*best
     tier1_chunk_cap: int = 12      # hard cap of chunks per CORE file
     multi_tier1_extra: int = 2     # search_multi: tier1 cap = tier1_max + this
+    # ── lexical anchor floor (see search_with_state) ────────────────────
+    anchor_df_cap: int = 10        # a query identifier matching more chunks than
+    #                                this is common vocabulary, not an anchor
+    anchor_chunk_cap: int = 6      # max chunks the anchor floor may append
     # ── recall floor (see search_with_state) ────────────────────────────
     recall_floor_top: int = 15     # raw-dense top-N chunks whose files are owed
                                    # a bundle slot (0 disables the floor). N is

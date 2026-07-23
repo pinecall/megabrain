@@ -205,6 +205,9 @@ def render_pruned(res: dict, with_text: bool = True,
         label = c["name"] or c["kind"]
         from .rerank import _is_reexport_chunk
         retag = " · re-exports" if _is_reexport_chunk(c.get("text") or "") else ""
+        if c.get("anchors"):
+            # names the rare query identifier that earned this chunk its slot
+            retag += f' · anchor: {", ".join(c["anchors"][:3])}'
         loc = (f'{c["file"]}:{c["start_line"]}-{c["end_line"]}' if not with_text
                else f'{c["file"]} L{c["start_line"]}-{c["end_line"]}')
         L.append(f'### {rank}. [{c["id"]}] {loc} · {label} · '
