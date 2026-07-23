@@ -57,6 +57,32 @@ def test_search_takes_the_prune_path(monkeypatch):
     assert calls == ["prune"]
 
 
+def test_call_tool_is_pure_without_a_session(tiny_repo):
+    """Body dedup is SESSION-scoped, never ambient. Keying by repo alone made
+    results depend on process call history: an in-process A/B harness read
+    'regressions' that were the previous config's bodies deduped away (rails
+    6/6 @52K isolated vs 4/6 @19K in-process, same args), and a multi-client
+    server would leak dedup across users. No session -> pure function; same
+    session -> second call dedupes; sessions never share."""
+    from megabrain.server.mcp import call_tool
+    # all three LLM lanes off: purity is a property of the deterministic
+    # path (LLM lanes are nondeterministic by nature — and a unit test must
+    # never make a network call)
+    args = {"repo_path": str(tiny_repo), "task": "user login password check",
+            "rerank": False, "agents": False, "expand": False}
+    a = call_tool("megabrain_search", dict(args))
+    b = call_tool("megabrain_search", dict(args))
+    assert a == b                                   # pure: history-free
+    assert "body already rendered" not in b
+
+    s1 = call_tool("megabrain_search", dict(args), session="s1")
+    s1b = call_tool("megabrain_search", dict(args), session="s1")
+    assert "body already rendered" in s1b           # dedup within a session
+    s2 = call_tool("megabrain_search", dict(args), session="s2")
+    assert "body already rendered" not in s2        # sessions never share
+    assert s1 == a                                  # first render identical
+
+
 def test_grep_tolerates_habit_param_names(monkeypatch):
     """Field run (rails#57197): the agent called grep with `query:` — the
     KeyError sent it back to HOST grep for the same string, the exact call

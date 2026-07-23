@@ -422,18 +422,26 @@ TOOLS = [
 ]
 
 
-# Chunk bodies rendered per repo in this server's lifetime, TTL'd. Parallel
-# searches over facets of ONE mechanism overlap by design (click#3652 field
-# run: the same get_help_record chunk rendered three times in one message) —
-# a body the agent already has renders as a pointer, never twice. The TTL
-# keeps a later, unrelated task from inheriting stale dedup.
+# Cross-search body dedup — SESSION-SCOPED, never ambient. Parallel searches
+# over facets of ONE mechanism overlap by design (click#3652 field run: the
+# same get_help_record chunk rendered three times in one message) — a body
+# the agent already has renders as a pointer, never twice. The TTL keeps a
+# later, unrelated task from inheriting stale dedup.
+#
+# The state is keyed by (session, repo) and applies ONLY when the caller
+# DECLARES a session: the stdio server (one process = one agent session)
+# declares its own; every other caller gets a PURE function. Keying by repo
+# alone made results depend on process call HISTORY — an in-process A/B
+# harness measured "regressions" that were the previous config's bodies
+# deduped away (field case: rails 6/6 @52K isolated vs 4/6 @19K in-process,
+# same args), and a multi-client server would leak dedup across users.
 _SEEN_TTL = 600
-_seen: dict[str, tuple[float, set]] = {}
+_seen: dict[tuple[str, str], tuple[float, set]] = {}
 
 
-def _seen_chunks(root: Path) -> set:
+def _seen_chunks(root: Path, session: str) -> set:
     import time as _t
-    key = str(root)
+    key = (session, str(root))
     ts, ids = _seen.get(key, (0.0, set()))
     if _t.time() - ts > _SEEN_TTL:
         ids = set()
@@ -451,7 +459,11 @@ def _scope(args: dict) -> tuple[Path, str | None]:
                              args.get("scope_path") or args.get("subpath"))
 
 
-def call_tool(name: str, args: dict) -> str:
+def call_tool(name: str, args: dict, session: str | None = None) -> str:
+    """Dispatch one tool call. PURE by default: identical (name, args) give
+    an identical render. `session` opts into session-scoped body dedup —
+    only the stdio server (one process = one agent conversation) passes it;
+    evals, scripts and multi-client servers stay history-free."""
     from .. import app
     if name in ("megabrain_search", "megabrain_query"):
         # megabrain_query = deprecated 0.9 alias (dispatch only — not in TOOLS,
@@ -480,7 +492,8 @@ def call_tool(name: str, args: dict) -> str:
                         with_docs=not bool(args.get("docs")),
                         closure=args.get("agents", True) is not False)
         return render_pruned(res, with_text=bodies,
-                             seen_ids=_seen_chunks(root))
+                             seen_ids=(_seen_chunks(root, session)
+                                       if session else None))
     if name == "megabrain_ask":
         from ..ask import render_ask
         root, pf = _scope(args)
@@ -603,6 +616,10 @@ def call_tool(name: str, args: dict) -> str:
 
 
 def main():
+    # one stdio process == one agent conversation: THE session that gets
+    # body dedup. Every other call_tool consumer stays pure (see call_tool).
+    import uuid
+    stdio_session = f"stdio-{uuid.uuid4().hex[:8]}"
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -623,7 +640,8 @@ def main():
         elif method == "tools/call":
             p = msg.get("params", {})
             try:
-                text = call_tool(p.get("name", ""), p.get("arguments", {}))
+                text = call_tool(p.get("name", ""), p.get("arguments", {}),
+                                 session=stdio_session)
                 result = {"content": [{"type": "text", "text": text}]}
             except MegabrainError as e:  # typed -> stable machine code in the text
                 result = {"content": [{"type": "text",
