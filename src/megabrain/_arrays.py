@@ -14,7 +14,7 @@ from typing import TypeAlias
 import numpy as np
 import numpy.typing as npt
 
-__all__ = ["Vector", "Matrix"]
+__all__ = ["Vector", "Matrix", "IndexArray", "BoolMask"]
 
 Vector: TypeAlias = npt.NDArray[np.float32]
 """One embedding: 1-D, unit length by the time anything downstream sees it."""
@@ -22,3 +22,11 @@ Vector: TypeAlias = npt.NDArray[np.float32]
 Matrix: TypeAlias = npt.NDArray[np.float32]
 """Stacked embeddings, one per row. Row *i* belongs to element *i* of whatever
 list it was built from — that alignment is the whole contract."""
+
+IndexArray: TypeAlias = npt.NDArray[np.int64]
+"""Positions into another array. Distinct from Matrix on purpose: indexing with
+a float array is an error a checker can catch, and a join built from the wrong
+dtype fails at the point of use rather than at the point of the mistake."""
+
+BoolMask: TypeAlias = npt.NDArray[np.bool_]
+"""A per-element yes/no — what `np.where` selects on."""

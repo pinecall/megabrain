@@ -12,10 +12,11 @@ from typing import Callable, Sequence
 
 from .._arrays import Vector
 from .._errors import MissingCredential
-from .._types import NotGiven, not_given
+from .._types import NotGiven, is_given, not_given
 from ._config import DEFAULT_BATCH, EmbedConfig
 from ._retry import request_with_retry
 from ._wire import decode_batch
+from .cache import EmbedCache, remember, split_cached
 from .http import RetryPolicy, Transport
 
 __all__ = ["Embedder"]
@@ -29,11 +30,13 @@ class Embedder:
                  model: str | None = None, base_url: str | None = None,
                  batch_size: int = DEFAULT_BATCH, timeout: float = 120.0,
                  policy: RetryPolicy | None = None,
-                 cache: object | None = None) -> None:
+                 cache: EmbedCache | None | NotGiven = not_given) -> None:
         self.config = EmbedConfig.resolve(api_key=api_key, model=model, base_url=base_url,
                                           batch_size=batch_size, timeout=timeout)
         self.policy = policy or RetryPolicy()
-        self.cache = cache
+        # Omitted enables the shared on-disk cache; an explicit None turns it
+        # off, which is what a test measuring real calls needs.
+        self.cache = EmbedCache() if not is_given(cache) else cache
         self.tokens = 0
         self._transport = transport
 
@@ -50,13 +53,22 @@ class Embedder:
         """
         if not texts:
             return []
-        self._require_key()
-        out: list[Vector] = []
-        for batch in _batches(texts, self.config.batch_size):
-            out.extend(self._embed_one(batch))
+        cached, missing = split_cached(self.cache, self.config.model, texts)
+        if missing:
+            self._require_key()
+        for start in range(0, len(missing), self.config.batch_size):
+            batch = missing[start:start + self.config.batch_size]
+            for text, vector in zip(batch, self._embed_one(batch)):
+                cached[text] = vector
+                remember(self.cache, self.config.model, text, vector)
+            # Reported per batch, not once at the end: indexing a large
+            # repository is a long silence otherwise, and progress counts the
+            # CALLER's texts — a cache hit is done work, not skipped work.
             if on_batch is not None:
-                on_batch(len(out), len(texts))
-        return out
+                on_batch(sum(1 for t in texts if t in cached), len(texts))
+        if on_batch is not None and not missing:
+            on_batch(len(texts), len(texts))
+        return [cached[t] for t in texts]
 
     def _embed_one(self, batch: Sequence[str]) -> list[Vector]:
         body = json.dumps({"model": self.config.model, "input": list(batch),
@@ -83,6 +95,3 @@ class Embedder:
             self._transport = UrllibTransport()
         return self._transport
 
-
-def _batches(texts: Sequence[str], size: int) -> list[Sequence[str]]:
-    return [texts[i:i + size] for i in range(0, len(texts), size)]
