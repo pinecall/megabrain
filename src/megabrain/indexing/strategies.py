@@ -24,7 +24,13 @@ __all__ = ["Strategy", "Registry", "EDGE_SCHEMA"]
 # It states "the edges in this index were built by schema N"; a pass that
 # extracted none and stamped it anyway told every future pass the graph was
 # current, which disables the exact rebuild the marker exists to trigger.
-EDGE_SCHEMA = 1
+#
+# 4 because indexes in the wild carry 3 and this extractor is not that one: it
+# resolves a DOTTED call receiver (`import a.b` then `a.b.run()`), which the
+# previous one could not — its alias map was keyed on the bound name only, so
+# every call written that way was invisible. Those indexes must rebuild once,
+# which is exactly what a number the engine has never seen makes them do.
+EDGE_SCHEMA = 4
 
 
 @runtime_checkable
@@ -43,6 +49,16 @@ class Strategy(Protocol):
     exts: tuple[str, ...]
 
     def parse(self, relpath: str, source: str) -> Parsed: ...
+
+    def edge_context(self, sources: dict[str, str]) -> object:
+        """Whatever resolving THIS language's references needs, built once.
+
+        Import resolution is a repo-wide question — a name means nothing
+        without knowing every module the repo declares — so it cannot be
+        answered file by file. Returning `None` costs nothing for a strategy
+        with no graph.
+        """
+        ...
 
     def edges(self, relpath: str, source: str,
               context: object) -> list[tuple[str, str]] | None: ...

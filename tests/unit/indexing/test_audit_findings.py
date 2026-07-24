@@ -43,15 +43,19 @@ def test_a_skipped_file_keeps_the_edges_pointing_at_it(repo: Path) -> None:
             "a skipped file was pruned as an orphan and took its incoming edges"
 
 
-def test_a_pass_that_built_no_edges_does_not_claim_an_edge_schema(repo: Path) -> None:
+def test_a_pass_with_nothing_to_graph_does_not_claim_an_edge_schema(
+        tmp_path: Path) -> None:
     """The marker means "the edges in this index were built by schema N".
 
-    Stamping it after a pass that extracted no edges makes every future pass
+    Stamping it after a pass that examined nothing makes every future pass
     believe the graph is current, so the rebuild the marker exists to trigger
-    never happens.
+    never happens. Here no strategy claims the file, so the edge pass has no
+    target — and says so by not stamping.
     """
-    index_repo(repo, embedder=CountingEmbedder())
-    with Store(repo) as store:
+    write(tmp_path, {"notes.md": "# not a language this registry knows\n"})
+    index_repo(tmp_path, embedder=CountingEmbedder())
+
+    with Store(tmp_path) as store:
         assert store.graph.get_meta("edge_schema") is None
         assert store.graph.all_edges() == []
 

@@ -13,6 +13,7 @@ from typing import Sequence
 
 from ..storage import Store
 from ._embed import Embeddable, embed_all
+from ._graph import write_edges
 from ._plan import Progress, plan, read_sources
 from ._write import prune_orphans, write_files
 from .builtin import default_registry
@@ -54,6 +55,7 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
                    on_progress=on_progress)                        # 1: CPU
     vectors = embed_all(planned.pending, embedder, on_progress)    # 2: network
     chunks = write_files(store, planned.pending, vectors)          # 3: disk
+    edges = write_edges(store, registry, sources, planned.pending)
     removed = prune_orphans(store, {f.relpath for f in found.files},
                             {s.relpath for s in found.skipped})
 
@@ -62,7 +64,7 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
     store.commit()
     return {"files": len(found), "changed": len(planned.pending),
             "unchanged": len(planned.unchanged), "removed": removed,
-            "chunks": chunks, "skipped": len(found.skipped),
+            "chunks": chunks, "edges": edges, "skipped": len(found.skipped),
             "partition_violations": planned.violations}
 
 

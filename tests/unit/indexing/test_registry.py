@@ -21,6 +21,9 @@ class Fake:
     def parse(self, relpath: str, source: str) -> Parsed:
         return Parsed(units=(), symbols=(), skeleton=self.tag, ok=True)
 
+    def edge_context(self, sources: dict[str, str]) -> object:
+        return None                 # a content type with no dependency graph
+
     def edges(self, relpath: str, source: str, context: object) -> list[tuple[str, str]] | None:
         return None
 
