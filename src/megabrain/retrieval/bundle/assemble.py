@@ -10,15 +10,16 @@ from __future__ import annotations
 import time
 
 from ..._arrays import Matrix
-from ...contracts import AnchorHit, Bundle, Tier1File
+from ...contracts import Bundle, Tier1File
 from ...storage.model import ChunkMeta
 from .._render import to_hit
 from ..params import RetrievalParams
 from ..scoring.pipeline import score_chunks
 from ..state import SearchState
+from ._anchors import render_anchors
 from ._rank import Ranking, core_chunks, core_files, rank_files
 from ._related import related_entry
-from .floors import anchor_chunks, file_floor
+from .floors import file_floor
 
 __all__ = ["search_with_state"]
 
@@ -58,21 +59,9 @@ def search_with_state(state: SearchState, query: str, *,
                              via_graph=f in neighbours, params=params)
                for f in related],
         flows=[],
-        anchors=_anchors(query, metas, fused, params),
+        anchors=render_anchors(query, metas, fused, params),
         ms=int((time.perf_counter() - started) * 1000),
     )
-
-
-def _anchors(query: str, metas: list[ChunkMeta], fused: Matrix,
-             params: RetrievalParams) -> list[AnchorHit]:
-    """Chunks the lexical floor pulled in, as spans rather than bodies.
-
-    The span is what makes it actionable: the reader opens exactly the lines
-    holding the identifier they asked about, instead of a whole file.
-    """
-    return [AnchorHit(file=metas[i].file, start_line=metas[i].start_line,
-                      end_line=metas[i].end_line, terms=terms)
-            for i, terms in anchor_chunks(query, metas, fused, params).items()]
 
 
 def _neighbours(state: SearchState, candidates: list[str], ranking: Ranking,

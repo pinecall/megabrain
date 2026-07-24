@@ -10,6 +10,160 @@ Reference implementation to imitate: `~/experiments/anthropic-sdk-python` (index
 
 ---
 
+## STATUS — read this before touching anything
+
+**Phases 0–7 are done, gated, and committed.** Phases 8–17 (§6) have not
+started. This section is the truth as of commit `68cc934`; the plan below it
+is unchanged from when it was written and still describes what's left.
+
+### Verify the state yourself before trusting this section
+
+```bash
+cd ~/megabrain-v3
+git log --oneline -1                                   # 68cc934
+git log --oneline | wc -l                               # 209
+git tag | wc -l                                          # 34
+./scripts/lint                                            # ruff + mypy + pyright + architecture
+python3 -m pytest tests -q                                 # 293 collected
+```
+
+### What exists
+
+```
+src/megabrain/
+├── _types.py _arrays.py _errors.py _version.py __init__.py     L0
+├── contracts/            chunk.py bundle.py prune.py            L1 — TypedDicts only
+├── storage/               store.py schema.py model.py            L2
+│                          _blobs.py _chunks.py _files.py _symbols.py _graph.py
+├── providers/             http.py _retry.py _urllib.py _wire.py   L2 (embeddings)
+│                          _config.py cache.py embeddings.py
+├── chunkers/               units.py model.py cast.py python.py     L3
+│                          _spans.py _merge.py _split.py _balance.py
+│                          _breadcrumb.py _signature.py _pysymbols.py
+└── retrieval/              params.py paths.py state.py search.py   L3 — NO LLM, enforced
+   ├── scoring/             lane.py lanes.py context.py pipeline.py
+   ├── bundle/              assemble.py _rank.py _related.py floors.py
+   └── _render.py
+
+evals/harness/gate.py    the golden-set runner, versioned (the private corpus is not)
+tests/                   293 tests: unit/ (chunkers, indexing, providers, storage),
+                         contracts/ (shape validation against captured payloads),
+                         architecture/ (the hard rules, executable), golden/
+```
+
+`providers/chat`, `enrich/`, `knowledge/`, `ask/`, `usecases/`, `transports/`
+and `studio/` do not exist yet — that's phases 8–16.
+
+### Gate status right now
+
+| Gate | Result |
+|---|---|
+| ruff | clean |
+| mypy strict | clean, 63 files |
+| pyright strict | clean, 0 errors |
+| pytest | **290 passed, 2 failed, 1 skipped** (293 collected) |
+| golden (`evals/harness/gate.py` against `~/pinecall/sdk-server`) | **R@1 0.91 · bundle_full 1.00 · p50 ~11ms — matches v2 exactly, same 2 misses (q01, q03)** |
+| `retrieval/` importing `providers.chat` or `enrich` | zero occurrences (checked by AST walk, not just grep) |
+
+The golden gate is not wired into `pytest` by default — it needs
+`MEGABRAIN_GOLDEN` and `MEGABRAIN_GOLDEN_REPO` pointing at a real corpus (see
+`tests/golden/test_gate.py`), which is why `pytest` alone shows it skipped.
+Without those two env vars set, **you cannot verify retrieval parity** — set
+them before touching anything under `retrieval/` or `providers/embeddings.py`.
+
+### Known debt — start here
+
+Two of `tests/architecture/test_invariants.py`'s own line-budget checks
+currently **fail**. This is self-inflicted (the fixes above were shipped under
+time pressure to close phase 7) and is exactly the kind of thing this round
+should fix:
+
+1. **`src/megabrain/providers/_wire.py` — 117 lines (budget 100).**
+   Grew past budget across two bug fixes (denormal detection, then
+   out-of-order row correction). Needs a real split, not a squeeze — the width
+   detection (`_decode`/`_has_magnitude`) and the row-ordering fix
+   (`_ordered`) are two distinct concerns that both currently live in one file
+   with `decode_batch`.
+2. **`src/megabrain/retrieval/bundle/assemble.py` — 105 lines (budget 100).**
+   `search_with_state` plus its four private helpers. `_anchors` is the
+   obvious extraction candidate — it's the newest addition and the one that
+   pushed the file over.
+
+Fix both the way every other split in this codebase was done: read the file,
+find the seam that was already implicit, extract to a new module, re-run
+`./scripts/lint` and the golden gate, confirm parity numbers are unchanged.
+**Do not just delete comments or compress lines to fit the budget** — the
+budget is diagnostic, not the goal; a forced-thin file with the same logic and
+no explanation is worse than the violation.
+
+### Two real bugs found and fixed during phase 7 (context for review)
+
+Both were caught by comparing behavior against the live embeddings endpoint
+and against v2's actual request/response handling — not by unit tests with
+fake data, which had the bugs baked into their own fixtures and couldn't see
+them. Worth knowing before reviewing `providers/`:
+
+1. **Wire format detection.** The endpoint can return base64-encoded float32
+   *or* int8, and misreading one as the other doesn't crash — it produces
+   either a dimension mismatch (loud) or finite-but-denormal floats around
+   `1e-42` that underflow to zero on normalization (silent, and the vector
+   then scores against nothing). `_decode`/`_has_magnitude` in
+   `providers/_wire.py` check three things before trusting a float32 read:
+   byte-count divisibility by 4, `isfinite`, and magnitude above `1e-20`.
+2. **Row ordering.** The embeddings endpoint may answer batched requests
+   out of order and says so via an `index` field per row. The code did not
+   sort by it. This is the single worst class of bug the module can have —
+   nothing raises, every text gets *a* vector, just not necessarily its own —
+   and it was found only by manually diffing this code's request/response
+   handling against v2's line by line, not by any test. Fixed in `_ordered()`
+   in `_wire.py`; falls back to arrival order if `index` is absent (some
+   OpenAI-compatible endpoints omit it).
+
+**Lesson for this round:** don't trust a green test suite alone when a module
+talks to something external. Re-derive the wire contract from a real request/
+response pair (or from the older implementation's actual behavior, not its
+docstring) before assuming the code matches it.
+
+### Not yet ported (known, deliberate, not a regression)
+
+Phase 7's commit message already flagged these; repeating here so this round
+doesn't rediscover them as mysteries:
+
+- **Issue mode** — the long-query lane (BM25 sparse entity-ID matching +
+  traceback/identifier grounding pins for bug-report-shaped queries). v2 had
+  it as a fourth scoring lane; v3's `scoring/lanes.py` has three
+  (`DenseFileFusion`, `TestPenalty`, `LexicalBoost`). It does not fire on the
+  golden set, which is why parity holds without it — but it needs to exist
+  before v3 can claim full behavioral parity with v2, not just golden-set parity.
+- **The cached-answer (flow) lane.** `Bundle.flows` is wired in the contract
+  and always returns `[]` in `assemble.py`. `storage/flows.py`'s equivalent
+  (the SQLite `flows` table, its cache-attach/serve split) has not been
+  ported at all.
+- **`related_entry`'s `via_flow` field** exists in the contract
+  (`contracts/bundle.py`) precisely because the flow lane is coming — it's not
+  dead code, it's a contract written ahead of its producer.
+
+### What this round should do, roughly in order
+
+1. **Fix the two budget violations above.** Small, mechanical, low-risk —
+   good warm-up before touching anything with retrieval-quality risk.
+2. **Audit `providers/` and `retrieval/` for the same CLASS of bug** the two
+   fixes above represent: silent-wrong-answer failure modes in code that
+   talks to something external or does array arithmetic. Look especially at
+   `chunkers/_split.py`/`_balance.py` (weight-based splitting, fixed once
+   already against a real corpus — see phase 5's commit) and
+   `retrieval/bundle/floors.py` (the two recall floors — read the "why" in
+   their docstrings and check the code still does what they say).
+3. **Re-run the golden gate after any change touching `retrieval/`,
+   `chunkers/`, or `providers/embeddings.py`.** Report the exact numbers
+   (`R@1`, `bundle_full`, `p50`) in the commit message — not "still passes",
+   the actual numbers, so a regression is visible in `git log` even if nobody
+   ran the gate at merge time.
+4. Only after that: continue with phase 8 (§6) if there's room, but fixing
+   what's here takes priority over building further on top of it.
+
+---
+
 ## 0. ⚠️ GIT — READ BEFORE TOUCHING ANYTHING
 
 `~/megabrain-v2` has **34 tags**, a published PyPI package (`megabrain`), and a
@@ -322,7 +476,7 @@ rewrite it carelessly.
 Each phase: **write the tests → watch them fail → implement → gate → commit.**
 Do not start phase N+1 with phase N's gate red.
 
-### Phase 0 — scaffold
+### Phase 0 — scaffold ✅ DONE (`75517c4`)
 
 Build `pyproject.toml` (copy the annotated one from
 `~/.claude/skills/art-of-python/STRUCTURE.md` §2), `scripts/{bootstrap,format,lint,test,gates}`,
@@ -337,7 +491,7 @@ Build `pyproject.toml` (copy the annotated one from
 
 **Gate:** CI green. `git tag | wc -l` still 34.
 
-### Phase 1 — L0 vocabulary
+### Phase 1 — L0 vocabulary ✅ DONE (`75517c4`)
 
 `_types.py` (`NotGiven`/`not_given`/`Omit`/`omit`/`is_given`), `_errors.py`
 (port v2's taxonomy incl. the dual inheritance), `_constants.py`, `_utils/`.
@@ -353,7 +507,7 @@ Build `pyproject.toml` (copy the annotated one from
 removes a default; `repr(not_given) == "NOT_GIVEN"`.
 **Gate:** mypy+pyright strict clean on `_*`; no I/O in this layer.
 
-### Phase 2 — L1 `contracts/` ← **the pivot of the whole rewrite**
+### Phase 2 — L1 `contracts/` ← **the pivot of the whole rewrite** ✅ DONE (`4f7b346`)
 
 **All payloads, defined before a single implementation exists.**
 
@@ -379,7 +533,7 @@ megabrain ask ~/experiments/anthropic-sdk-python \
 optional keys nobody documented — `setaside`, `related_docs`, `related_tests`.
 **Gate:** every fixture in `tests/fixtures/parity/` validates.
 
-### Phase 3 — L2 storage
+### Phase 3 — L2 storage ✅ DONE (`7561799`)
 
 `storage/{store,schema,flows,registry}.py`. `schema.py` owns DDL + versioned
 migrations. **`Store` is the only module in the entire codebase allowed to
@@ -388,7 +542,7 @@ write SQL** — enforce with a test that greps for `db.execute` outside
 
 **Gate:** round-trip tests against an in-memory sqlite; the SQL-locality test.
 
-### Phase 4 — L2 embeddings
+### Phase 4 — L2 embeddings ✅ DONE (`1ab2ec6`, fixed further in `68cc934` — see STATUS)
 
 `providers/embeddings.py` + `providers/_http.py` (retry, backoff,
 `Retry-After`, `__cause__` chain walk — copy the reference's policy).
@@ -402,7 +556,7 @@ megabrain ask ~/experiments/anthropic-sdk-python \
 retry; a wrapped retryable error still retries; the content-addressed cache
 avoids a second call. **No network in any test.**
 
-### Phase 5 — L3 chunkers
+### Phase 5 — L3 chunkers ✅ DONE (`c40c8c2`)
 
 `base` → `cast` → `python` → `treesitter/chunker` + `specs/` → `markdown` →
 `php`.
@@ -415,7 +569,7 @@ spec — port them before the implementations.
 
 **Gate:** zero partition violations indexing 5 real repos of different languages.
 
-### Phase 6 — L3 indexing
+### Phase 6 — L3 indexing ✅ DONE (`49ce49d`)
 
 `discover` → `strategies` (+`trust`) → `edges/` → `indexer` (3 phases = 3
 functions).
@@ -429,7 +583,7 @@ functions).
 
 **Gate:** `IndexStats` byte-identical to v2 on 3 real repos.
 
-### Phase 7 — L3 retrieval ← **the highest-risk phase**
+### Phase 7 — L3 retrieval ← **the highest-risk phase** ✅ DONE (`fbcbc9a`) — see STATUS for what's not yet ported
 
 `params` → `state` → `scoring/{pipeline,lanes/*}` → `bundle/{assemble,floors,select}`
 → `render` → `lexical/*` → `project/*`.
@@ -466,12 +620,12 @@ every PR. The big private corpus stays in `evals/private/` (gitignored). Today
 `tests/test_engine_golden.py` is gitignored — the engine's #2 rule has no
 versioned gate at all. **Fixing that is part of this phase, not a follow-up.**
 
-### Phase 8 — L3 knowledge (the graph)
+### Phase 8 — L3 knowledge (the graph) — NOT STARTED
 
 Split `graph.py` (852) into `knowledge/{build,communities,paths,render}.py`.
 **The graph never ranks** — it supplies candidates and annotations only.
 
-### Phase 9 — L4 chat + `enrich/`
+### Phase 9 — L4 chat + `enrich/` — NOT STARTED
 
 `providers/chat/{router,openai_compat,claude}.py`, then `enrich/{expand,rerank,deep,closure}.py`.
 
@@ -481,7 +635,7 @@ opt-in and fail-open; on any failure it returns its input unchanged.
 **Tests first:** for each enricher — provider raises → the input bundle comes
 back identical. That test is the hard rule, executable.
 
-### Phase 10 — L4 ask
+### Phase 10 — L4 ask — NOT STARTED
 
 `narrator` + `splice` + `agents/` + `stream`.
 
@@ -497,7 +651,7 @@ fabricated code and assert **none of it** reaches the output; only spliced
 disk bytes do. Port `test_ask_citation`, `test_ask_modes`,
 `test_ask_v2_integration`.
 
-### Phase 11 — L5 `usecases/`
+### Phase 11 — L5 `usecases/` — NOT STARTED
 
 One file per verb. Decompose `app.prune()` (165 lines, 7 responsibilities) into
 `prune.py` + the helpers it calls. **The test-file scan moves into `Store`** —
@@ -505,7 +659,7 @@ no raw SQL outside `storage/`.
 
 **Gate:** behaviour parity with v2 on the captured fixtures.
 
-### Phase 12 — CLI · Phase 13 — MCP · Phase 14 — HTTP
+### Phase 12 — CLI · Phase 13 — MCP · Phase 14 — HTTP — NOT STARTED
 
 In that order (cheapest surface first, and each validates the use-case layer
 before the next).
@@ -519,7 +673,7 @@ before the next).
 
 **Gate:** `test_mcp_tools_golden`, `test_serve_api_ui`, `test_studio_boot`, e2e CLI.
 
-### Phase 15 — the studio
+### Phase 15 — the studio — NOT STARTED
 
 `studio/` as its own TypeScript workspace (esbuild), with `studio/src/api/`
 typed against `contracts/` — the same contract the MCP serves. Build output
@@ -541,12 +695,12 @@ non-empty.** Both benefits, no drift.
 `bernardocastro.dev/services/megabrain/` passes (every assertion in it came
 from a real outage).
 
-### Phase 16 — forge
+### Phase 16 — forge — NOT STARTED
 
 `coverage` (LLM, partition-gated) + `specialize` + `ab_gate` (both no-LLM).
 Last because it depends on `chunkers` + `indexing` + `providers/chat`.
 
-### Phase 17 — **algorithm improvements** (only after full parity)
+### Phase 17 — **algorithm improvements** (only after full parity) — NOT STARTED, and not eligible until 8–16 land
 
 **Do not touch the algorithm before phase 16's gate is green.** Refactoring and
 re-tuning at the same time makes a regression unattributable — you will not know

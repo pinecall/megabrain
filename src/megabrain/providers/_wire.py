@@ -1,10 +1,9 @@
-"""Decoding the embeddings wire format.
+"""Decoding one embeddings response: order, shape, and normalise.
 
-The endpoint may answer in either of two shapes, and both appear in practice:
-a plain list of floats, or int8 values base64-encoded (roughly 4x smaller on
-the wire, which matters when a cold index sends tens of thousands of texts).
-The int8 form arrives UNNORMALISED — it is a quantised direction, not a unit
-vector — so normalisation happens here, once, rather than in each scoring lane.
+The endpoint may answer in either of two shapes — a plain list of floats, or
+base64 (see `_width.py` for the float32-vs-int8 detection) — and may answer
+batched requests out of order. Both are handled here, once, so nothing above
+this module ever sees a row that could belong to the wrong text.
 """
 
 from __future__ import annotations
@@ -17,12 +16,13 @@ import numpy as np
 
 from .._arrays import Vector
 from .._errors import ProviderError
+from ._width import decode_width
 
 __all__ = ["decode_batch"]
 
 
 def decode_batch(payload: bytes, expected: int) -> list[Vector]:
-    """Parse one response into normalised float32 vectors, in wire order.
+    """Parse one response into normalised float32 vectors, in REQUEST order.
 
     The count is checked rather than trusted: a short batch would shift every
     later text onto the wrong vector, and nothing downstream could detect it —
@@ -57,44 +57,17 @@ def _ordered(rows: list[Any]) -> list[Any]:
 def _vector(raw: object) -> Vector:
     """One embedding, whichever way the endpoint chose to send it.
 
-    The suppressions are numpy's, not ours: its shipped overloads declare
-    `buffer: Unknown`, so the SYMBOL reads as partially unknown however the
-    call site is annotated. By rule name at the exact lines, never
-    package-wide — the declared return type pins this for every caller.
+    The suppression is numpy's, not ours: its shipped `asarray` overload
+    declares an `Unknown` element type for a plain list, so the SYMBOL reads
+    as partially unknown however the call site is annotated. By rule name at
+    the exact line, never package-wide — the declared return type pins this
+    for every caller.
     """
     if isinstance(raw, str):
-        return _decode(base64.b64decode(raw))
+        return decode_width(base64.b64decode(raw))
     if isinstance(raw, list):                   # plain floats
         return np.asarray(raw, dtype=np.float32)  # pyright: ignore[reportUnknownArgumentType]
     raise ProviderError(f"unsupported embedding encoding: {type(raw).__name__}")
-
-
-def _decode(payload: bytes) -> Vector:
-    """Base64 bytes -> floats, detecting the width rather than assuming it.
-
-    `encoding_format: "base64"` means float32 in the OpenAI-compatible spec,
-    and that is tried first. Some endpoints quantise to int8 instead — four
-    times smaller on the wire, which matters when a cold index ships tens of
-    thousands of texts — and the two are indistinguishable as raw bytes.
-
-    Three tells, checked before trusting the float reading, because a wrong
-    guess here is not a crash but a wrong index:
-
-    * a byte count that is not a multiple of four cannot be float32 at all;
-    * int8 bytes read as float32 put arbitrary bits in the exponent field,
-      which yields infinities and NaNs almost immediately;
-    * and when they happen not to, they yield DENORMALS — 1e-42 and smaller.
-      Those are finite, so a plain isfinite check waves them through, and their
-      norm then underflows to zero, which silently skips normalisation and
-      leaves a vector that scores against nothing. No real embedding component
-      is that small.
-    """
-    if len(payload) % 4 == 0:
-        floats = np.frombuffer(payload, dtype=np.float32)  # pyright: ignore[reportUnknownMemberType]
-        if floats.size and np.isfinite(floats).all() and _has_magnitude(floats):
-            return floats
-    ints = np.frombuffer(payload, dtype=np.int8)  # pyright: ignore[reportUnknownMemberType]
-    return ints.astype(np.float32)
 
 
 def _normalise(vec: Vector) -> Vector:
@@ -106,12 +79,3 @@ def _normalise(vec: Vector) -> Vector:
     """
     norm = float(np.linalg.norm(vec))  # pyright: ignore[reportUnknownMemberType]
     return (vec / norm).astype(np.float32) if norm else vec
-
-
-def _has_magnitude(values: Vector) -> bool:
-    """Whether these look like real embedding components rather than a misread.
-
-    A genuine vector always has at least one component of ordinary magnitude.
-    Denormals below this floor mean the bytes were never float32.
-    """
-    return bool(np.abs(values).max() > 1e-20)
