@@ -63,6 +63,13 @@ def embed_all(pending: Sequence[Planned], embedder: Embeddable,
         spans.append((start, len(item.result.chunks), has_skeleton))
 
     vectors = embedder.embed(texts, on_batch=_ticker(on_progress)) if texts else []
+    if len(vectors) != len(texts):
+        # Positional slicing makes the count part of the contract. A reply one
+        # row short does not raise on its own: the slices simply walk off the
+        # end, so a file's skeleton becomes the next file's chunk and the
+        # shortfall is only visible as an index that ranks strangely.
+        raise ValueError(f"embedder returned {len(vectors)} vectors "
+                         f"for {len(texts)} texts")
     return [Vectors(chunks=vectors[start:start + count],
                     skeleton=vectors[start + count] if skeleton else None)
             for start, count, skeleton in spans]

@@ -34,17 +34,23 @@ def write_files(store: Store, pending: Sequence[Planned],
     return written
 
 
-def prune_orphans(store: Store, present: set[str]) -> int:
-    """Drop files that are indexed but no longer on disk.
+def prune_orphans(store: Store, present: set[str], skipped: set[str]) -> int:
+    """Drop indexed files this pass did not index — telling GONE from SKIPPED.
 
-    Here — and only here — incoming edges go too: a file that does not exist
-    cannot be a valid import target, so an edge pointing at it is a lie the
-    graph would otherwise keep telling.
+    Both lose their rows: whatever the reason, this pass could not confirm what
+    they contain, and stale chunks answer as confidently as fresh ones.
+
+    Only a file that is genuinely gone loses its INCOMING edges. A skipped file
+    still exists, so the imports pointing at it are still true — and those edges
+    belong to other files, which did nothing wrong. Treating "too big today" as
+    "deleted" silently tore arcs out of the graph.
     """
-    gone = store.files.all_paths() - present
-    for relpath in gone:
+    indexed = store.files.all_paths()
+    for relpath in indexed - present - skipped:
         store.files.delete(relpath, drop_incoming=True)
-    return len(gone)
+    for relpath in indexed & skipped:
+        store.files.delete(relpath, drop_incoming=False)
+    return len(indexed - present)
 
 
 def _matrix(vectors: Sequence[object]):      # type: ignore[no-untyped-def]

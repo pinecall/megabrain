@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -35,8 +36,14 @@ class CountingEmbedder:
         return [self._vector(t) for t in texts]
 
     def _vector(self, text: str) -> Vector:
-        """Stable per text, so a re-index of unchanged content is comparable."""
-        rng = np.random.default_rng(abs(hash(text)) % (2**32))
+        """Stable per text, so a re-index of unchanged content is comparable.
+
+        Seeded from a DIGEST, not `hash()`: Python salts str hashing per
+        process, so the same text produced a different vector in every run —
+        a fixture that advertises determinism and delivers a coin flip.
+        """
+        digest = hashlib.sha256(text.encode("utf-8")).digest()[:4]
+        rng = np.random.default_rng(int.from_bytes(digest, "big"))
         vec = rng.standard_normal(self.dims).astype(np.float32)
         return vec / np.linalg.norm(vec)
 

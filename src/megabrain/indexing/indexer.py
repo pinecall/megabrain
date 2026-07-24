@@ -17,7 +17,7 @@ from ._plan import Progress, plan, read_sources
 from ._write import prune_orphans, write_files
 from .builtin import default_registry
 from .discover import discover
-from .strategies import EDGE_SCHEMA, Registry, Strategy
+from .strategies import Registry, Strategy
 
 __all__ = ["index_repo"]
 
@@ -54,10 +54,10 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
                    on_progress=on_progress)                        # 1: CPU
     vectors = embed_all(planned.pending, embedder, on_progress)    # 2: network
     chunks = write_files(store, planned.pending, vectors)          # 3: disk
-    removed = prune_orphans(store, {f.relpath for f in found.files})
+    removed = prune_orphans(store, {f.relpath for f in found.files},
+                            {s.relpath for s in found.skipped})
 
     store.graph.set_meta("embed_model", embedder.model)
-    store.graph.set_meta("edge_schema", EDGE_SCHEMA)
     store.graph.set_meta("last_index", {"at": time.time(), "files": len(found)})
     store.commit()
     return {"files": len(found), "changed": len(planned.pending),

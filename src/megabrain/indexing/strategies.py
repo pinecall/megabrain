@@ -19,6 +19,11 @@ __all__ = ["Strategy", "Registry", "EDGE_SCHEMA"]
 # whose bytes changed — so without a version marker, a repository indexed by an
 # older engine keeps its stale graph forever, and only a full re-embed (which
 # costs real money) would fix it.
+#
+# The marker is stamped BY WHATEVER WRITES EDGES, and only after it wrote them.
+# It states "the edges in this index were built by schema N"; a pass that
+# extracted none and stamped it anyway told every future pass the graph was
+# current, which disables the exact rebuild the marker exists to trigger.
 EDGE_SCHEMA = 1
 
 
