@@ -136,10 +136,14 @@ def test_payload_keeps_records_and_true_counts(grep_repo_fs):
     assert "reached_from" in p["defines"][0]
 
 
-def test_mcp_tool_registered_and_dispatches(grep_repo_fs):
+def test_mcp_tool_dispatches_but_stays_off_the_agent_surface(grep_repo_fs):
+    """grep is DISPATCH-ONLY now: the deep retriever greps internally, and
+    exposing it invited outer agents to re-verify what the search render
+    already showed (click#3652 field run). Registered clients and internal
+    callers keep working through call_tool."""
     from megabrain.server import mcp
-    assert any(t["name"] == "megabrain_grep" for t in mcp.TOOLS)
-    assert "megabrain_grep" in mcp.INSTRUCTIONS
+    assert not any(t["name"] == "megabrain_grep" for t in mcp.TOOLS)
+    assert any(t["name"] == "megabrain_grep" for t in mcp._ALL_TOOLS)
     out = mcp.call_tool("megabrain_grep",
                         {"repo_path": str(grep_repo_fs),
                          "pattern": "resolve_flag"})

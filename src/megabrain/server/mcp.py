@@ -45,29 +45,26 @@ PROTOCOL = "2024-11-05"
 # Every line below is a lesson from a real session, not documentation for its
 # own sake; keep it that way, and keep it short — it costs context in every
 # session that loads this server.
-INSTRUCTIONS = """megabrain answers questions about a repo's CODE from a pre-built index, so you don't have to crawl files to understand it. Retrieval runs NO LLM: it ranks real chunks and returns verbatim code with true line numbers.
+INSTRUCTIONS = """megabrain answers questions about a repo's CODE from a pre-built index. Retrieval is deterministic (verbatim chunks, true line numbers); an internal fast-lane retriever agent completes the package (tests to imitate, doc sections, changelog) before answering.
 
-The implement/fix loop, ONE discovery call: megabrain_search returns the task's whole surface WITH bodies — the render IS your read; NEVER re-fetch a span it showed. megabrain_read only for spans rendered as POINTERS (omitted/set-aside/docs/tests), one batch (auto-splits). Then pinning tests FIRST -> ONE megabrain_replace built from the rendered code -> gates. No host Read/Edit, no grep.
+Two tools, two jobs:
+- megabrain_search — ONE call returns a task's WHOLE edit surface with code bodies (`N→` gutter): the mechanism, constructor/serialization set-aside sites, the retrieved-context section (test conventions, doc spans), the changelog head. The render IS your read: implement directly from it with your own edit tools — NEVER re-fetch, grep or re-verify a span it already showed. A `(body omitted — megabrain_read file:a-b)` pointer names content that did not fit; if you truly need it, follow the pointer's instruction.
+- megabrain_ask — the flow narrated across subsystems, real code spliced in. Spliced CODE is verbatim; the PROSE is narration — verify its claims against that code.
 
-Which tool:
-- megabrain_map — FIRST call for any task: files ranked, spans, symbol outline, edges both ways, def sites, pinning tests. No bodies, judge-ranked.
-- megabrain_read — batch fetch: ALL read targets in ONE call (path, path#symbol, path:start-end). Verbatim, true line numbers.
-- megabrain_replace — batch exact-string edits in ONE call, transactional: validates every op first, any failure writes NOTHING. Existing files only (Write for new).
-- megabrain_grep — exact identifier/string: matches grouped into DEFINES / READS (ranked by dependents, with who-reaches-it edges) / CONFIG / TESTS / DOCS. Zero LLM, ~50ms.
-- megabrain_search — the task's whole surface WITH code bodies (`N→` gutter): ranked chunks + set-aside sites, doc sections, changelog, pinning tests. Replace directly from it; read only its pointers.
-- megabrain_ask — the flow narrated across subsystems, code spliced in (broad questions fan out into sub-agents). Spliced CODE is verbatim; the PROSE is narration — verify its claims against that code.
-- megabrain_graph — communities, core abstractions, how two areas connect.
-- megabrain_index — register/refresh a repo (auto-refreshes when stale).
-- megabrain_flows — cached ask walkthroughs.
-- megabrain_forge — add a chunker for an uncovered file type.
-
-TRUST the CODE, verify the PROSE: never grep or re-read what a render already showed. ONE scoped call, then work from it.
+ONE search per task, not per facet. If something seems missing, RE-READ the render first — the key finding is usually in the first chunks.
 
 Two things that decide answer quality:
 - scope_path EXCLUDES everything outside it from retrieval. Scope to a package root (e.g. activejob), never to its lib/ or src/ subfolder — that cuts away the package's tests, which are often the spec of the behavior you are asking about.
 - On a bug, name the STATE to track, not just the symptom: "where along this path could scheduled_at be lost?" returns a trace; "why does the retry fire immediately?" invites a theory."""
 
-TOOLS = [
+# Every tool the DISPATCH understands. The agent-visible surface (TOOLS,
+# below) is a strict subset: field evidence across the click/rails/jinja/
+# attrs duels showed that exposing grep/map/read invites the outer agent to
+# re-verify what the search render already contains — the deep retriever
+# greps/reads INTERNALLY now, and edits belong to the caller's own tools.
+# Hidden tools keep working via call_tool for registered clients, evals and
+# scripts (same stance as the deprecated megabrain_query alias).
+_ALL_TOOLS = [
     {
         "name": "megabrain_ask",
         "description": (
@@ -420,6 +417,10 @@ TOOLS = [
         },
     },
 ]
+
+# The agent-visible surface: discovery and understanding, nothing else.
+AGENT_TOOLS = ("megabrain_ask", "megabrain_search")
+TOOLS = [t for t in _ALL_TOOLS if t["name"] in AGENT_TOOLS]
 
 
 # Cross-search body dedup — SESSION-SCOPED, never ambient. Parallel searches

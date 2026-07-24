@@ -7345,70 +7345,61 @@
      null,
      null,
      1,
-     36,
+     58,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "8efa5accb40b848df18cb49909fa806b008c2d07"
-    ],
-    [
-     "module",
-     null,
-     null,
-     37,
-     68,
-     "megabrain > megabrain/server/mcp.py (module level)",
-     "201ffa9e514b73a26b8b2bfe296e3c8617ad52cf"
+     "dae28856e112694cbf62dc89b14babc740b504df"
     ],
     [
      "block",
      null,
      "1/4",
-     69,
-     145,
+     59,
+     134,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "57b33e3dc92f30d4c2355c07d0f1c2b76bce6db6"
+     "b4460af2c1d03eabd0fa2478c4408aeec14b7ad7"
     ],
     [
      "block",
      null,
      "2/4",
-     146,
-     245,
+     135,
+     224,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "c9d3ac4277c2418e1313d01386a5879b50a06399"
+     "680bce7ffc90ebf7e37da6b174caa6095a87f953"
     ],
     [
      "block",
      null,
      "3/4",
-     246,
-     344,
+     225,
+     324,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "b774e1277b238b8651c099a20125717ea623964f"
+     "96de99036bbc8e5ee977b61beec44d2e7018ab22"
     ],
     [
      "block",
      null,
      "4/4",
-     345,
-     422,
+     325,
+     419,
      "megabrain > megabrain/server/mcp.py (module level)",
-     "e455d03550b8e376ecca80f60360f6eb74812422"
+     "05f9f1dd06078ee3f801bc37ff5678fbe60e0b90"
     ],
     [
      "module",
      "_seen_chunks, _scope",
      null,
-     423,
-     459,
+     420,
+     460,
      "megabrain > megabrain/server/mcp.py > [_seen_chunks, _scope]",
-     "df031cc05615145ff387c998bb400e521c343c21"
+     "e2d5b0344c910254c7e81cd4e9f455550ae83b98"
     ],
     [
      "block",
      "call_tool",
      "1/2",
-     460,
-     560,
+     461,
+     561,
      "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict, session: str | None=None) -> str",
      "82091801594cb860c2a2480953912948cd94ba13"
     ],
@@ -7416,8 +7407,8 @@
      "block",
      "call_tool",
      "2/2",
-     561,
-     615,
+     562,
+     616,
      "megabrain > megabrain/server/mcp.py > def call_tool(name: str, args: dict, session: str | None=None) -> str",
      "cbb5381aa7c55aa5fdcd394bd784b9e9d00d59c5"
     ],
@@ -7425,13 +7416,13 @@
      "function",
      "main",
      null,
-     616,
-     663,
+     617,
+     664,
      "megabrain > megabrain/server/mcp.py > def main()",
      "2e4832092f830667ff902bb165c5c0f052369381"
     ]
    ],
-   "skeleton_sha": "fbaf8bf1c7a18ca4a8b523a82f2f067712b8507c",
+   "skeleton_sha": "1e8de157064de9fa6537899883ace2d8bb182e78",
    "symbols": [
     [
      "PROTOCOL",
@@ -7444,56 +7435,70 @@
      "INSTRUCTIONS",
      "constant",
      48,
-     68,
-     "INSTRUCTIONS = 'megabrain answers questions about a repo\\'s CODE from a pre-built index, so you don\\'t have to crawl fil"
+     58,
+     "INSTRUCTIONS = 'megabrain answers questions about a repo\\'s CODE from a pre-built index. Retrieval is deterministic (ver"
+    ],
+    [
+     "_ALL_TOOLS",
+     "constant",
+     67,
+     419,
+     "_ALL_TOOLS = [{'name': 'megabrain_ask', 'description': 'THE primary tool for any how/where/why question about an indexed"
+    ],
+    [
+     "AGENT_TOOLS",
+     "constant",
+     422,
+     422,
+     "AGENT_TOOLS = ('megabrain_ask', 'megabrain_search')"
     ],
     [
      "TOOLS",
      "constant",
-     70,
-     422,
-     "TOOLS = [{'name': 'megabrain_ask', 'description': 'THE primary tool for any how/where/why question about an indexed repo"
+     423,
+     423,
+     "TOOLS = [t for t in _ALL_TOOLS if t['name'] in AGENT_TOOLS]"
     ],
     [
      "_SEEN_TTL",
      "constant",
-     438,
-     438,
+     439,
+     439,
      "_SEEN_TTL = 600"
     ],
     [
      "_seen",
      "constant",
-     439,
-     439,
+     440,
+     440,
      "_seen: dict[tuple[str, str], tuple[float, set]] = {}"
     ],
     [
      "_seen_chunks",
      "function",
-     442,
-     449,
+     443,
+     450,
      "def _seen_chunks(root: Path, session: str) -> set"
     ],
     [
      "_scope",
      "function",
-     452,
-     459,
+     453,
+     460,
      "def _scope(args: dict) -> tuple[Path, str | None]"
     ],
     [
      "call_tool",
      "function",
-     462,
-     615,
+     463,
+     616,
      "def call_tool(name: str, args: dict, session: str | None=None) -> str"
     ],
     [
      "main",
      "function",
-     618,
-     659,
+     619,
+     660,
      "def main()"
     ]
    ]

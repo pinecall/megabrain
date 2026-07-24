@@ -9,12 +9,12 @@ from megabrain.server.mcp import TOOLS, _scope, call_tool
 
 def test_tool_schemas_are_wellformed():
     names = [t["name"] for t in TOOLS]
-    # read/replace close the map's loop in-engine: batch fetch + transactional
-    # batch edit, so implement tasks never pay one-host-Read-per-turn again
-    assert names == ["megabrain_ask", "megabrain_search", "megabrain_map",
-                     "megabrain_read", "megabrain_replace",
-                     "megabrain_grep", "megabrain_graph", "megabrain_index",
-                     "megabrain_forge", "megabrain_flows"]
+    # The agent-visible surface is discovery + understanding ONLY. Field
+    # evidence: exposing grep/map/read invited outer agents to re-verify
+    # what the render already contained; the deep retriever greps/reads
+    # internally, and edits belong to the caller's own tools. Everything
+    # else stays dispatch-only (call_tool) for registered clients/evals.
+    assert names == ["megabrain_ask", "megabrain_search"]
     for t in TOOLS:
         req = t["inputSchema"].get("required", [])
         props = t["inputSchema"]["properties"]
