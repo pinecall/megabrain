@@ -192,6 +192,12 @@ def render_pruned(res: dict, with_text: bool = True,
         # the terms double as vocabulary hints for the reader, not just lanes
         L.insert(1, "expanded with mechanism terms: "
                     + ", ".join(res["expanded"]["terms"]))
+    if res.get("deep"):
+        dd = res["deep"]
+        L.insert(1, f'deep retrieval: {len(dd["specs"])} spec(s) in '
+                    f'{dd["turns"]} internal turn(s) · {dd["ms"]}ms · '
+                    f'`{dd["model"]}` — the retrieved-context section below '
+                    f'is part of your read')
     if res.get("closure"):
         cl = res["closure"]
         L.insert(1, f'surface closure: {len(cl["facets"])} facets · '
@@ -272,6 +278,28 @@ def render_pruned(res: dict, with_text: bool = True,
                 omitted += 1
                 L.append(f'(body omitted — output budget · megabrain_read '
                          f'{c["file"]}:{c["start_line"]}-{c["end_line"]})')
+        L.append("")
+    # THE PACKAGE SECTION — specs the internal retriever (deep.py) chose so
+    # the outer agent never hunts again: test-convention bodies, doc spans,
+    # config sites. Bodies verbatim from disk, same budget, pointer on
+    # overflow. Rendered BEFORE the pointer sections: this is content the
+    # implementer reads, not a map.
+    if res.get("deep"):
+        d = res["deep"]
+        L.append(f'— retrieved context (internal retriever · '
+                 f'{len(d["specs"])} spec(s) · {d["turns"]} turn(s) · '
+                 f'{d["ms"]}ms):')
+        for t in d.get("blocks") or []:
+            body = "\n".join(_numbered(t["lines"], t["start"]))
+            block = (f'## {t["spec"]}  L{t["start"]}-{t["end"]}\n'
+                     f'```{lang_of(t["file"])}\n{body}\n```')
+            if spent + len(body) <= budget:
+                L.append(block)
+                spent += len(body)
+            else:
+                omitted += 1
+                L.append(f'{t["spec"]} (body omitted — output budget · '
+                         f'megabrain_read {t["file"]}:{t["start"]}-{t["end"]})')
         L.append("")
     if omitted:
         L.insert(2, f'⚠ output budget {budget // 1000}K: {omitted} lower-ranked '

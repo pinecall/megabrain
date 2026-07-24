@@ -126,14 +126,17 @@ def prune(root: Path, task: str, path_filter: str | None = None,
             ex = expand_pool(st, task, res, model,
                              path_filter=path_filter, with_text=with_text, **cf)
             terms = (ex or {}).get("terms", []) or []
-        # SURFACE CLOSURE LOOP (closure.py) — the internal agent fan-out:
-        # plan facets → probe fan-out → deterministic resolution → verify
-        # critics, up to 30 fast-lane calls. Runs BEFORE the judge so the
-        # judge sees the closed pool; its additions are facet-tagged and the
-        # judge cannot silently drop them (set-aside guard).
+        # INTERNAL AGENT RETRIEVAL, two generations, best-available-first:
+        # deep.py — a real multi-turn retriever with internal tools that
+        # assembles the missing package pieces (tests bodies, doc spans) as
+        # verbatim read-specs; closure.py — the facet critic fan-out — is
+        # the fallback when the deep lane yields nothing. Both run BEFORE
+        # the judge; additions are tagged and judge-protected.
         if closure and not docs:
-            from .retrieval.closure import close_surface
-            close_surface(st, task, res, model)
+            from .retrieval.deep import deep_retrieve
+            if deep_retrieve(st, Path(root), task, res, model) is None:
+                from .retrieval.closure import close_surface
+                close_surface(st, task, res, model)
         # the judge runs BEFORE the docs/tests closures so they read the
         # JUDGED surface (kept + set-aside), not the raw det order — on the
         # click aliases task Command.__init__ sat past det rank 12 but the
