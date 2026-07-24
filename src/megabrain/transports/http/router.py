@@ -8,6 +8,7 @@ arms and forgotten in others.
 from __future__ import annotations
 
 from .messages import Reply, Request, Route, error_reply
+from .routes.graph import graph_route
 from .routes.indexing import index_stream
 from .routes.meta import config, health, repos
 from .routes.query import get_route, search_route, symbols_route
@@ -20,6 +21,7 @@ ROUTES: dict[tuple[str, str], Route] = {
     ("GET", "/repos"): repos,
     ("GET", "/get"): get_route,
     ("GET", "/symbols"): symbols_route,
+    ("GET", "/graph"): graph_route,
     ("POST", "/search"): search_route,
     ("POST", "/index/stream"): index_stream,
 }

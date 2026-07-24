@@ -109,4 +109,4 @@ def test_every_command_is_reachable() -> None:
     from megabrain.transports.cli.main import build_parser
 
     actions = [a for a in build_parser()._actions if a.dest == "command"]
-    assert set(actions[0].choices) == {"index", "search", "get"}  # type: ignore[union-attr]
+    assert set(actions[0].choices) == {"index", "search", "get", "graph"}  # type: ignore[union-attr]

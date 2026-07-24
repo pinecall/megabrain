@@ -13,6 +13,14 @@ from __future__ import annotations
 from .bundle import AnchorHit, Bundle, FlowHit, Tier1File, Tier2File
 from .chunk import ChunkHit, ChunkRef, PrunedChunk, Span, SymbolRef
 from .file import FileView
+from .graph import (
+    Community,
+    GraphLink,
+    GraphMap,
+    GraphNode,
+    GraphPath,
+    Neighbourhood,
+)
 from .prune import NoiseSpan, PruneResult, RelatedDoc, RelatedTest
 from .repo import RepoEntry
 
@@ -25,6 +33,8 @@ __all__ = [
     "FileView",
     # the machine's indexed repositories
     "RepoEntry",
+    # the dependency graph
+    "GraphMap", "GraphNode", "GraphLink", "Community", "Neighbourhood", "GraphPath",
     # the flat projection
     "PruneResult", "NoiseSpan", "RelatedDoc", "RelatedTest",
 ]
