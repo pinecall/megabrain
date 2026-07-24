@@ -14,6 +14,7 @@ from .bundle import AnchorHit, Bundle, FlowHit, Tier1File, Tier2File
 from .chunk import ChunkHit, ChunkRef, PrunedChunk, Span, SymbolRef
 from .file import FileView
 from .prune import NoiseSpan, PruneResult, RelatedDoc, RelatedTest
+from .repo import RepoEntry
 
 __all__ = [
     # chunk level
@@ -22,6 +23,8 @@ __all__ = [
     "Bundle", "Tier1File", "Tier2File", "FlowHit", "AnchorHit",
     # one file, expanded
     "FileView",
+    # the machine's indexed repositories
+    "RepoEntry",
     # the flat projection
     "PruneResult", "NoiseSpan", "RelatedDoc", "RelatedTest",
 ]

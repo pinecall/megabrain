@@ -14,6 +14,7 @@ from ..indexing import index_repo
 from ..indexing._embed import Embeddable
 from ..indexing.strategies import Strategy
 from ..storage import Store
+from .repos import remember
 
 __all__ = ["build_index"]
 
@@ -30,10 +31,17 @@ def build_index(root: Path | str, *, embedder: Embeddable | None = None,
     project instead — the most expensive possible way to answer a typo.
     """
     path = Path(root).expanduser().resolve()
+    if not path.is_dir():
+        # A walk of a path that is not there yields nothing, so indexing a
+        # typo REPORTED SUCCESS: "0 files, 0 chunks", and created an empty
+        # index beside it. Every later query then answers nothing, correctly,
+        # about a repository nobody ever indexed.
+        raise NotADirectoryError(f"{path} is not a directory to index")
     report = index_repo(path, embedder=embedder, force=force, exclude=exclude,
                         strategies=strategies,
                         on_progress=on_progress)  # type: ignore[arg-type]
     _remember_name(path)
+    remember(path)          # so the studio and `repos` can find it
     return {**report, "repo": path.name, "root": str(path)}
 
 

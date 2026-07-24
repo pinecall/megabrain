@@ -15,6 +15,7 @@ from __future__ import annotations
 from ._root import resolve_root
 from .build import build_index
 from .get import get_code
+from .repos import known, remember
 from .search import search
 
-__all__ = ["resolve_root", "build_index", "search", "get_code"]
+__all__ = ["resolve_root", "build_index", "search", "get_code", "known", "remember"]

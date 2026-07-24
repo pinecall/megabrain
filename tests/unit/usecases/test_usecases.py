@@ -48,6 +48,14 @@ def test_searching_from_a_subdirectory_answers_for_the_whole_repo(repo: Path) ->
     assert bundle["tier1"], "nothing came back from a repo that has matches"
 
 
+def test_indexing_a_path_that_is_not_there_fails_loudly(tmp_path: Path) -> None:
+    """A walk of a missing path yields nothing, so this REPORTED SUCCESS —
+    "0 files, 0 chunks" — and left an empty index beside the typo. Every later
+    query then answered nothing, correctly, about a repo nobody indexed."""
+    with pytest.raises(NotADirectoryError, match="not a directory"):
+        build_index(tmp_path / "typo", embedder=CountingEmbedder())
+
+
 def test_the_report_says_what_the_pass_did(repo: Path) -> None:
     report = build_index(repo, embedder=CountingEmbedder())
     assert report["files"] == 3

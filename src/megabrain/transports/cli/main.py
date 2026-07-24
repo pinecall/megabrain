@@ -45,7 +45,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         output = args.run(args)
-    except MegabrainError as err:
+    except (MegabrainError, OSError) as err:
+        # OSError too: a path that does not exist or cannot be read is an
+        # ordinary mistake, and the person who made it wants one line, not a
+        # traceback through the standard library.
         print(f"megabrain: {err}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

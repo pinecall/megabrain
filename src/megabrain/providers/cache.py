@@ -21,13 +21,14 @@ from typing import Sequence
 import numpy as np
 
 from .._arrays import Vector
+from .._home import megabrain_home
 
 __all__ = ["EmbedCache", "split_cached", "remember"]
 
 
 class EmbedCache:
     def __init__(self, root: Path | None = None) -> None:
-        self.root = Path(root) if root else Path.home() / ".megabrain" / "embeddings"
+        self.root = Path(root) if root else megabrain_home() / "embeddings"
 
     def get(self, model: str, text: str) -> Vector | None:
         path = self._path(model, text)
