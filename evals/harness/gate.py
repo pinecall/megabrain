@@ -23,9 +23,15 @@ from typing import Callable, Sequence
 
 # The floors. bundle_full is the load-bearing one: fusion is a ranking opinion,
 # never a recall gate, so a bundle that LOST a file is a regression even when
-# it ranks better.
-MIN_R_AT_1 = 0.85
+# it ranks better. R@1 matches the documented bar exactly — two numbers that
+# disagree means one of them is lying.
+MIN_R_AT_1 = 0.86
 MIN_BUNDLE_FULL = 0.90
+# Deliberately far above the ~10ms warm figure: on a machine whose embedding
+# cache is cold, every query pays one real network round trip (~200ms
+# measured), and a gate that fails on cache temperature rather than on the
+# engine would get ignored. This ceiling catches an order-of-magnitude
+# regression; the warm number is tracked in commit messages, not gated here.
 MAX_P50_SECONDS = 1.0
 
 SearchFn = Callable[[Path, str], dict[str, object]]
@@ -100,8 +106,21 @@ def _report(hits: int, full: int, latencies: list[float], misses: list[str]) -> 
                   ordered[min(int(n * 0.9), n - 1)], tuple(misses))
 
 
+def resolve_search() -> SearchFn:
+    """The engine entry the gate drives — resolved in exactly ONE place.
+
+    Deferred (the harness is importable without the engine installed) and
+    shared: `main()` and the corpus-free smoke test both call THIS, so the
+    import the runner executes is the import the test exercises. It once lived
+    inline in `main()` pointing at a name its module never exported — every
+    ad-hoc parity run passed while the committed runner died on first import.
+    """
+    from megabrain.retrieval.search import search
+    return search
+
+
 def main() -> int:
-    from megabrain.retrieval.bundle import search  # noqa: PLC0415 — optional dep
+    search = resolve_search()
     repo = Path(os.environ["MEGABRAIN_GOLDEN_REPO"]).expanduser()
     cases = load_cases(Path(os.environ["MEGABRAIN_GOLDEN"]).expanduser(), "python", repo.name)
     report = run(search, repo, cases)
