@@ -35,7 +35,11 @@ log = logging.getLogger(__name__)
 MAX_TURNS = 5
 MAX_SPECS = 14          # specs the retriever may add to the package
 TOOL_FEED_CHARS = 3200  # per-turn tool-result feedback shown to the model
-MANIFEST_LINES = 70
+# The manifest must reflect what the implementer will ACTUALLY receive —
+# the render's head — not the raw pool. Showing all ~70 scored spans made
+# flash-lite answer `{"actions": [], "done": true}` on turn 1 every time
+# (the pool LOOKS complete; the rendered package is ~10 spans of it).
+MANIFEST_LINES = 12
 WALL_BUDGET_S = 45      # hard wall-clock cap for the whole loop
 
 _PROMPT = """You are megabrain's internal RETRIEVER. An implementation agent
@@ -54,6 +58,13 @@ Package so far (each line is already rendered verbatim to the implementer):
 Tool results from your previous turn:
 {feedback}
 
+A package is NOT complete until it contains, beyond the mechanism code:
+- the span of an EXISTING TEST FILE covering this mechanism (the implementer
+  copies its conventions — grep a distinctive identifier to find it, then
+  add the relevant span);
+- the doc section describing the feature, if the repo documents it;
+- nothing invented: `add` specs must come from tool results or the manifest.
+
 Reply ONLY one JSON object:
 {{"actions": [
    {{"tool": "grep", "pattern": "exact_string"}},
@@ -61,9 +72,9 @@ Reply ONLY one JSON object:
    {{"tool": "add", "specs": ["path#Symbol", "path:START-END"]}}
  ],
  "done": false}}
-`add` specs must come from tool results or the manifest — never invent
-paths. Set "done": true when the package suffices (actions may be empty).
-You have {turns} turn(s) left and may add {slots} more spec(s)."""
+Set "done": true ONLY when the checklist above is satisfied (actions may
+then be empty). You have {turns} turn(s) left and may add {slots} more
+spec(s)."""
 
 
 def _grep_feed(root, pattern: str) -> str:

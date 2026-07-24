@@ -5169,24 +5169,24 @@
    "chunks": [
     [
      "module",
-     "_grep_feed, _search_feed, _validate_specs, _manifest",
+     "_grep_feed, _search_feed",
      null,
      1,
-     121,
-     "megabrain > megabrain/retrieval/deep.py > [_grep_feed, _search_feed, _validate_specs, _manifest]",
-     "aae35a7ddf303cc228a7e049d2f69f08b3a34eed"
+     106,
+     "megabrain > megabrain/retrieval/deep.py > [_grep_feed, _search_feed]",
+     "399382c2487d8182b940736a3a599c6771a256b1"
     ],
     [
-     "function",
-     "deep_retrieve",
+     "module",
+     "_validate_specs, _manifest, deep_retrieve",
      null,
-     122,
-     188,
-     "megabrain > megabrain/retrieval/deep.py > def deep_retrieve(st, root, query: str, res: dict, model: str | None=None) -> dict | None",
-     "0d9eb885a1ad8d9d9c1873871d617bf705208327"
+     107,
+     199,
+     "megabrain > megabrain/retrieval/deep.py > [_validate_specs, _manifest, deep_retrieve]",
+     "b0bca3a1e8ca3111b16e1aa3447da49e63d825a0"
     ]
    ],
-   "skeleton_sha": "982e299893c606097d9cdf646abd7ba4abe8fc1b",
+   "skeleton_sha": "2e9f73ec1e9109ea85ffac2dffbc233339ad4e02",
    "symbols": [
     [
      "log",
@@ -5219,57 +5219,57 @@
     [
      "MANIFEST_LINES",
      "constant",
-     38,
-     38,
-     "MANIFEST_LINES = 70"
+     42,
+     42,
+     "MANIFEST_LINES = 12"
     ],
     [
      "WALL_BUDGET_S",
      "constant",
-     39,
-     39,
+     43,
+     43,
      "WALL_BUDGET_S = 45"
     ],
     [
      "_PROMPT",
      "constant",
-     41,
-     66,
+     45,
+     77,
      "_PROMPT = 'You are megabrain\\'s internal RETRIEVER. An implementation agent\\nwill receive ONLY the package you assemble "
     ],
     [
      "_grep_feed",
      "function",
-     69,
-     81,
+     80,
+     92,
      "def _grep_feed(root, pattern: str) -> str"
     ],
     [
      "_search_feed",
      "function",
-     84,
      95,
+     106,
      "def _search_feed(st, query: str) -> str"
     ],
     [
      "_validate_specs",
      "function",
-     98,
-     111,
+     109,
+     122,
      "def _validate_specs(root, specs: list) -> list[str]"
     ],
     [
      "_manifest",
      "function",
-     114,
-     121,
+     125,
+     132,
      "def _manifest(res: dict, specs: list[str]) -> str"
     ],
     [
      "deep_retrieve",
      "function",
-     124,
-     188,
+     135,
+     199,
      "def deep_retrieve(st, root, query: str, res: dict, model: str | None=None) -> dict | None"
     ]
    ]
@@ -6017,27 +6017,27 @@
      "render_pruned",
      "1/3",
      158,
-     216,
+     228,
      "megabrain > megabrain/retrieval/render.py > def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str",
-     "3f9de15a6ecc2465453be671e9cf3e7274782272"
+     "ac7cc4adfe6aabe9416566abfbfc798d6b93caf2"
     ],
     [
      "block",
      "render_pruned",
      "2/3",
-     217,
-     327,
+     229,
+     335,
      "megabrain > megabrain/retrieval/render.py > def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str",
-     "27e157bbd398e53db8cfde7431c3b64a0a306d2e"
+     "7f613d0ef280268efe7b6cbd9197a66f273531b4"
     ],
     [
      "block",
      "render_pruned",
      "3/3",
-     328,
-     366,
+     336,
+     378,
      "megabrain > megabrain/retrieval/render.py > def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str",
-     "516d24724eccee7b3aab7da9863dcb46fe979977"
+     "b23c08907ba02d386a43338e1848c2da204d91c6"
     ]
    ],
    "skeleton_sha": "986680cc7cef720fe2cf2ee56ae154767079a892",
@@ -6095,7 +6095,7 @@
      "render_pruned",
      "function",
      160,
-     366,
+     378,
      "def render_pruned(res: dict, with_text: bool=True, budget: int | None=None, seen_ids: set | None=None) -> str"
     ]
    ]

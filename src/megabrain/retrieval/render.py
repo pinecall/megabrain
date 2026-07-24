@@ -213,6 +213,18 @@ def render_pruned(res: dict, with_text: bool = True,
                  "constructor/serialization sites, tests, doc sections) "
                  "GENEROUSLY in a single call; oversized batches auto-split.\n")
     spent = 0
+    # BUDGET PRIORITY BY PROVENANCE: what the internal retriever fought to
+    # add outranks the pool's near-tie TAIL. Field case (click#3652 duel):
+    # deep chose tests/test_options.py:1-150 — exactly what the agent needed
+    # next — and 8 near-tie core.py chunks ate the whole budget first, so
+    # the ONE deep spec rendered as a pointer and the agent burned outer
+    # turns re-fetching it. Reserve the deep blocks' cost up front (capped);
+    # the main loop spends what remains, pointering tail chunks instead.
+    deep_reserved = 0
+    if with_text and res.get("deep"):
+        deep_cost = sum(sum(len(ln) + 1 for ln in t["lines"])
+                        for t in res["deep"].get("blocks") or [])
+        deep_reserved = min(deep_cost, budget // 3)
     omitted = 0
     for rank, c in enumerate(res["chunks"], 1):
         label = c["name"] or c["kind"]
@@ -238,7 +250,7 @@ def render_pruned(res: dict, with_text: bool = True,
         if text:
             lines = text.rstrip("\n").splitlines()
             body = "\n".join(lines)
-            remaining = budget - spent
+            remaining = budget - deep_reserved - spent
             # true line numbers per line (same `N→` gutter as megabrain_read),
             # so a search result feeds megabrain_replace directly: the reader
             # sees exactly where each line lives, and the `→` marks the prefix
