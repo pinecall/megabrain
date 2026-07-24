@@ -37,7 +37,9 @@ def request_with_retry(transport: Transport, url: str, body: bytes, *,
             break
         seen = outcome.headers if isinstance(outcome, Response) else {}
         time.sleep(policy.delay(Attempt(number=number, headers=seen)))
-    raise _error(url, last)
+    # `from` keeps the causes chain: a wrapped failure stays diagnosable, and
+    # anything upstream that classifies by walking __cause__ still can.
+    raise _error(url, last) from (last if isinstance(last, BaseException) else None)
 
 
 def _attempt(transport: Transport, url: str, body: bytes,

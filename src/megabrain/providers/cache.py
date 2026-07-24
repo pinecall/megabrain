@@ -32,9 +32,19 @@ class EmbedCache:
     def get(self, model: str, text: str) -> Vector | None:
         path = self._path(model, text)
         try:
-            return np.frombuffer(path.read_bytes(), dtype=np.float32)  # pyright: ignore[reportUnknownMemberType]
-        except (OSError, ValueError):
-            return None       # absent or truncated — both mean "embed it again"
+            data = path.read_bytes()
+        except OSError:
+            return None                       # absent — embed it again
+        if not data or len(data) % 4:
+            # Rename is atomic but nothing fsyncs: after power loss the renamed
+            # file can legally hold zero or partial bytes. Zero is divisible by
+            # four, so a length check alone served it as a HIT with an empty
+            # vector — failing far away at matrix-stack time, or scoring as
+            # nothing. A corrupt entry is a miss, and it is unlinked so it is
+            # re-embedded once rather than retried forever.
+            path.unlink(missing_ok=True)
+            return None
+        return np.frombuffer(data, dtype=np.float32)  # pyright: ignore[reportUnknownMemberType]
 
     def put(self, model: str, text: str, vector: Vector) -> None:
         """Write atomically: rename is atomic on POSIX, so a reader never sees

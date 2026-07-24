@@ -73,7 +73,12 @@ class RetryPolicy:
         """
         asked = _retry_after(attempt.headers)
         if asked is not None and 0 < asked <= self.max_honoured_retry_after:
-            return min(asked, self.max_delay)
+            # Obeyed, NOT clamped by the backoff ceiling: a server saying
+            # "come back in 30s" that is hit again at 8s is guaranteed another
+            # 429. The honouring ceiling above exists precisely so values past
+            # the backoff cap can still be obeyed — clamping made it
+            # unreachable.
+            return asked
         # The exponent is capped independently of max_retries so a caller
         # passing a very large number cannot overflow the power.
         base = self.initial_delay * 2.0 ** min(attempt.number, 16)
