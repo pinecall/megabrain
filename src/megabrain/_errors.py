@@ -6,9 +6,10 @@ translates the TYPE in exactly one catch site: the CLI prints one line and
 exits 2, HTTP maps to a status without leaking internals, MCP returns
 `error (<code>)` with isError.
 
-Back-compat by construction: each subclass ALSO inherits the builtin it
-replaced, so a 1.x caller's `except ValueError` / `except RuntimeError` keeps
-working across the 2.0 boundary — the same trick as json.JSONDecodeError.
+Back-compat by construction: each subclass ALSO inherits the builtin a caller
+would plausibly have been catching before the typed error existed, so an
+`except ValueError` / `except RuntimeError` in the wild keeps working across a
+major boundary — the same trick as json.JSONDecodeError(ValueError).
 """
 
 from __future__ import annotations

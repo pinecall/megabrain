@@ -1,17 +1,15 @@
 """The retrieval gate — hard rule #2, made runnable by anyone who has a corpus.
 
-v2 kept this logic in `tests/test_engine_golden.py`, which is **gitignored**:
-the engine's most important rule ("completeness beats ordering; never merge a
-change that lowers bundle_full") lived in a file the repo did not contain, so
-it ran only when a human remembered. The runner is versioned here; only the
-private corpus stays out.
+The corpus this scores against is private, but the RUNNER is not: a gate that
+lives outside the repository runs only when a human remembers, and the rule it
+protects ("completeness beats ordering; never merge a change that lowers
+bundle_full") is the one that most needs to be automatic.
 
-    MEGABRAIN_GOLDEN=~/megabrain-v2/evals/golden.json \
-    MEGABRAIN_GOLDEN_REPO=~/pinecall/sdk-server \
+    MEGABRAIN_GOLDEN=/path/to/golden.json \
+    MEGABRAIN_GOLDEN_REPO=/path/to/corpus \
         python -m evals.harness.gate
 
-Measured on v2 @ 409c38f (the parity bar for the v3 rewrite):
-    R@1 = 0.91 · bundle_full = 1.00 · p50 = 13 ms · p90 = 14 ms
+The bar to hold: R@1 = 0.91 · bundle_full = 1.00 · p50 = 13 ms · p90 = 14 ms.
 """
 
 from __future__ import annotations

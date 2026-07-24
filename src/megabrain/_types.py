@@ -8,9 +8,9 @@ caller said nothing":
     search(root, q, path_filter=None)    # explicitly repo-wide
     search(root, q)                      # whatever the caller's config says
 
-v2 had 80 `X | None = None` parameters and a hand-rolled tri-state parser
-(`app.normalize_agents`: None | "auto" | bool). That function WAS a NotGiven
-written by hand; this is the real one.
+Without a sentinel the middle case is unreachable, and the usual workaround —
+a magic string like "auto", or a tri-state parsed per call site — spreads the
+same decision across every frontend and drifts.
 """
 
 from __future__ import annotations
@@ -85,10 +85,10 @@ def is_given(value: _T | NotGiven | Omit) -> TypeGuard[_T]:
 
 
 # Search is CODE or DOCS, never a blend: with both indexed, a big README wins
-# on prose-shaped questions and buries the implementation (v2 field case —
-# sinatra's README took CORE from lib/sinatra/base.rb the moment docs entered
-# its index). One Literal beats the `exclude_docs`/`only_docs` bool pair that
-# could express the meaningless "neither".
+# on prose-shaped questions and buries the implementation it describes (field
+# case: a framework's README took the whole CORE tier from lib/base.rb the
+# moment docs entered its index). One Literal beats an `exclude_docs` /
+# `only_docs` bool pair, which can also express the meaningless "neither".
 Content: TypeAlias = Literal["code", "docs"]
 
 JSON: TypeAlias = "str | int | float | bool | None | list[JSON] | dict[str, JSON]"

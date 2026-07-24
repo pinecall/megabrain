@@ -4,7 +4,8 @@ The load-bearing case is `delete_file`. Re-indexing a file drops its OUTGOING
 edges (they are rebuilt from the new source) but must KEEP its incoming ones:
 the importers' A->B edges are still true, and deleting them silently destroyed
 every edge whose source file happened to be processed before its destination in
-the same pass. v2 carries that scar as a comment; here it is a test.
+the same pass. That failure is silent — the index still answers, just with
+half its graph — so it is pinned here rather than described in a comment.
 """
 
 from __future__ import annotations

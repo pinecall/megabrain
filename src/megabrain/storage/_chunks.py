@@ -16,8 +16,9 @@ from .model import ChunkMeta
 
 __all__ = ["ChunkTable"]
 
-# The column order lives in exactly one file: this one. v2 spelled it out at
-# both the insert and the load site and kept the two in sync by hand.
+# The column order lives in exactly one file: this one. Spelled out at both the
+# insert and the load site it has to be kept in sync by hand, and the failure
+# is silent — every field shifts one column left.
 _COLS = "file,kind,name,part,start_line,end_line,text,breadcrumb,vec"
 _READ = f"id,{_COLS}"
 

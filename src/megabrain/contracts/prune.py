@@ -29,8 +29,8 @@ class NoiseSpan(Span):
 
 class RelatedDoc(Span, total=False):
     """A doc span the same query matched. Carries the SPAN, not just the file:
-    a bare filename makes the agent read the whole document (v2 field run —
-    426 lines of commands-and-groups.md fetched for an ~80-line section)."""
+    a bare filename makes the agent read the whole document (field run: 426
+    lines of a guide fetched to reach an ~80-line section)."""
 
     changelog: bool               # a fixed edit target, pinned deterministically
 

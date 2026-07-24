@@ -1,15 +1,15 @@
 """The retrieval bundle — the engine's central artifact.
 
-v2 returned this as a bare `dict`, and `render`, `ask`, MCP, HTTP and the
-studio each rediscovered its shape by reading the producer (88 functions
-returned `-> dict`; none said what was inside).
+Six readers consume this — `render`, `ask`, the CLI, MCP, HTTP and the studio —
+so it is declared once here rather than rediscovered by reading the producer.
 
-TypedDict on purpose — not a dataclass, not pydantic: at runtime these ARE
-dicts, so every existing consumer (`res["chunks"]`, the JSON on the wire, the
-studio's fetch) keeps working and the engine gains no dependency.
+TypedDict on purpose, not a dataclass and not pydantic: at runtime these ARE
+dicts, so a consumer writes `res["chunks"]`, the wire format is the same object
+serialised, and the engine gains no dependency.
 
-Every field was verified against payloads v2 actually produced
-(tests/fixtures/parity/), never against what its code looked like it returned.
+Every field is verified against real captured payloads (tests/fixtures/parity/)
+rather than against what the producing code looks like it returns — the two
+disagree more often than anyone expects.
 
 ⚠️ Optionality uses the `total=False` SPLIT, never `NotRequired`. Under
 `from __future__ import annotations` every annotation is a string, so TypedDict

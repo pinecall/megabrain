@@ -1,7 +1,7 @@
 """The hard rules, executable.
 
-v2 stated these in ARCHITECTURE.md and enforced them with discipline; three of
-them are structural here. A violation is a failing test, not a review comment.
+Each of these is stated in ARCHITECTURE.md, and prose alone is enforced by
+whoever happens to review the diff. Here a violation is a failing test.
 """
 
 from __future__ import annotations
@@ -25,8 +25,9 @@ def test_the_walker_actually_sees_the_package() -> None:
 def test_retrieval_never_imports_an_llm() -> None:
     """HARD RULE #1 — no LLM in the retrieval path.
 
-    v2 kept rerank/deep/closure/mapcard INSIDE `retrieval/`, so the rule lived
-    only in prose. Here the LLM lanes are `enrich/` and this test is the fence.
+    LLM pruning was tested four ways and every variant cost completeness or
+    added seconds for no recall gain. The deterministic floor is the product,
+    so the LLM lanes live in `enrich/` and this test is the fence between them.
     """
     modules = modules_under("retrieval")
     if not modules:
@@ -40,8 +41,9 @@ def test_retrieval_never_imports_an_llm() -> None:
 
 
 def test_sql_lives_only_in_storage() -> None:
-    """v2's `app.prune()` ran raw SQL 100 lines above a docstring promising it
-    never would. The Store is the sole owner of the schema."""
+    """The Store is the sole owner of the schema. A query anywhere else is a
+    second place that knows the column order, and it is always the one nobody
+    updates when the schema moves."""
     for module in modules_under(""):
         if module.startswith("megabrain.storage"):
             continue
@@ -72,8 +74,8 @@ def test_no_multiple_inheritance_between_project_classes() -> None:
     scoring lanes already work.
 
     Mixing ONE project class with builtins stays legal, because that is the
-    deliberate back-compat trick in _errors.py: `IndexNotFound(MegabrainError,
-    ValueError)` keeps a 1.x `except ValueError` caller working.
+    deliberate trick in _errors.py: `IndexNotFound(MegabrainError, ValueError)`
+    keeps an `except ValueError` caller in the wild working.
 
     TypedDicts and Protocols are exempt: they are data and contracts, and
     `class X(Base, total=False)` is the only PEP 563-safe way to spell an

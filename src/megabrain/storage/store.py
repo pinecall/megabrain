@@ -1,13 +1,13 @@
 """The index: one SQLite file per repo, and the ONLY package that writes SQL.
 
-`tests/architecture` enforces that — v2's `app.prune()` ran a raw query 100
-lines above a docstring promising the frontend never would.
+`tests/architecture` enforces that. A query written anywhere else is a second
+place that knows the schema, and it is always the one nobody updates.
 
 `Store` owns the connection and the schema; each table is its own object
-(`store.files`, `store.chunks`, `store.symbols`, `store.graph`). v2 exposed
-eighteen flat methods here, which meant adding a column touched a facade that
-knew about every table. Sub-objects put each table's knowledge in one module
-and leave this file with nothing to know but the connection.
+(`store.files`, `store.chunks`, `store.symbols`, `store.graph`). Flat methods
+here would make this file know about every table, so adding a column would
+touch both the table module and the facade. This way it knows only the
+connection.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ class Store:
         self.close()
 
     def stats(self) -> dict[str, int]:
-        """Index shape counts. Lives here, not in a frontend, so no caller ever
-        needs to know the table names to report on the index."""
+        """Index shape counts — here, not in a frontend, so no caller needs to
+        know a table name in order to report on the index."""
         return {name: int(self.db.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0])
                 for name in ("files", "chunks", "symbols", "edges")}

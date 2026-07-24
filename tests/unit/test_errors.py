@@ -1,8 +1,9 @@
 """The error taxonomy: every failure carries a machine code and an HTTP status.
 
-The dual-inheritance trick is load-bearing and inherited from v2: each subclass
-also inherits the builtin it replaced, so pre-existing `except ValueError` /
-`except RuntimeError` callers keep working across the 1.x -> 2.0 boundary.
+The dual-inheritance trick is load-bearing: each subclass also inherits the
+builtin a caller would plausibly have been catching before the typed error
+existed, so `except ValueError` / `except RuntimeError` in the wild keeps
+working across a major boundary.
 """
 
 from __future__ import annotations
@@ -44,7 +45,7 @@ def test_codes_are_unique() -> None:
      (UnknownTool, ValueError)],
 )
 def test_back_compat_inheritance(cls: type[Exception], builtin: type[Exception]) -> None:
-    """A 1.x caller catching the builtin must still catch us."""
+    """A caller catching the builtin must still catch us."""
     assert issubclass(cls, builtin)
 
 

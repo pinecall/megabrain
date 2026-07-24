@@ -6,8 +6,8 @@ skip, because it reads as evidence.
 
 Point it at the corpus and it runs:
 
-    MEGABRAIN_GOLDEN=~/megabrain-v2/evals/golden.json \
-    MEGABRAIN_GOLDEN_REPO=~/pinecall/sdk-server pytest tests/golden
+    MEGABRAIN_GOLDEN=/path/to/golden.json \
+    MEGABRAIN_GOLDEN_REPO=/path/to/corpus pytest tests/golden
 """
 
 from __future__ import annotations
@@ -46,9 +46,10 @@ def test_a_perfect_run_passes() -> None:
 
 
 @needs_corpus
-def test_engine_meets_the_parity_bar() -> None:
-    """v2 @ 409c38f measured R@1 0.91 · bundle_full 1.00 · p50 13ms.
-    v3 must match before any algorithm work begins (plan phase 17)."""
+def test_engine_meets_the_bar() -> None:
+    """R@1 0.91 · bundle_full 1.00 · p50 13ms. Algorithm work starts only once
+    this is green: retuning and refactoring at the same time makes a regression
+    unattributable."""
     from megabrain.retrieval.bundle import search
 
     repo = Path(REPO or "").expanduser()

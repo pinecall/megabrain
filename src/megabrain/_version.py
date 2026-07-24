@@ -1,7 +1,8 @@
-"""The version, in exactly one place.
+"""The version, in exactly one place — `pyproject.toml` reads it from here.
 
-v2 shipped 1.0.0. v3 breaks public contracts, so the next release is 2.0.0.
-PyPI versions are permanent and monotonic — this number only ever goes up.
+PyPI versions are permanent and monotonic: this number only ever goes up, and
+a release that breaks a public contract (CLI, MCP, HTTP, the Python API) takes
+the major.
 """
 
 __title__ = "megabrain"

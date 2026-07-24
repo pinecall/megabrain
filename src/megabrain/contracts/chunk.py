@@ -1,7 +1,7 @@
 """Chunk-level payloads: what a located piece of code looks like on the wire.
 
-Two distinctions here are load-bearing, and both were discovered by checking
-real v2 output rather than reading its source:
+Two distinctions here are load-bearing, and both come from checking real
+payloads rather than reading the producing code:
 
 `ChunkRef` vs `ChunkHit` — a tier-2 `best_chunk` carries NO score (the FILE was
 ranked, not that span); a tier-1 chunk does (it was ranked among its siblings).

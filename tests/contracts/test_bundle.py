@@ -1,12 +1,13 @@
-"""The bundle contract, checked against payloads v2 actually produced.
+"""The bundle contract, checked against payloads the engine really produced.
 
-The fixtures in tests/fixtures/parity/ were captured by running v2:
+The fixtures in tests/fixtures/parity/ are captured output:
 
     megabrain search . "<q>" --json          -> search_bundle.json
     megabrain search . "<q>" --prune --json  -> prune_bundle.json
 
-so these tests fail if the contract describes something v2 never emitted, or
-omits a key it did. That is how the optional keys nobody documented get found.
+so these fail if the contract describes a shape nothing emits, or omits a key
+something does. A contract written from the producing code instead would just
+inherit its author's assumptions.
 """
 
 from __future__ import annotations
@@ -26,11 +27,11 @@ def _load(name: str) -> dict[str, object]:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
-def test_search_bundle_matches_v2() -> None:
+def test_search_bundle_matches_the_contract() -> None:
     assert_shape(_load("search_bundle.json"), Bundle)
 
 
-def test_prune_result_matches_v2() -> None:
+def test_prune_result_matches_the_contract() -> None:
     assert_shape(_load("prune_bundle.json"), PruneResult)
 
 
