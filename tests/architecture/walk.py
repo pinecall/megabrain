@@ -55,6 +55,32 @@ def _resolve(node: ast.ImportFrom, pkg: str) -> str:
     return f"{root}.{node.module}" if node.module else root
 
 
+def classes_of(module: str) -> list[tuple[str, list[str]]]:
+    """`(class_name, base_names)` for every class, TypedDicts excluded.
+
+    TypedDicts are data, not behaviour: `class X(Base, total=False)` is the only
+    PEP 563-safe way to declare an optional field, so they are exempt from the
+    shallow-hierarchy rule.
+    """
+    out: list[tuple[str, list[str]]] = []
+    for node in ast.walk(_tree(module)):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        bases = [_base_name(b) for b in node.bases]
+        if "TypedDict" in bases or "Protocol" in bases:
+            continue
+        out.append((node.name, [b for b in bases if b]))
+    return out
+
+
+def _base_name(node: ast.expr) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return ""
+
+
 def long_functions(module: str, limit: int) -> list[str]:
     """`name:lines` for every function whose body exceeds `limit` lines.
 

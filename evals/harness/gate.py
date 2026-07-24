@@ -1,0 +1,117 @@
+"""The retrieval gate — hard rule #2, made runnable by anyone who has a corpus.
+
+v2 kept this logic in `tests/test_engine_golden.py`, which is **gitignored**:
+the engine's most important rule ("completeness beats ordering; never merge a
+change that lowers bundle_full") lived in a file the repo did not contain, so
+it ran only when a human remembered. The runner is versioned here; only the
+private corpus stays out.
+
+    MEGABRAIN_GOLDEN=~/megabrain-v2/evals/golden.json \
+    MEGABRAIN_GOLDEN_REPO=~/pinecall/sdk-server \
+        python -m evals.harness.gate
+
+Measured on v2 @ 409c38f (the parity bar for the v3 rewrite):
+    R@1 = 0.91 · bundle_full = 1.00 · p50 = 13 ms · p90 = 14 ms
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Sequence
+
+# The floors. bundle_full is the load-bearing one: fusion is a ranking opinion,
+# never a recall gate, so a bundle that LOST a file is a regression even when
+# it ranks better.
+MIN_R_AT_1 = 0.85
+MIN_BUNDLE_FULL = 0.90
+MAX_P50_SECONDS = 1.0
+
+SearchFn = Callable[[Path, str], dict[str, object]]
+
+
+@dataclass(frozen=True, slots=True)
+class Case:
+    id: str
+    query: str
+    expected: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Report:
+    r_at_1: float
+    bundle_full: float
+    p50: float
+    p90: float
+    misses: tuple[str, ...]
+
+    def passed(self) -> bool:
+        return (self.r_at_1 >= MIN_R_AT_1 and self.bundle_full >= MIN_BUNDLE_FULL
+                and self.p50 < MAX_P50_SECONDS)
+
+    def line(self) -> str:
+        return (f"R@1={self.r_at_1:.2f} bundle_full={self.bundle_full:.2f} "
+                f"p50={self.p50 * 1000:.0f}ms p90={self.p90 * 1000:.0f}ms")
+
+
+def load_cases(golden: Path, scope: str, repo_name: str) -> list[Case]:
+    """Golden queries for one scope, expected paths normalised to repo-relative."""
+    raw = json.loads(golden.read_text(encoding="utf-8"))["queries"]
+    marker = f"{repo_name}/"
+    return [
+        Case(q["id"], q["query"],
+             tuple(f.split(marker)[-1] for f in q["expected_files"]))
+        for q in raw if q["scope"] == scope
+    ]
+
+
+def run(search: SearchFn, repo: Path, cases: Sequence[Case]) -> Report:
+    """Score `search` against the golden cases. Pure: no printing, no asserts."""
+    hits = full = 0
+    latencies: list[float] = []
+    misses: list[str] = []
+    for case in cases:
+        t0 = time.perf_counter()
+        bundle = _files_of(search(repo, case.query))
+        latencies.append(time.perf_counter() - t0)
+        top1 = bool(bundle) and bundle[0] in case.expected
+        complete = all(f in bundle for f in case.expected)
+        hits += top1
+        full += complete
+        if not (top1 and complete):
+            lost = [f for f in case.expected if f not in bundle]
+            misses.append(f"{case.id}: top1={bundle[0] if bundle else '-'} lost={lost}")
+    return _report(hits, full, latencies, misses)
+
+
+def _files_of(result: dict[str, object]) -> list[str]:
+    tiers: list[str] = []
+    for key in ("tier1", "tier2"):
+        for entry in result.get(key, []):        # type: ignore[union-attr]
+            tiers.append(entry["file"])
+    return tiers
+
+
+def _report(hits: int, full: int, latencies: list[float], misses: list[str]) -> Report:
+    n = len(latencies) or 1
+    ordered = sorted(latencies) or [0.0]
+    return Report(hits / n, full / n, ordered[n // 2],
+                  ordered[min(int(n * 0.9), n - 1)], tuple(misses))
+
+
+def main() -> int:
+    from megabrain.retrieval.bundle import search       # noqa: PLC0415 — optional dep
+    repo = Path(os.environ["MEGABRAIN_GOLDEN_REPO"]).expanduser()
+    cases = load_cases(Path(os.environ["MEGABRAIN_GOLDEN"]).expanduser(), "python", repo.name)
+    report = run(search, repo, cases)
+    print(report.line())
+    for miss in report.misses:
+        print("  ", miss)
+    return 0 if report.passed() else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

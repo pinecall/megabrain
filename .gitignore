@@ -24,7 +24,7 @@ evals/swebench/wt_ask/
 evals/swebench/out/
 
 # benchmarks / evals — kept local, never committed
-evals/
+
 
 # examples live in their own repo now (~/megabrain-examples)
 examples/
@@ -35,3 +35,8 @@ examples/
 # local working notes, not for public history
 REFACTOR.md
 NEXT.md
+
+# the golden HARNESS is versioned (evals/harness/); only the private corpus is not
+evals/golden.json
+evals/private/
+evals/swebench/

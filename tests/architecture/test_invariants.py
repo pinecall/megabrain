@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from tests.architecture.walk import imports_of, modules_under, source_of
+from tests.architecture.walk import classes_of, imports_of, modules_under, source_of
 
 MAX_FILE_LINES = 100
 MAX_FUNC_LINES = 30
+
+_CLASS_NAMES = {name for m in modules_under("") for name, _ in classes_of(m)}
 
 
 def test_the_walker_actually_sees_the_package() -> None:
@@ -55,6 +57,32 @@ def test_the_engine_is_sync() -> None:
         if module.startswith("megabrain.transports.http"):
             continue
         assert "asyncio.run(" not in source_of(module), f"{module} runs an event loop"
+
+
+def test_no_multiple_inheritance_between_project_classes() -> None:
+    """Composition over inheritance, enforced where it actually bites.
+
+    pyright's `reportImplicitOverride` is off (`@override` needs
+    typing_extensions on 3.10/3.11 and this package ships three runtime
+    dependencies on purpose — see pyproject). The mitigation is structural: the
+    bug `@override` guards is a method silently overriding, or failing to
+    override, something its author did not have in mind — and that hides in MRO
+    surprises, which need two project bases to exist. Extension here happens
+    through Protocols and registries instead, which is how the chunkers and the
+    scoring lanes already work.
+
+    Mixing ONE project class with builtins stays legal, because that is the
+    deliberate back-compat trick in _errors.py: `IndexNotFound(MegabrainError,
+    ValueError)` keeps a 1.x `except ValueError` caller working.
+
+    TypedDicts and Protocols are exempt: they are data and contracts, and
+    `class X(Base, total=False)` is the only PEP 563-safe way to spell an
+    optional field (contracts/bundle.py).
+    """
+    for module in modules_under(""):
+        for cls, bases in classes_of(module):
+            project = [b for b in bases if b in _CLASS_NAMES]
+            assert len(project) <= 1, f"{module}.{cls} inherits from {project}"
 
 
 @pytest.mark.parametrize("module", list(modules_under("")))
