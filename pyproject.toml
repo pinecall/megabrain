@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "megabrain"
-dynamic = ["version"]                       # single-sourced from megabrain/__init__.py
+dynamic = ["version"]                       # single-sourced from _version.py
 description = "Local code-intelligence engine: one call returns all the code related to a question, explained with the real code spliced in."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,8 @@ authors = [{ name = "Bernardo Castro", email = "me@bernardocastro.dev" }]
 keywords = ["code-intelligence", "retrieval", "rag", "embeddings", "code-search",
             "mcp", "ast", "tree-sitter", "developer-tools"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
+    "Typing :: Typed",                      # advertises py.typed on PyPI
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -22,11 +23,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries",
-    "Topic :: Software Development :: Documentation",
 ]
-# Always-on languages (Python via stdlib ast; TS/JS via tree-sitter) + markdown,
-# retrieval, the MCP server and serve-api all run on this base. urllib (stdlib)
-# talks to any OpenAI-compatible endpoint (OpenRouter/local) — no SDK dependency.
+# Three deps, deliberately. urllib (stdlib) talks to any OpenAI-compatible
+# endpoint — no SDK dependency. That thinness is a product feature.
 dependencies = [
     "numpy>=1.24",
     "tree_sitter>=0.21",
@@ -34,20 +33,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Extra code languages — activate when their grammar is installed.
 languages = ["tree_sitter_ruby>=0.23", "tree_sitter_go>=0.23",
              "tree_sitter_rust>=0.23", "tree_sitter_php>=0.23"]
-# Claude chat provider for ask/--best (MEGABRAIN_CHAT_PROVIDER=claude):
-# Claude Code subscription credits or ANTHROPIC_API_KEY, via the Agent SDK.
 claude = ["claude-agent-sdk>=0.1.0"]
 
 [project.scripts]
-megabrain = "megabrain.server.cli:main"
+megabrain = "megabrain.transports.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/bernatch22/megabrain"
 Repository = "https://github.com/bernatch22/megabrain"
-Issues = "https://github.com/bernatch22/megabrain/issues"
 Changelog = "https://github.com/bernatch22/megabrain/blob/master/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
@@ -55,27 +50,57 @@ where = ["src"]
 include = ["megabrain*"]
 
 [tool.setuptools.package-data]
-megabrain = ["py.typed", "server/ui/*", "server/ui/icons/*"]
+megabrain = ["py.typed", "transports/http/ui/*", "transports/http/ui/icons/*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "megabrain._version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --tb=short"
+xfail_strict = true            # an xfail that passes is a FAILURE
+filterwarnings = ["error"]     # a new deprecation fails the suite that day
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B"]
-# E501: prompts/tables/URLs legitimately run long; B905: zip(strict=) would be
-# a behavior change on the tuned retrieval path — revisit deliberately.
+select = ["E", "F", "W", "I", "B", "ARG", "TID251", "FA102", "T201"]
 ignore = ["E501", "B905"]
 
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E402"]   # tests insert the repo root on sys.path before importing
-# examples/forged/* is VERBATIM LLM output kept as an authentic artifact —
-# don't lint the model's import order / unused-import style.
-"examples/forged/*" = ["I001", "F401", "E741", "B007"]
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"functools.lru_cache".msg = "Use megabrain._utils.cache — the stdlib one drops type information"
 
-[tool.setuptools.dynamic]
-version = { attr = "megabrain.__version__" }
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402", "T201"]
+"scripts/*" = ["T201"]
+
+[tool.mypy]
+python_version = "3.10"
+strict_equality = true
+warn_unreachable = true
+warn_return_any = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_unused_ignores = false     # off: would fight pyright's ignores
+warn_redundant_casts = false    # idem
+files = ["src/megabrain"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.10"          # the OLDEST supported, not the newest
+include = ["src/megabrain"]
+reportImportCycles = false      # lazy imports make this noisy
+reportPrivateUsage = false
+# reportImplicitOverride would be ON (it catches real hierarchy bugs), but
+# `@override` needs typing_extensions on Python 3.10/3.11 and this package
+# ships exactly three runtime dependencies on purpose. A `sys.version_info`
+# shim does not help: pyright resolves it against `pythonVersion = 3.10` and
+# takes the no-op branch. The mitigation is architectural — this engine is
+# composition-first (Protocols + registries, shallow hierarchies), so the
+# rule's value here is low. Revisit if typing_extensions ever lands as a dep.
+reportImplicitOverride = false

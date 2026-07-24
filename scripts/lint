@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Every static gate, in one command. CI runs THIS, not inline steps.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "==> ruff"
+ruff check .
+
+echo "==> mypy"
+mypy
+
+echo "==> pyright"
+pyright
+
+echo "==> architecture invariants"
+python -m pytest tests/architecture -q
+
+echo "all gates green"

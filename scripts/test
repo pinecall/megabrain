@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The full OFFLINE suite — no key, no network. Exactly what CI runs.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec python -m pytest "$@"
