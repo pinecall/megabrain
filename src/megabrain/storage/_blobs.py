@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from .._types import Matrix, Vector
+from .._arrays import Matrix, Vector
 
 __all__ = ["to_blob", "to_matrix"]
 

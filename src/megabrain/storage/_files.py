@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from .._types import Matrix, Vector
+from .._arrays import Matrix, Vector
 from ._blobs import to_blob, to_matrix
 
 __all__ = ["FileTable"]

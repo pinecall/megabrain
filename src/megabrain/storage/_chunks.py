@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any, Sequence
 
-from .._types import Matrix
+from .._arrays import Matrix
 from ..chunkers.model import Chunk
 from ._blobs import to_blob, to_matrix
 from .model import ChunkMeta

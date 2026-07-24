@@ -15,21 +15,13 @@ same decision across every frontend and drifts.
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias, TypeGuard, TypeVar
-
-import numpy as np
-import numpy.typing as npt
+from typing import Literal, TypeAlias, TypeGuard, TypeVar, cast
 
 __all__ = ["NotGiven", "not_given", "NOT_GIVEN", "Omit", "omit", "is_given",
-           "Content", "JSON", "Vector", "Matrix"]
-
-# Embeddings are float32 end to end: that is what the store writes and what the
-# scoring lanes multiply. Naming the dtype (rather than a bare `np.ndarray`)
-# keeps a float64 array from silently doubling the matrix at load time.
-Vector: TypeAlias = npt.NDArray[np.float32]
-Matrix: TypeAlias = npt.NDArray[np.float32]
+           "Content", "JSON"]
 
 _T = TypeVar("_T")
+_S = TypeVar("_S", bound="_Sentinel")
 
 
 class _Sentinel:
@@ -42,10 +34,19 @@ class _Sentinel:
     _instance: "_Sentinel | None" = None
     _name = "SENTINEL"
 
-    def __new__(cls) -> "_Sentinel":
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    def __new__(cls: type[_S]) -> _S:
+        """One instance per subclass, typed as that subclass.
+
+        Returning `_Sentinel` instead would make `NotGiven()` unusable as a
+        default: every signature declaring `x: str | NotGiven = not_given`
+        would be rejected. `object.__new__` rather than `super().__new__`
+        because the latter re-derives `cls` and loses the subclass type.
+        """
+        existing = cls.__dict__.get("_instance")
+        if existing is None:
+            existing = object.__new__(cls)
+            cls._instance = existing
+        return cast("_S", existing)
 
     def __bool__(self) -> Literal[False]:
         return False
