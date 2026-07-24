@@ -12,7 +12,7 @@ import time
 from ..._arrays import Matrix
 from ...contracts import Bundle, Tier1File
 from ...storage.model import ChunkMeta
-from .._render import to_hit
+from .._render import to_hit, to_outline
 from ..params import RetrievalParams
 from ..scoring.pipeline import score_chunks
 from ..state import SearchState
@@ -89,6 +89,11 @@ def _core(state: SearchState, relpath: str, ranking: Ranking, metas: list[ChunkM
         file=relpath,
         score=ranking.best_of[relpath],
         chunks=[to_hit(metas[i], float(fused[i])) for i in indexes],
-        symbols=[s for s in state.store.symbols.read_for(relpath)],  # type: ignore[misc]
+        # Through the SAME narrowing door tier-2 uses. A raw storage row has
+        # seven keys (including `decorators`) where the contract declares six;
+        # emitting it directly once shipped green because only fixtures from
+        # the previous engine were ever shape-checked — no fixture could
+        # contain this engine's leak.
+        symbols=[to_outline(s) for s in state.store.symbols.read_for(relpath)],
         neighbors=sorted(state.store.graph.neighbors(relpath) & set(bundle_files)),
     )

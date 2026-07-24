@@ -45,15 +45,23 @@ def _check_value(value: object, hint: Any, path: str) -> list[str]:
     if origin is list:
         return _check_list(value, hint, path)
     if origin is dict:
-        return [] if isinstance(value, dict) else [f"{path}: expected dict"]
+        return _check_dict(value, hint, path)
     if origin is typing.Literal:
+        # Value AND type: `True == 1`, so a value-only `in` admits booleans
+        # into an int Literal — and Literal tags are the discriminators of
+        # every event union, where a misrouted bool would be silent.
         opts = get_args(hint)
-        return [] if value in opts else [f"{path}: {value!r} not in {opts}"]
+        ok = any(value == opt and type(value) is type(opt) for opt in opts)
+        return [] if ok else [f"{path}: {value!r} not in {opts}"]
     if isinstance(hint, type) and hasattr(hint, "__required_keys__"):
         return check(value, hint, path)
     if isinstance(hint, type):
         return _check_scalar(value, hint, path)
-    return []
+    # FAIL CLOSED. The old fallback returned [] — a validator that passes what
+    # it cannot read is vacuous for exactly the fields most likely to be new
+    # (the first tuple, the first Mapping, the first anything-else a contract
+    # grows). An unsupported hint is a checker gap to fix, loudly.
+    return [f"{path}: unsupported annotation {hint!r} — teach shape.py this form"]
 
 
 def _check_union(value: object, hint: Any, path: str) -> list[str]:
@@ -74,10 +82,33 @@ def _check_list(value: object, hint: Any, path: str) -> list[str]:
     return out
 
 
+def _check_dict(value: object, hint: Any, path: str) -> list[str]:
+    """A mapping, with its PARAMETRIZATION honoured.
+
+    Ignoring the args made every `dict[str, str]` field vacuous — any dict at
+    all validated, whatever its values held.
+    """
+    if not isinstance(value, dict):
+        return [f"{path}: expected dict, got {type(value).__name__}"]
+    args = get_args(hint)
+    if not args:
+        return []
+    key_hint, value_hint = args
+    out: list[str] = []
+    for key, item in value.items():          # type: ignore[union-attr]
+        out += _check_value(key, key_hint, f"{path}[{key!r} (key)]")
+        out += _check_value(item, value_hint, f"{path}[{key!r}]")
+    return out
+
+
 def _check_scalar(value: object, hint: type, path: str) -> list[str]:
     if hint is type(None):
         return [] if value is None else [f"{path}: expected None"]
-    if hint is float and isinstance(value, int) and not isinstance(value, bool):
+    # bool subclasses int, so a bare isinstance would wave `True` through any
+    # int or float field. No JSON producer means a boolean millisecond count.
+    if hint in (int, float) and isinstance(value, bool):
+        return [f"{path}: expected {hint.__name__}, got bool"]
+    if hint is float and isinstance(value, int):
         return []                              # JSON ints are valid floats
     if hint is bool and not isinstance(value, bool):
         return [f"{path}: expected bool, got {type(value).__name__}"]
