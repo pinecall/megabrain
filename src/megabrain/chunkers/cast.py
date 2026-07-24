@@ -17,6 +17,21 @@ from .units import ParseFn, Unit
 __all__ = ["Chunker"]
 
 
+def _physical_lines(source: str) -> list[str]:
+    """Split on \n ONLY — the physical-line model `ast` counts by.
+
+    `str.splitlines()` also breaks on \f, \v, \x1c-\x1e and U+2028/U+2029.
+    A form feed inside a string literal (a legal PEP-8 page separator) then
+    makes the two models disagree: chunk line numbers drift one past every ast
+    symbol after it, and joining the split lines back with \n rewrites the
+    \f to a newline — silent corruption of text that is promised verbatim.
+    """
+    lines = source.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()          # a trailing newline is a terminator, not a line
+    return lines
+
+
 class Chunker:
     """Turns source into a partition of chunks.
 
@@ -30,7 +45,7 @@ class Chunker:
         self.budget = budget
 
     def chunk_file(self, relpath: str, source: str) -> FileResult:
-        lines = source.splitlines()
+        lines = _physical_lines(source)
         parsed = self._parse(relpath, source)
         spans = self._layout(parsed.units, len(lines), lines)
         return FileResult(

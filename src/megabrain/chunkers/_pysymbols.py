@@ -32,7 +32,7 @@ def symbols_of(relpath: str, node: ast.AST, prefix: str = "") -> list[Symbol]:
         if isinstance(child, Def):
             out.append(_definition(relpath, child, prefix, nested=bool(prefix)))
             out.extend(symbols_of(relpath, child, f"{prefix}{child.name}."))
-        elif isinstance(child, ast.Assign) and not prefix:
+        elif isinstance(child, ast.Assign | ast.AnnAssign) and not prefix:
             out.extend(_constants(relpath, child))
     return out
 
@@ -55,9 +55,22 @@ def _definition(relpath: str, node: Def, prefix: str, *, nested: bool) -> Symbol
                   doc=(ast.get_docstring(node) or "").split("\n")[0] or None)
 
 
-def _constants(relpath: str, node: ast.Assign) -> list[Symbol]:
-    """Module-level assignments. Configuration lives in constants, and a search
-    for a setting has to be able to reach the line that defines it."""
+def _constants(relpath: str, node: ast.Assign | ast.AnnAssign) -> list[Symbol]:
+    """Module-level assignments — the untyped AND the annotated form.
+
+    Configuration lives in constants, and a search for a setting has to reach
+    the line that defines it. `MAX: int = 10` is the same declaration as
+    `MAX = 10` with better manners — `X: Final = ...` is the house style of
+    the reference SDK itself — so skipping AnnAssign silently dropped every
+    typed constant from the lexical lane and the outlines.
+    """
+    if isinstance(node, ast.AnnAssign):
+        if not isinstance(node.target, ast.Name):
+            return []
+        value = f" = {ast.unparse(node.value)[:60]}" if node.value is not None else ""
+        return [Symbol(file=relpath, name=node.target.id, kind="constant",
+                       line=node.lineno, end_line=node.end_lineno or node.lineno,
+                       signature=f"{node.target.id}: {ast.unparse(node.annotation)}{value}")]
     return [Symbol(file=relpath, name=target.id, kind="constant", line=node.lineno,
                    end_line=node.end_lineno or node.lineno,
                    signature=f"{target.id} = {ast.unparse(node.value)[:60]}")

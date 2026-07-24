@@ -33,4 +33,36 @@ def balance(first_line: int, weights: list[int], budget: int) -> list[tuple[int,
             start, running = line, 0
         running += weight
     out.append((start, first_line + len(weights) - 1))
-    return out
+    return _fold(out, first_line, weights, budget)
+
+
+def _fold(pieces: list[tuple[int, int]], first_line: int, weights: list[int],
+          budget: int) -> list[tuple[int, int]]:
+    """Merge any adjacent pieces that still fit together.
+
+    The eager cut above overshoots `target` by up to one line per piece; the
+    accumulated overshoot leaves a sub-target remainder as its own part — and
+    the merge pass is forbidden from touching parts, so without this the
+    no-signal fragment both docstrings promise to avoid ships anyway (a real
+    corpus produced a part whose entire text was one closing parenthesis).
+
+    This restates merge's guarantee for the one region merge is banned from:
+    no adjacent pair of emitted pieces may be foldable within the budget.
+    Total weight exceeds the budget here by construction — balance is only
+    called for oversized spans — so folding can never collapse to one piece
+    covering the whole span.
+    """
+    def weight_of(piece: tuple[int, int]) -> int:
+        start, end = piece
+        return sum(weights[start - first_line:end - first_line + 1])
+
+    folded = list(pieces)
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(folded) - 1):
+            if weight_of(folded[i]) + weight_of(folded[i + 1]) <= budget:
+                folded[i:i + 2] = [(folded[i][0], folded[i + 1][1])]
+                changed = True
+                break
+    return folded

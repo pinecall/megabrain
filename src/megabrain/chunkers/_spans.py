@@ -65,13 +65,26 @@ def renumber(spans: Sequence[Span]) -> list[Span]:
     Done after all cutting rather than during it, because how many parts there
     are is only known once the recursion finishes — and a part labelled `1/?`
     tells a reader nothing.
+
+    A run is CONSECUTIVE fragments only. A class with heavy regions on both
+    sides of a member produces two separate header runs; numbering them as one
+    1/6..6/6 with the member sitting between part 3 and part 4 claims a
+    contiguity that does not exist. Any non-fragment span ends the run.
     """
     out = list(spans)
-    runs: dict[tuple[str | None, str], list[int]] = {}
+    runs: list[list[int]] = []
+    previous: tuple[str | None, str] | None = None
     for i, span in enumerate(out):
-        if span.part == "?":
-            runs.setdefault((span.name, span.kind), []).append(i)
-    for indexes in runs.values():
+        if span.part != "?":
+            previous = None          # anything between fragments ends the run
+            continue
+        key = (span.name, span.kind)
+        if key == previous and runs:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+        previous = key
+    for indexes in runs:
         for position, i in enumerate(indexes, start=1):
             out[i] = replace(out[i], part=f"{position}/{len(indexes)}")
     return out
