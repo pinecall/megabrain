@@ -93,6 +93,21 @@ def test_no_multiple_inheritance_between_project_classes() -> None:
             assert len(project) <= 1, f"{module}.{cls} inherits from {project}"
 
 
+def test_layer_zero_imports_nothing_from_the_package() -> None:
+    """The vocabulary modules sit UNDER everything and depend on nothing.
+
+    That is what makes them safe to import from any layer without thinking
+    about cycles, and it is why the top-level `__init__` can expose the error
+    types eagerly while everything else stays lazy. One import from a sibling
+    turns the base of the package into a graph, and the failure arrives later
+    as a circular import from some unrelated module.
+    """
+    for module in ("megabrain._types", "megabrain._arrays",
+                   "megabrain._errors", "megabrain._version"):
+        siblings = [i for i in imports_of(module) if i.startswith("megabrain")]
+        assert not siblings, f"{module} is layer 0 but imports {siblings}"
+
+
 def test_shipped_code_never_asserts() -> None:
     """`python -O` deletes every assert, and people run libraries under -O.
 

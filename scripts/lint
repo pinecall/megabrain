@@ -3,6 +3,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The project venv wins over whatever the shell happens to have. Without this
+# the script ran a MIXTURE — a globally installed ruff, and then "mypy: command
+# not found" the moment a tool was only in the venv — so the gate a developer
+# saw depended on their machine. Everything the gates need is one
+# `uv sync --group dev` (or `pip install --group dev .`) away.
+[ -d .venv/bin ] && PATH="$PWD/.venv/bin:$PATH"
+
+for tool in ruff mypy pyright python; do
+    command -v "$tool" >/dev/null || {
+        echo "$tool is not installed — run: uv sync --group dev" >&2
+        exit 1
+    }
+done
+
 echo "==> ruff"
 ruff check .
 

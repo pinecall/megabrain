@@ -32,6 +32,15 @@ dependencies = [
     "tree_sitter_typescript>=0.23",
 ]
 
+# The gates, as a dependency group (PEP 735) rather than an extra: they are not
+# part of what anyone installs megabrain FOR, and an extra would advertise them
+# on PyPI as if they were. `uv sync --group dev` (or `pip install --group dev`)
+# is all a fresh checkout needs before `./scripts/lint` — which previously
+# failed on a clean machine with "ruff: command not found", and the fix lived
+# only in whichever shell history had it.
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pyright>=1.1.380"]
+
 [project.optional-dependencies]
 languages = ["tree_sitter_ruby>=0.23", "tree_sitter_go>=0.23",
              "tree_sitter_rust>=0.23", "tree_sitter_php>=0.23"]

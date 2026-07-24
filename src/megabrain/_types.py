@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Literal, TypeAlias, TypeGuard, TypeVar, cast
 
 __all__ = ["NotGiven", "not_given", "NOT_GIVEN", "Omit", "omit", "is_given",
-           "Content", "JSON"]
+           "Content"]
 
 _T = TypeVar("_T")
 _S = TypeVar("_S", bound="_Sentinel")
@@ -91,5 +91,3 @@ def is_given(value: _T | NotGiven | Omit) -> TypeGuard[_T]:
 # moment docs entered its index). One Literal beats an `exclude_docs` /
 # `only_docs` bool pair, which can also express the meaningless "neither".
 Content: TypeAlias = Literal["code", "docs"]
-
-JSON: TypeAlias = "str | int | float | bool | None | list[JSON] | dict[str, JSON]"

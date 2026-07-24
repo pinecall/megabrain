@@ -27,6 +27,14 @@ def test_singletons() -> None:
     assert Omit() is omit
 
 
+def test_each_subclass_gets_its_OWN_singleton() -> None:
+    """`_instance` is looked up in the subclass's own `__dict__`, not through
+    the MRO. Reading it inherited would let whichever sentinel was constructed
+    first answer for both, and `is not_given` would then be true of OMIT."""
+    assert NotGiven() is not Omit()
+    assert type(NotGiven()) is NotGiven and type(Omit()) is Omit
+
+
 @pytest.mark.parametrize(
     ("value", "given"),
     [(not_given, False), (omit, False), (None, True), (0, True), ("", True), (False, True)],

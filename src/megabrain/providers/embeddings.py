@@ -11,7 +11,6 @@ import json
 from typing import Callable, Sequence
 
 from .._arrays import Vector
-from .._errors import MissingCredential
 from .._types import NotGiven, is_given, not_given
 from ._config import DEFAULT_BATCH, EmbedConfig
 from ._retry import request_with_retry
@@ -55,7 +54,7 @@ class Embedder:
             return []
         cached, missing = split_cached(self.cache, self.config.model, texts)
         if missing:
-            self._require_key()
+            self.config.require_key()
         for start in range(0, len(missing), self.config.batch_size):
             batch = missing[start:start + self.config.batch_size]
             for text, vector in zip(batch, self._embed_one(batch)):
@@ -75,17 +74,10 @@ class Embedder:
                            "encoding_format": "base64"}).encode()
         payload = request_with_retry(
             self._require_transport(), self.config.endpoint, body,
-            headers={"Authorization": f"Bearer {self.config.api_key}",
-                     "Content-Type": "application/json"},
+            headers=self.config.headers(),
             timeout=self.config.timeout, policy=self.policy)
         self.tokens += sum(len(t) for t in batch) // 4    # rough, for reporting only
         return decode_batch(payload, len(batch))
-
-    def _require_key(self) -> None:
-        """Checked before the first request rather than after a 401 comes back:
-        the fault is in the caller's configuration, so name what to set."""
-        if not self.config.api_key:
-            raise MissingCredential.named("MEGABRAIN_EMBED_API_KEY")
 
     def _require_transport(self) -> Transport:
         """Imported on first use, not at module load — nothing that merely

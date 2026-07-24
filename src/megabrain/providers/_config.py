@@ -10,7 +10,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from .._errors import MissingCredential
 from .._types import NotGiven, is_given, not_given
+from ._local import is_local_url
 
 __all__ = ["EmbedConfig"]
 
@@ -53,6 +55,28 @@ class EmbedConfig:
     @property
     def endpoint(self) -> str:
         return f"{self.base_url}/embeddings"
+
+    @property
+    def is_local(self) -> bool:
+        """A server on this machine (Ollama, LM Studio, vLLM) — no auth."""
+        return is_local_url(self.base_url)
+
+    def require_key(self) -> None:
+        """Fail before the first request rather than after a 401 comes back:
+        the fault is in the caller's configuration, so name what to set.
+
+        Here rather than in the client because this object already owns where
+        the key comes from — a second module deciding when it is required is a
+        second place to update when a new local runtime shows up.
+        """
+        if not self.api_key and not self.is_local:
+            raise MissingCredential.named(_KEY_VARS[0])
+
+    def headers(self) -> dict[str, str]:
+        """The auth header is OMITTED when there is no key, not sent empty:
+        `Bearer None` is a credential that reads as real and fails as bogus."""
+        auth = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        return {**auth, "Content-Type": "application/json"}
 
 
 def _key_from_env() -> str | None:

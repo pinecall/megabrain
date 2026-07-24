@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 __all__ = ["MegabrainError", "IndexNotFound", "EmptyIndex", "MissingCredential",
-           "ProviderError", "UnknownTool"]
+           "MissingAPIKey", "ProviderError", "UnknownTool"]
 
 
 class MegabrainError(Exception):
@@ -51,14 +51,27 @@ class EmptyIndex(MegabrainError, RuntimeError):
 
 
 class MissingCredential(MegabrainError, RuntimeError):
-    """A required provider credential is not configured."""
+    """A required provider credential is not configured.
 
-    code = "missing_credential"
+    `code` keeps its released spelling. The class name is internal vocabulary
+    and improving it costs nothing; `code` is a WIRE value that MCP payloads,
+    HTTP bodies and log pipelines switch on, so changing it would break every
+    frontend that reads it — for no gain a user can see.
+    """
+
+    code = "missing_api_key"
     http_status = 503
 
     @classmethod
     def named(cls, name: str) -> "MissingCredential":
         return cls(f"{name} is not set (export it, or add it to your shell profile)")
+
+
+# The released spelling, kept as an alias: it is what code in the wild catches,
+# and a rename that only reads better is not worth an ImportError in somebody
+# else's script. Same class, so `except MissingAPIKey` and
+# `except MissingCredential` are the same catch.
+MissingAPIKey = MissingCredential
 
 
 class ProviderError(MegabrainError, RuntimeError):
