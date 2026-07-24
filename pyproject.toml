@@ -95,6 +95,10 @@ ignore = [
 # the gate is a CLI: printing its report IS its output
 "evals/harness/gate.py" = ["T201"]
 "scripts/*" = ["T201"]
+# T201 exists to keep the LIBRARY silent — a function that writes to stdout
+# cannot be called from a server. The CLI is the one place where writing to a
+# terminal IS the product, so the ban is lifted exactly here and nowhere deeper.
+"src/megabrain/transports/cli/*" = ["T201"]
 
 [tool.mypy]
 # 3.12, NOT the 3.10 floor: numpy's shipped stubs use `type` statements that

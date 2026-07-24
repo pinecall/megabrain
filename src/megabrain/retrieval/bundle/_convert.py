@@ -3,6 +3,10 @@
 One place that knows how a `ChunkMeta` becomes a `ChunkHit`, so the shape the
 MCP client and the studio see is decided here rather than at four call sites
 that can drift apart.
+
+Named for the conversion, not for rendering: `render/` turns these contracts
+into text for a human, which is a different job at a different layer, and two
+modules called render would be one word covering both.
 """
 
 from __future__ import annotations

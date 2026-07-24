@@ -16,6 +16,7 @@ from ..._types import Content
 from ...storage.model import ChunkMeta
 from ..paths import under
 from ..state import SearchState
+from ._space import require_same_space
 from .context import build_context
 from .lanes import BASE, LANES
 
@@ -53,6 +54,7 @@ def score_chunks(state: SearchState, query: str, *,
         raise EmptyIndex.at(state.store.root)
     metas, chunks = _candidates(state, path_filter, content)
     vector = state.embedder.embed([query])[0]      # the ONE embedding of a query
+    require_same_space(state, vector)
     ctx = build_context(query=query, params=state.params, metas=metas, chunks=chunks,
                         file_paths=state.file_paths, files=state.files,
                         query_vector=vector)

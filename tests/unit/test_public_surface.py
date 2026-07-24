@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PUBLIC = ["index_repo", "search", "search_with_state", "load_state", "Store",
           "Chunk", "Symbol", "FileResult", "Strategy", "validate_partition",
           "MegabrainError", "IndexNotFound", "EmptyIndex", "MissingCredential",
-          "ProviderError", "UnknownTool"]
+          "ProviderError", "ModelMismatch"]
 
 
 @pytest.mark.parametrize("name", PUBLIC)

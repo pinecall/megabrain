@@ -16,9 +16,9 @@ from ...storage.model import ChunkMeta
 from ..scoring.pipeline import Scored, score_chunks
 from ..state import SearchState
 from ._anchors import render_anchors
+from ._convert import to_hit, to_outline
 from ._rank import Ranking, core_chunks, core_files, rank_files
 from ._related import neighbours_of, related_entry
-from ._render import to_hit, to_outline
 from .floors import file_floor
 
 __all__ = ["search_with_state"]

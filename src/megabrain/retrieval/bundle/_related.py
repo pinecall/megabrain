@@ -11,8 +11,8 @@ from ...contracts import Tier2File
 from ...storage.model import ChunkMeta
 from ..params import RetrievalParams
 from ..state import SearchState
+from ._convert import OUTLINE_KINDS, to_outline, to_ref
 from ._rank import Ranking
-from ._render import OUTLINE_KINDS, to_outline, to_ref
 
 __all__ = ["neighbours_of", "related_entry"]
 

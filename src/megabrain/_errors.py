@@ -1,23 +1,22 @@
 """Structured engine errors: a small taxonomy every boundary maps ONCE.
 
 Errors are data, not strings. Each carries a stable machine `code` (for MCP
-payloads and logs) and an `http_status` (for the HTTP transport), so a frontend
-translates the TYPE in exactly one catch site: the CLI prints one line and
-exits 2, HTTP maps to a status without leaking internals, MCP returns
-`error (<code>)` with isError.
+payloads and logs) and an `http_status`, so every transport translates the TYPE
+in exactly one catch site instead of matching on message text.
 
 Back-compat by construction: each subclass ALSO inherits the builtin a caller
 would plausibly have been catching before the typed error existed, so an
-`except ValueError` / `except RuntimeError` in the wild keeps working across a
-major boundary — the same trick as json.JSONDecodeError(ValueError).
+`except ValueError` in the wild keeps working across a major boundary — the
+same trick as json.JSONDecodeError(ValueError). Every message names what to DO:
+it is the only thing a stuck user reads.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["MegabrainError", "IndexNotFound", "EmptyIndex", "MissingCredential",
-           "MissingAPIKey", "ProviderError", "UnknownTool"]
+__all__ = ["MegabrainError", "IndexNotFound", "EmptyIndex", "ModelMismatch",
+           "MissingCredential", "MissingAPIKey", "ProviderError"]
 
 
 class MegabrainError(Exception):
@@ -35,8 +34,8 @@ class IndexNotFound(MegabrainError, ValueError):
 
     @classmethod
     def at(cls, path: str | Path) -> "IndexNotFound":
-        return cls(f"no megabrain index at or above {path} — run `megabrain index` "
-                   f"on the repo root (looked for .megabrain/db.sqlite up the tree)")
+        return cls(f"no megabrain index at or above {path} — "
+                   f"run `megabrain index` on the repo root")
 
 
 class EmptyIndex(MegabrainError, RuntimeError):
@@ -50,13 +49,26 @@ class EmptyIndex(MegabrainError, RuntimeError):
         return cls(f"index{f' at {path}' if path else ''} is empty — run: megabrain index")
 
 
+class ModelMismatch(MegabrainError, RuntimeError):
+    """The query's embedding model is not the one that built the index."""
+
+    code = "model_mismatch"
+    http_status = 409
+
+    @classmethod
+    def between(cls, *, query_model: str, query_dims: int, index_dims: int,
+                index_model: object) -> "ModelMismatch":
+        return cls(f"index built with {index_model} at {index_dims} dimensions, "
+                   f"but {query_model} returns {query_dims} — different vector "
+                   f"spaces. Re-run `megabrain index`, or set the old model back.")
+
+
 class MissingCredential(MegabrainError, RuntimeError):
     """A required provider credential is not configured.
 
-    `code` keeps its released spelling. The class name is internal vocabulary
-    and improving it costs nothing; `code` is a WIRE value that MCP payloads,
-    HTTP bodies and log pipelines switch on, so changing it would break every
-    frontend that reads it — for no gain a user can see.
+    `code` keeps its released spelling: a class name is internal vocabulary and
+    improving it is free, but `code` is a WIRE value that MCP payloads, HTTP
+    bodies and log pipelines switch on.
     """
 
     code = "missing_api_key"
@@ -67,10 +79,7 @@ class MissingCredential(MegabrainError, RuntimeError):
         return cls(f"{name} is not set (export it, or add it to your shell profile)")
 
 
-# The released spelling, kept as an alias: it is what code in the wild catches,
-# and a rename that only reads better is not worth an ImportError in somebody
-# else's script. Same class, so `except MissingAPIKey` and
-# `except MissingCredential` are the same catch.
+# The released spelling: what code in the wild catches, so it stays. Same class.
 MissingAPIKey = MissingCredential
 
 
@@ -82,12 +91,4 @@ class ProviderError(MegabrainError, RuntimeError):
 
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
-        self.status = status
-        """The upstream HTTP status, or None when the request never resolved."""
-
-
-class UnknownTool(MegabrainError, ValueError):
-    """An MCP tools/call named a tool this server does not expose."""
-
-    code = "unknown_tool"
-    http_status = 404
+        self.status = status      # the upstream status, None if it never resolved

@@ -15,11 +15,11 @@ from megabrain._errors import (
     IndexNotFound,
     MegabrainError,
     MissingCredential,
+    ModelMismatch,
     ProviderError,
-    UnknownTool,
 )
 
-ALL = [IndexNotFound, EmptyIndex, MissingCredential, ProviderError, UnknownTool]
+ALL = [IndexNotFound, EmptyIndex, ModelMismatch, MissingCredential, ProviderError]
 
 
 @pytest.mark.parametrize("cls", ALL)
@@ -42,7 +42,7 @@ def test_codes_are_unique() -> None:
     ("cls", "builtin"),
     [(IndexNotFound, ValueError), (EmptyIndex, RuntimeError),
      (MissingCredential, RuntimeError), (ProviderError, RuntimeError),
-     (UnknownTool, ValueError)],
+     (ModelMismatch, RuntimeError)],
 )
 def test_back_compat_inheritance(cls: type[Exception], builtin: type[Exception]) -> None:
     """A caller catching the builtin must still catch us."""

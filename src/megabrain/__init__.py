@@ -38,8 +38,8 @@ if TYPE_CHECKING:
         MegabrainError,
         MissingAPIKey,
         MissingCredential,
+        ModelMismatch,
         ProviderError,
-        UnknownTool,
     )
     from .chunkers import Chunk, FileResult, Symbol, validate_partition
     from .indexing import Registry, Strategy, discover, index_repo
@@ -70,7 +70,7 @@ _EXPORTS = {
     "MissingCredential": "._errors",
     "MissingAPIKey": "._errors",
     "ProviderError": "._errors",
-    "UnknownTool": "._errors",
+    "ModelMismatch": "._errors",
 }
 # Spelled out rather than derived from _EXPORTS: a type checker cannot follow
 # `[*mapping]` and gives up on the export list entirely, which costs every
@@ -80,7 +80,7 @@ __all__ = [
     "score_chunks", "Store", "ChunkMeta", "Strategy", "Registry", "Chunk",
     "Symbol", "FileResult", "validate_partition", "MegabrainError",
     "IndexNotFound", "EmptyIndex", "MissingCredential", "MissingAPIKey",
-    "ProviderError", "UnknownTool", "__version__",
+    "ProviderError", "ModelMismatch", "__version__",
 ]
 
 

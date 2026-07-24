@@ -11,6 +11,7 @@ from typing import Sequence
 
 import numpy as np
 
+from .._arrays import Matrix, Vector
 from ..storage import Store
 from ._embed import Vectors
 from ._plan import Planned
@@ -53,6 +54,10 @@ def prune_orphans(store: Store, present: set[str], skipped: set[str]) -> int:
     return len(indexed - present)
 
 
-def _matrix(vectors: Sequence[object]):      # type: ignore[no-untyped-def]
+def _matrix(vectors: Sequence[Vector]) -> Matrix | None:
     """Stack a file's chunk vectors, or None when it produced no chunks."""
-    return np.stack(vectors) if vectors else None      # type: ignore[arg-type]
+    if not vectors:
+        return None
+    # numpy's `stack` declares a partially unknown return in its shipped
+    # overloads; suppressed by rule name at the exact line, never package-wide.
+    return np.stack(vectors)      # pyright: ignore[reportUnknownMemberType]
