@@ -37,7 +37,16 @@ class ChunkTable:
 
         `vecs=None` stores them unembedded, which `read_matrix` then filters
         out — an unembedded chunk in the metas list would shift every later row.
+
+        A matrix of a different height is refused rather than zipped short:
+        it means the vectors were computed for some OTHER chunk list, so row i
+        is not chunk i and every vector after the divergence is filed against
+        text it does not describe. That misalignment cannot be detected later —
+        the index simply answers confidently wrong — so it dies here.
         """
+        if vecs is not None and len(vecs) != len(chunks):
+            raise ValueError(f"refusing to store {len(vecs)} vectors "
+                             f"for {len(chunks)} chunks: the rows would not align")
         self.db.executemany(
             f"INSERT INTO chunks({_COLS}) VALUES (?,?,?,?,?,?,?,?,?)",
             [(c.file, c.kind, c.name, c.part, c.start_line, c.end_line, c.text,

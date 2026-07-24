@@ -69,7 +69,19 @@ class Store:
 
     def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None,
                  tb: TracebackType | None) -> None:
-        self.close()
+        """Clean exit commits; a raised exception rolls back. Always closes.
+
+        sqlite3 opens a transaction on the first write and `close()` does NOT
+        commit it, so a block that only closed discarded everything it wrote —
+        an index that reported success and came back empty. Committing here
+        also means the failure path is a real rollback rather than whatever
+        happened to be flushed, so a run that dies half way leaves no partial
+        index behind for the next run to treat as up to date.
+        """
+        try:
+            self.db.rollback() if exc_type else self.db.commit()
+        finally:
+            self.close()
 
     def stats(self) -> dict[str, int]:
         """Index shape counts — here, not in a frontend, so no caller needs to

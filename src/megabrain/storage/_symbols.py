@@ -18,6 +18,17 @@ _COLS = "file,name,kind,line,end_line,signature,decorators,doc"
 _READ = "name,kind,line,end_line,signature,decorators,doc"
 
 
+def _like_literal(text: str) -> str:
+    r"""A string to be matched literally by LIKE ... ESCAPE '\'.
+
+    The backslash goes first: escaping it after the wildcards would escape the
+    escapes this function just added.
+    """
+    for char in ("\\", "%", "_"):
+        text = text.replace(char, "\\" + char)
+    return text
+
+
 class SymbolTable:
     def __init__(self, db: sqlite3.Connection) -> None:
         self.db = db
@@ -42,11 +53,16 @@ class SymbolTable:
 
         Matches the exact name or the last segment of a qualified
         `Class.method`, so `handle` finds `Service.handle`. Uses idx_symbols_name.
+
+        The suffix arm is a LIKE, so the name has to be escaped before it goes
+        in: `_` is LIKE's single-character wildcard and Python is made of
+        underscores. Unescaped, `get_meta` also matched `getXmeta` in another
+        file — go-to-definition offering a symbol that merely rhymes.
         """
         rows = self.db.execute(
             "SELECT file,name,kind,line,end_line,signature FROM symbols "
-            "WHERE name=? OR name LIKE '%.' || ? ORDER BY file, line",
-            (name, name)).fetchall()
+            r"WHERE name=? OR name LIKE '%.' || ? ESCAPE '\' ORDER BY file, line",
+            (name, _like_literal(name))).fetchall()
         return [{"file": r[0], "name": r[1], "kind": r[2], "line": r[3],
                  "end_line": r[4], "signature": r[5]} for r in rows]
 

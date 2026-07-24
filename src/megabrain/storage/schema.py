@@ -59,7 +59,20 @@ def apply(db: sqlite3.Connection) -> None:
     """Create everything missing and backfill late columns. Idempotent."""
     db.executescript(DDL)
     for table, column in _LATE_COLUMNS:
-        try:
-            db.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
-        except sqlite3.OperationalError:
-            pass            # already present — the only outcome we expect here
+        _add_column(db, table, column)
+
+
+def _add_column(db: sqlite3.Connection, table: str, column: str) -> None:
+    """Add a late column, tolerating ONLY the already-present case.
+
+    `except OperationalError: pass` also swallowed "database is locked",
+    "disk I/O error" and "no such table" — every real reason a migration can
+    fail. The index then opened against a schema that was never migrated and
+    failed later, somewhere else, as a missing-column error with no trace of
+    the migration that quietly gave up.
+    """
+    try:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
+    except sqlite3.OperationalError as err:
+        if "duplicate column name" not in str(err).lower():
+            raise
