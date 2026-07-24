@@ -34,7 +34,24 @@ def decode_batch(payload: bytes, expected: int) -> list[Vector]:
         raise ProviderError(f"embeddings response was not the expected shape: {err}") from err
     if len(rows) != expected:
         raise ProviderError(f"embeddings returned {len(rows)} vectors for {expected} texts")
-    return [_normalise(_vector(row.get("embedding"))) for row in rows]
+    return [_normalise(_vector(row.get("embedding"))) for row in _ordered(rows)]
+
+
+def _ordered(rows: list[Any]) -> list[Any]:
+    """Rows in the order they were REQUESTED, not the order they arrived.
+
+    The endpoint is free to answer out of order and says which text each row
+    belongs to in `index`. Trusting arrival order instead is the worst failure
+    this module can have: nothing raises, every text gets a vector, and each
+    one belongs to a different text — so the index is silently, permanently
+    wrong and no later check can see it.
+
+    An endpoint that omits `index` leaves arrival order as the only signal,
+    which is also what the spec implies when it is absent.
+    """
+    if all(isinstance(row.get("index"), int) for row in rows):
+        return sorted(rows, key=lambda row: int(row["index"]))
+    return rows
 
 
 def _vector(raw: object) -> Vector:
