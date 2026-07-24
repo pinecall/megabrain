@@ -74,10 +74,18 @@ ignore = ["E501", "B905"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402", "T201"]
+# the gate is a CLI: printing its report IS its output
+"evals/harness/gate.py" = ["T201"]
 "scripts/*" = ["T201"]
 
 [tool.mypy]
-python_version = "3.10"
+# 3.12, NOT the 3.10 floor: numpy's shipped stubs use `type` statements that
+# mypy cannot parse under an older target, and it aborts the whole run. The
+# floor is still enforced, by the two gates that can do it without third-party
+# stubs in the way — pyright runs at pythonVersion 3.10, and CI actually
+# EXECUTES the suite on 3.10. mypy's job here is type correctness, not
+# version-syntax policing.
+python_version = "3.12"
 strict_equality = true
 warn_unreachable = true
 warn_return_any = true

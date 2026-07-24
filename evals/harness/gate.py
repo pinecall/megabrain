@@ -103,7 +103,7 @@ def _report(hits: int, full: int, latencies: list[float], misses: list[str]) -> 
 
 
 def main() -> int:
-    from megabrain.retrieval.bundle import search       # noqa: PLC0415 — optional dep
+    from megabrain.retrieval.bundle import search  # noqa: PLC0415 — optional dep
     repo = Path(os.environ["MEGABRAIN_GOLDEN_REPO"]).expanduser()
     cases = load_cases(Path(os.environ["MEGABRAIN_GOLDEN"]).expanduser(), "python", repo.name)
     report = run(search, repo, cases)

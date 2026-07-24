@@ -1,0 +1,63 @@
+"""The chunks table: rows in, aligned matrix out.
+
+`read_matrix` is the hot path — it produces the numpy matrix every query scores
+against — so ALIGNMENT is the invariant this module exists to protect.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from typing import Any, Sequence
+
+from .._types import Matrix
+from ..chunkers.model import Chunk
+from ._blobs import to_blob, to_matrix
+from .model import ChunkMeta
+
+__all__ = ["ChunkTable"]
+
+# The column order lives in exactly one file: this one. v2 spelled it out at
+# both the insert and the load site and kept the two in sync by hand.
+_COLS = "file,kind,name,part,start_line,end_line,text,breadcrumb,vec"
+_READ = f"id,{_COLS}"
+
+
+def _meta(row: Sequence[Any]) -> ChunkMeta:
+    return ChunkMeta(id=row[0], file=row[1], kind=row[2], name=row[3], part=row[4],
+                     start_line=row[5], end_line=row[6], text=row[7], breadcrumb=row[8])
+
+
+class ChunkTable:
+    def __init__(self, db: sqlite3.Connection) -> None:
+        self.db = db
+
+    def insert(self, chunks: Sequence[Chunk], vecs: Matrix | None) -> None:
+        """Persist chunks with their vectors.
+
+        `vecs=None` stores them unembedded, which `read_matrix` then filters
+        out — an unembedded chunk in the metas list would shift every later row.
+        """
+        self.db.executemany(
+            f"INSERT INTO chunks({_COLS}) VALUES (?,?,?,?,?,?,?,?,?)",
+            [(c.file, c.kind, c.name, c.part, c.start_line, c.end_line, c.text,
+              c.breadcrumb, to_blob(vecs[i]) if vecs is not None else None)
+             for i, c in enumerate(chunks)])
+
+    def read_matrix(self) -> tuple[list[ChunkMeta], Matrix]:
+        """Every embedded chunk, ordered by id, with its vector at the same row.
+
+        Row *i* belongs to metas[i]. A misalignment does not raise — it answers
+        confidently wrong — so both lists are built in ONE pass from ONE query
+        and never zipped together from separate reads.
+        """
+        rows = self.db.execute(
+            f"SELECT {_READ} FROM chunks WHERE vec IS NOT NULL ORDER BY id").fetchall()
+        return [_meta(r) for r in rows], to_matrix([r[9] for r in rows])
+
+    def read_file(self, path: str) -> list[ChunkMeta]:
+        """One file's chunks in line order — what the graph node view splices
+        verbatim, the same anti-hallucination stance as `ask`."""
+        rows = self.db.execute(
+            f"SELECT {_READ} FROM chunks WHERE file=? ORDER BY start_line",
+            (path,)).fetchall()
+        return [_meta(r) for r in rows]

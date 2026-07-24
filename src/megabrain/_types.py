@@ -17,8 +17,17 @@ from __future__ import annotations
 
 from typing import Literal, TypeAlias, TypeGuard, TypeVar
 
+import numpy as np
+import numpy.typing as npt
+
 __all__ = ["NotGiven", "not_given", "NOT_GIVEN", "Omit", "omit", "is_given",
-           "Content", "JSON"]
+           "Content", "JSON", "Vector", "Matrix"]
+
+# Embeddings are float32 end to end: that is what the store writes and what the
+# scoring lanes multiply. Naming the dtype (rather than a bare `np.ndarray`)
+# keeps a float64 array from silently doubling the matrix at load time.
+Vector: TypeAlias = npt.NDArray[np.float32]
+Matrix: TypeAlias = npt.NDArray[np.float32]
 
 _T = TypeVar("_T")
 
