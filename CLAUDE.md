@@ -13,18 +13,18 @@ Reference implementation to imitate: `~/experiments/anthropic-sdk-python` (index
 ## STATUS — read this before touching anything
 
 **Phases 0–7 are done, gated, and committed.** Phases 8–17 (§6) have not
-started. This section is the truth as of commit `68cc934`; the plan below it
+started. This section is the truth as of commit `974a5fa`; the plan below it
 is unchanged from when it was written and still describes what's left.
 
 ### Verify the state yourself before trusting this section
 
 ```bash
 cd ~/megabrain-v3
-git log --oneline -1                                   # 68cc934
-git log --oneline | wc -l                               # 209
+git log --oneline -1                                   # 974a5fa
+git log --oneline | wc -l                               # 210
 git tag | wc -l                                          # 34
-./scripts/lint                                            # ruff + mypy + pyright + architecture
-python3 -m pytest tests -q                                 # 293 collected
+./scripts/lint                                            # ruff + mypy + pyright + architecture — ALL GREEN
+python3 -m pytest tests -q                                 # 293 collected, 0 failed, 1 skipped
 ```
 
 ### What exists
@@ -36,13 +36,13 @@ src/megabrain/
 ├── storage/               store.py schema.py model.py            L2
 │                          _blobs.py _chunks.py _files.py _symbols.py _graph.py
 ├── providers/             http.py _retry.py _urllib.py _wire.py   L2 (embeddings)
-│                          _config.py cache.py embeddings.py
+│                          _width.py _config.py cache.py embeddings.py
 ├── chunkers/               units.py model.py cast.py python.py     L3
 │                          _spans.py _merge.py _split.py _balance.py
 │                          _breadcrumb.py _signature.py _pysymbols.py
 └── retrieval/              params.py paths.py state.py search.py   L3 — NO LLM, enforced
    ├── scoring/             lane.py lanes.py context.py pipeline.py
-   ├── bundle/              assemble.py _rank.py _related.py floors.py
+   ├── bundle/              assemble.py _rank.py _related.py _anchors.py floors.py
    └── _render.py
 
 evals/harness/gate.py    the golden-set runner, versioned (the private corpus is not)
@@ -61,8 +61,8 @@ and `studio/` do not exist yet — that's phases 8–16.
 | ruff | clean |
 | mypy strict | clean, 63 files |
 | pyright strict | clean, 0 errors |
-| pytest | **290 passed, 2 failed, 1 skipped** (293 collected) |
-| golden (`evals/harness/gate.py` against `~/pinecall/sdk-server`) | **R@1 0.91 · bundle_full 1.00 · p50 ~11ms — matches v2 exactly, same 2 misses (q01, q03)** |
+| pytest | **293 passed, 0 failed, 1 skipped** |
+| golden (`evals/harness/gate.py` against `~/pinecall/sdk-server`) | **R@1 0.91 · bundle_full 1.00 · p50 ~10ms — matches v2 exactly, same 2 misses (q01, q03)** |
 | `retrieval/` importing `providers.chat` or `enrich` | zero occurrences (checked by AST walk, not just grep) |
 
 The golden gate is not wired into `pytest` by default — it needs
@@ -71,30 +71,21 @@ The golden gate is not wired into `pytest` by default — it needs
 Without those two env vars set, **you cannot verify retrieval parity** — set
 them before touching anything under `retrieval/` or `providers/embeddings.py`.
 
-### Known debt — start here
+### Known debt — RESOLVED (`974a5fa`)
 
-Two of `tests/architecture/test_invariants.py`'s own line-budget checks
-currently **fail**. This is self-inflicted (the fixes above were shipped under
-time pressure to close phase 7) and is exactly the kind of thing this round
-should fix:
+~~Two line-budget violations~~ — fixed. `providers/_wire.py` (117 lines) split
+into `_wire.py` (81: orchestration, row ordering, normalisation) +
+`_width.py` (48: the float32-vs-int8 detection, as `decode_width()`).
+`retrieval/bundle/assemble.py` (105 lines) split into `assemble.py` (94) +
+`bundle/_anchors.py` (23: `render_anchors()`, matching the shape of its
+sibling `_related.py`). Full lint gate green, golden gate re-confirmed
+unchanged (R@1 0.91 · bundle_full 1.00 · p50 10ms) after the split. All
+`tests/architecture/test_invariants.py` checks pass — 293/293, 0 failed.
 
-1. **`src/megabrain/providers/_wire.py` — 117 lines (budget 100).**
-   Grew past budget across two bug fixes (denormal detection, then
-   out-of-order row correction). Needs a real split, not a squeeze — the width
-   detection (`_decode`/`_has_magnitude`) and the row-ordering fix
-   (`_ordered`) are two distinct concerns that both currently live in one file
-   with `decode_batch`.
-2. **`src/megabrain/retrieval/bundle/assemble.py` — 105 lines (budget 100).**
-   `search_with_state` plus its four private helpers. `_anchors` is the
-   obvious extraction candidate — it's the newest addition and the one that
-   pushed the file over.
-
-Fix both the way every other split in this codebase was done: read the file,
-find the seam that was already implicit, extract to a new module, re-run
-`./scripts/lint` and the golden gate, confirm parity numbers are unchanged.
-**Do not just delete comments or compress lines to fit the budget** — the
-budget is diagnostic, not the goal; a forced-thin file with the same logic and
-no explanation is worse than the violation.
+**A domain-by-domain audit is the current activity** (background agents, one
+per L0–L3 domain, see the note this section is followed by if one was run).
+Do not assume its findings are in yet — check for new commits and an audit
+report before continuing past this point.
 
 ### Two real bugs found and fixed during phase 7 (context for review)
 
@@ -143,24 +134,30 @@ doesn't rediscover them as mysteries:
   (`contracts/bundle.py`) precisely because the flow lane is coming — it's not
   dead code, it's a contract written ahead of its producer.
 
-### What this round should do, roughly in order
+### What this round is doing
 
-1. **Fix the two budget violations above.** Small, mechanical, low-risk —
-   good warm-up before touching anything with retrieval-quality risk.
-2. **Audit `providers/` and `retrieval/` for the same CLASS of bug** the two
-   fixes above represent: silent-wrong-answer failure modes in code that
-   talks to something external or does array arithmetic. Look especially at
-   `chunkers/_split.py`/`_balance.py` (weight-based splitting, fixed once
-   already against a real corpus — see phase 5's commit) and
-   `retrieval/bundle/floors.py` (the two recall floors — read the "why" in
-   their docstrings and check the code still does what they say).
-3. **Re-run the golden gate after any change touching `retrieval/`,
-   `chunkers/`, or `providers/embeddings.py`.** Report the exact numbers
-   (`R@1`, `bundle_full`, `p50`) in the commit message — not "still passes",
-   the actual numbers, so a regression is visible in `git log` even if nobody
-   ran the gate at merge time.
-4. Only after that: continue with phase 8 (§6) if there's room, but fixing
-   what's here takes priority over building further on top of it.
+The two budget violations are fixed (see above). Current activity: a
+domain-by-domain read-only AUDIT — one background agent per L0–L3 domain
+(vocabulary, contracts, storage, providers, chunkers, indexing, retrieval),
+each briefed to find the same CLASS of bug the two fixes above represent
+(silent-wrong-answer failure modes in code that talks to something external or
+does array arithmetic), plus large/heavy files, logic errors, ordering
+dependencies, directory-structure smells, oversized methods, and unnecessary
+indirection — measured against this project's OWN declared design language
+(§§1–2, the `art-of-python` skill), not generic style preference.
+
+**These agents do not edit code.** They report findings; a human or a
+follow-up session decides what to act on and fixes it with the same TDD
+discipline as everything else here (§3): a failing test first, then the fix,
+then the golden gate re-run with numbers reported.
+
+After findings land and are triaged: **re-run the golden gate after any change
+touching `retrieval/`, `chunkers/`, or `providers/embeddings.py`.** Report the
+exact numbers (`R@1`, `bundle_full`, `p50`) in the commit message — not "still
+passes", the actual numbers, so a regression is visible in `git log` even if
+nobody ran the gate at merge time. Only once the audit's findings are resolved:
+continue with phase 8 (§6) — fixing what's here takes priority over building
+further on top of it.
 
 ---
 
