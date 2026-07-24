@@ -67,7 +67,16 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "ARG", "TID251", "FA102", "T201"]
-ignore = ["E501", "B905"]
+ignore = [
+  "E501",    # prompts, tables and URLs legitimately run long
+  "B905",    # zip(strict=) would change behaviour on the tuned retrieval path
+  # ARG002 flags a METHOD that ignores a parameter it declares. This engine is
+  # Protocol-heavy by design (Strategy, Transport, Embeddable, ParseFn), and an
+  # implementation must accept the full signature whether or not it uses every
+  # part of it — a fake transport that ignores `timeout` is correct, not sloppy.
+  # ARG001 stays on: a plain function with an unused parameter IS a mistake.
+  "ARG002",
+]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "functools.lru_cache".msg = "Use megabrain._utils.cache — the stdlib one drops type information"
