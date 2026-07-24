@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from ...contracts import Tier2File
 from ...storage.model import ChunkMeta
-from .._render import OUTLINE_KINDS, to_outline, to_ref
 from ..params import RetrievalParams
 from ..state import SearchState
 from ._rank import Ranking
+from ._render import OUTLINE_KINDS, to_outline, to_ref
 
-__all__ = ["related_entry"]
+__all__ = ["neighbours_of", "related_entry"]
 
 
 def related_entry(state: SearchState, relpath: str, ranking: Ranking,
@@ -40,3 +40,26 @@ def _first_doc(symbols: list[dict[str, object]]) -> str | None:
     which is most of what a map entry is for."""
     return next((s["doc"] for s in symbols
                  if isinstance(s.get("doc"), str)), None)      # type: ignore[return-value]
+
+
+def neighbours_of(state: SearchState, candidates: list[str], ranking: Ranking,
+                  params: RetrievalParams) -> list[str]:
+    """Graph neighbours of the strongest few files.
+
+    Only the top three seed this: an import edge is evidence about the file it
+    came from, and past the leaders that evidence is about something the query
+    barely matched. Neighbours are ordered by their OWN score — the graph
+    supplies candidates, it never ranks.
+
+    The tie-break on the path is what makes that order TOTAL. The candidates
+    come out of a set, whose iteration order comes from salted string hashes,
+    so sorting on the score alone left equally-scoring neighbours in a
+    different order in every process — a different bundle for the same query
+    and the same index.
+    """
+    reachable: set[str] = set()
+    for relpath in candidates[:3]:
+        reachable |= state.store.graph.neighbors(relpath)
+    reachable -= set(candidates)
+    scored = reachable & set(ranking.order)
+    return sorted(scored, key=lambda f: (-ranking.best_of[f], f))[:params.graph_extras]

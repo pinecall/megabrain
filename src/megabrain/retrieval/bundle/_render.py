@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..contracts import ChunkHit, ChunkRef, SymbolRef
-from ..storage.model import ChunkMeta
+from ...contracts import ChunkHit, ChunkRef, SymbolRef
+from ...storage.model import ChunkMeta
 
 __all__ = ["to_ref", "to_hit", "to_outline", "OUTLINE_KINDS"]
 

@@ -32,10 +32,16 @@ def rank_files(metas: list[ChunkMeta], fused: Matrix) -> Ranking:
     """Files ordered by their best chunk, with each file's chunks grouped."""
     order: list[str] = []
     chunks_of: dict[str, list[int]] = {}
+    # STABLE, not the default introsort: scores tie constantly — a file whose
+    # chunks are near-identical, a query that matches nothing in particular —
+    # and introsort returns ties in whatever order its partitioning produced,
+    # which changes with array size and numpy version. Retrieval promises the
+    # same answer for the same index, so ties fall back to index order.
+    #
     # numpy's argsort/flatnonzero declare partially unknown returns in their
     # shipped overloads; suppressed by rule name at the exact line rather than
     # package-wide, since the surrounding annotations are what pin the types.
-    for index in np.argsort(-fused):  # pyright: ignore[reportUnknownMemberType]
+    for index in np.argsort(-fused, kind="stable"):  # pyright: ignore[reportUnknownMemberType]
         relpath = metas[int(index)].file
         if relpath not in chunks_of:
             order.append(relpath)

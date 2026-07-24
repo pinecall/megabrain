@@ -81,6 +81,12 @@ def _base_name(node: ast.expr) -> str:
     return ""
 
 
+def asserts_in(module: str) -> list[int]:
+    """Line numbers of every `assert` statement in a shipped module."""
+    return [node.lineno for node in ast.walk(_tree(module))
+            if isinstance(node, ast.Assert)]
+
+
 def long_functions(module: str, limit: int) -> list[str]:
     """`name:lines` for every function whose body exceeds `limit` lines.
 

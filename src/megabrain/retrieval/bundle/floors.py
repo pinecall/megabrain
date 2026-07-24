@@ -50,7 +50,9 @@ def file_floor(*, metas: list[ChunkMeta], all_metas: list[ChunkMeta], all_chunks
     dense = all_chunks[rows[present]] @ query_vector
     owed: list[str] = []
     seen = set(already)
-    for position in np.argsort(-dense)[:params.recall_floor_top]:  # pyright: ignore[reportUnknownMemberType]
+    # Stable for the same reason ranking is: which files the floor admits must
+    # not depend on how numpy happened to partition a run of equal cosines.
+    for position in np.argsort(-dense, kind="stable")[:params.recall_floor_top]:  # pyright: ignore[reportUnknownMemberType]
         relpath = metas[int(present[int(position)])].file
         if relpath in seen or is_test(relpath):
             continue

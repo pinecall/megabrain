@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 
-from .._arrays import Matrix, Vector
+from .._arrays import Matrix
 from ..providers.embeddings import Embedder
 from ..storage import Store
 from ..storage.model import ChunkMeta
@@ -32,13 +32,6 @@ class SearchState:
     files: Matrix           # row i belongs to file_paths[i]
     repo: str
     params: RetrievalParams = DEFAULT_PARAMS
-    query_vector: Vector | None = None
-    """The last query's embedding, stashed by scoring.
-
-    Later stages (the recall floor, any cached-answer lane) need it, and
-    retrieval must never embed the same text twice — the whole path is meant to
-    cost exactly one embedding call.
-    """
 
     def close(self) -> None:
         self.store.close()

@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import pytest
 
-from tests.architecture.walk import classes_of, imports_of, modules_under, source_of
+from tests.architecture.walk import (
+    asserts_in,
+    classes_of,
+    imports_of,
+    modules_under,
+    source_of,
+)
 
 MAX_FILE_LINES = 100
 MAX_FUNC_LINES = 30
@@ -85,6 +91,24 @@ def test_no_multiple_inheritance_between_project_classes() -> None:
         for cls, bases in classes_of(module):
             project = [b for b in bases if b in _CLASS_NAMES]
             assert len(project) <= 1, f"{module}.{cls} inherits from {project}"
+
+
+def test_shipped_code_never_asserts() -> None:
+    """`python -O` deletes every assert, and people run libraries under -O.
+
+    An assert that guards a real invariant becomes a no-op there — the value it
+    swore was not None flows on and fails somewhere unrelated, with the check
+    that would have named it compiled out. Both asserts this rule removed were
+    also a signal in themselves: each one propped up an Optional that the types
+    said could occur and the design said could not. Making the design say so
+    (a base signal that always runs, a result that carries its own vector)
+    deleted the Optional instead of asserting it away.
+
+    Real preconditions raise. Test files are exempt: that is where assert is.
+    """
+    for module in modules_under(""):
+        lines = asserts_in(module)
+        assert not lines, f"{module}: assert at line(s) {lines} — raise instead"
 
 
 @pytest.mark.parametrize("module", list(modules_under("")))

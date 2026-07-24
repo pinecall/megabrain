@@ -7,25 +7,42 @@ makes a regression measurable at all.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable
 
-from ..._arrays import Matrix
+from ..._arrays import Matrix, Vector
 from ..._errors import EmptyIndex
 from ..._types import Content
 from ...storage.model import ChunkMeta
 from ..paths import under
 from ..state import SearchState
 from .context import build_context
-from .lanes import LANES
+from .lanes import BASE, LANES
 
-__all__ = ["score_chunks", "DOC_EXTENSIONS"]
+__all__ = ["Scored", "score_chunks", "DOC_EXTENSIONS"]
 
 DOC_EXTENSIONS = (".md", ".markdown", ".mdx")
 
 
+@dataclass(frozen=True, slots=True)
+class Scored:
+    """One query's scores, and the vector they were computed from.
+
+    The vector travels WITH the scores because later stages need it — the
+    recall floor scores raw cosine against the same query, and retrieval must
+    never embed the same text twice. Handing it over as a field makes that a
+    parameter; leaving it on the shared state made it a convention, where every
+    later stage simply trusted that whoever scored last scored THIS query.
+    """
+
+    metas: list[ChunkMeta]
+    fused: Matrix               # score i belongs to metas[i]
+    query_vector: Vector
+
+
 def score_chunks(state: SearchState, query: str, *,
                  path_filter: str | None = None,
-                 content: Content | None = None) -> tuple[list[ChunkMeta], Matrix]:
+                 content: Content | None = None) -> Scored:
     """Fused relevance for every candidate chunk, index-aligned with the metas.
 
     Filtering happens BEFORE scoring, not after: restricting a finished ranking
@@ -35,21 +52,15 @@ def score_chunks(state: SearchState, query: str, *,
     if not state.metas:
         raise EmptyIndex.at(state.store.root)
     metas, chunks = _candidates(state, path_filter, content)
-    # The ONE embedding call of a query. Stashed on the state because the
-    # recall floor needs the same vector, and embedding a query twice would
-    # double the only network cost on this path.
-    vector = state.embedder.embed([query])[0]
-    state.query_vector = vector
-
+    vector = state.embedder.embed([query])[0]      # the ONE embedding of a query
     ctx = build_context(query=query, params=state.params, metas=metas, chunks=chunks,
                         file_paths=state.file_paths, files=state.files,
                         query_vector=vector)
-    fused: Matrix | None = None
+    fused = BASE.apply(ctx)
     for lane in LANES:
         if lane.applies(ctx):
             fused = lane.apply(ctx, fused)
-    assert fused is not None      # noqa: S101 — LANES is non-empty by construction
-    return metas, fused
+    return Scored(metas=metas, fused=fused, query_vector=vector)
 
 
 def _candidates(state: SearchState, path_filter: str | None,

@@ -10,15 +10,15 @@ from __future__ import annotations
 import time
 
 from ..._arrays import Matrix
+from ..._types import Content
 from ...contracts import Bundle, Tier1File
 from ...storage.model import ChunkMeta
-from .._render import to_hit, to_outline
-from ..params import RetrievalParams
-from ..scoring.pipeline import score_chunks
+from ..scoring.pipeline import Scored, score_chunks
 from ..state import SearchState
 from ._anchors import render_anchors
 from ._rank import Ranking, core_chunks, core_files, rank_files
-from ._related import related_entry
+from ._related import neighbours_of, related_entry
+from ._render import to_hit, to_outline
 from .floors import file_floor
 
 __all__ = ["search_with_state"]
@@ -26,27 +26,27 @@ __all__ = ["search_with_state"]
 
 def search_with_state(state: SearchState, query: str, *,
                       path_filter: str | None = None,
-                      content: str | None = None,
-                      scored: tuple[list[ChunkMeta], Matrix] | None = None) -> Bundle:
+                      content: Content | None = None,
+                      scored: Scored | None = None) -> Bundle:
     """The full bundle for one query.
 
     `scored` lets a caller that already computed the scores reuse them, so a
-    view needing both the raw scores and the bundle scores exactly once.
+    view needing both the raw scores and the bundle scores exactly once. It
+    carries its own query vector, so a reused result cannot be paired with a
+    vector from some other query.
     """
     started = time.perf_counter()
-    metas, fused = scored or score_chunks(state, query, path_filter=path_filter,
-                                          content=content)  # type: ignore[arg-type]
+    scored = scored or score_chunks(state, query, path_filter=path_filter,
+                                    content=content)
+    metas, fused = scored.metas, scored.fused
     ranking = rank_files(metas, fused)
     params = state.params
 
     candidates = ranking.top(params.cand_files)
-    neighbours = _neighbours(state, candidates, ranking, params)
+    neighbours = neighbours_of(state, candidates, ranking, params)
     core = core_files(ranking, params)
-    # `query_vector` is set by scoring, which always runs before this point —
-    # either here or in the caller that passed `scored`.
-    assert state.query_vector is not None      # noqa: S101
     floor = file_floor(metas=metas, all_metas=state.metas, all_chunks=state.chunks,
-                       query_vector=state.query_vector,
+                       query_vector=scored.query_vector,
                        already=set(candidates) | set(neighbours), params=params)
 
     related = [f for f in candidates if f not in core] + neighbours + floor
@@ -62,23 +62,6 @@ def search_with_state(state: SearchState, query: str, *,
         anchors=render_anchors(query, metas, fused, params),
         ms=int((time.perf_counter() - started) * 1000),
     )
-
-
-def _neighbours(state: SearchState, candidates: list[str], ranking: Ranking,
-                params: RetrievalParams) -> list[str]:
-    """Graph neighbours of the strongest few files.
-
-    Only the top three seed this: an import edge is evidence about the file it
-    came from, and past the leaders that evidence is about something the query
-    barely matched. Neighbours are ordered by their OWN score — the graph
-    supplies candidates, it never ranks.
-    """
-    reachable: set[str] = set()
-    for relpath in candidates[:3]:
-        reachable |= state.store.graph.neighbors(relpath)
-    reachable -= set(candidates)
-    scored = reachable & set(ranking.order)
-    return sorted(scored, key=lambda f: -ranking.best_of[f])[:params.graph_extras]
 
 
 def _core(state: SearchState, relpath: str, ranking: Ranking, metas: list[ChunkMeta],

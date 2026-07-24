@@ -1,4 +1,4 @@
-"""The scoring signals themselves, one class each.
+"""The signals that REWEIGHT the base score, one class each.
 
 Adding a signal is one class and one entry in `LANES` — never surgery on a long
 function, which is how a scoring path becomes the thing nobody dares touch.
@@ -10,43 +10,11 @@ import numpy as np
 
 from ..._arrays import Matrix
 from ..paths import ident_tokens
+from ._fusion import DenseFileFusion
 from .context import QueryContext
-from .lane import Lane
+from .lane import Base, Lane
 
-__all__ = ["DenseFileFusion", "TestPenalty", "LexicalBoost", "LANES"]
-
-
-class DenseFileFusion:
-    """Base relevance: chunk cosine fused with the cosine of its whole file.
-
-    A chunk is judged partly by the company it keeps. A short helper inside the
-    right file beats an eloquent chunk inside an unrelated one, which is what
-    stops a well-worded comment somewhere else from outranking the code that
-    actually answers the question.
-
-    Cosines are mapped from [-1, 1] to [0, 1] so the fusion weight means the
-    same thing across the range and later additive bonuses keep their scale.
-    """
-
-    name = "dense+file"
-
-    def applies(self, ctx: QueryContext) -> bool:
-        return True
-
-    def apply(self, ctx: QueryContext, fused: Matrix | None) -> Matrix:
-        dense = (ctx.chunks @ ctx.query_vector + 1) / 2
-        by_file = (ctx.files @ ctx.query_vector + 1) / 2
-        # A chunk whose file has no skeleton vector gets a neutral 0.5 rather
-        # than 0: absence of a signal is not evidence against it.
-        # `.astype` is not cosmetic: numpy promotes to float64 on mixed
-        # arithmetic, and a promoted score array would silently double the
-        # memory of the hottest structure in the engine.
-        # numpy's `where` declares a partially unknown return in its shipped
-        # overloads; suppressed by rule name at the exact line, never
-        # package-wide — the declared return type is what pins this.
-        blended = dense + ctx.params.file_fusion_w * np.where(  # pyright: ignore[reportUnknownMemberType]
-            ctx.file_of >= 0, by_file[ctx.file_of], 0.5)
-        return blended.astype(np.float32)
+__all__ = ["TestPenalty", "LexicalBoost", "BASE", "LANES"]
 
 
 class TestPenalty:
@@ -92,6 +60,8 @@ class LexicalBoost:
         return fused + boost
 
 
+BASE: Base = DenseFileFusion()
+
 # Order is load-bearing: the penalty applies to the fused base, and the lexical
 # nudge lands last so it breaks ties rather than being scaled by anything after.
-LANES: tuple[Lane, ...] = (DenseFileFusion(), TestPenalty(), LexicalBoost())  # type: ignore[assignment]
+LANES: tuple[Lane, ...] = (TestPenalty(), LexicalBoost())
