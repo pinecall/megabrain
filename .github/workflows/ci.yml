@@ -12,6 +12,11 @@ on:
   workflow_call:
 
 jobs:
+  # v3: lint is no longer ruff alone. The package ships `py.typed` — a PEP 561
+  # promise of verified types — and v2 shipped it with ZERO type checking. mypy
+  # and pyright are now part of the same gate, plus the architecture suite that
+  # makes the engine's hard rules executable (no LLM in retrieval, no SQL
+  # outside storage, no event loop in the engine, file/function line budgets).
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -19,8 +24,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff
-      - run: ruff check .
+      - run: pip install -e ".[languages]" ruff mypy pyright pytest
+      - run: ./scripts/lint
 
   test:
     strategy:
