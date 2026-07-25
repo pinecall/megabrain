@@ -10,6 +10,7 @@ import { api } from "../api.js";
 import type { Bundle, Tier1File, Tier2File } from "../contracts.js";
 import { code, el, fill } from "../dom.js";
 import { icon } from "../icons.js";
+import { scopePicker } from "../scope.js";
 
 export interface SearchView {
   root: HTMLElement;
@@ -72,30 +73,6 @@ function render(bundle: Bundle, results: HTMLElement, stats: HTMLElement,
          el("div", { class: "split-2" },
             ...bundle.tier2.map((file) => relatedCard(file, onOpen)))]
       : []));
-}
-
-interface Scope {
-  root: HTMLElement;
-  value(): "code" | "docs" | undefined;
-}
-
-function scopePicker(): Scope {
-  const options: [string, "code" | "docs" | undefined][] = [
-    ["Both", undefined], ["Code", "code"], ["Docs", "docs"]];
-  let chosen: "code" | "docs" | undefined;
-  const root = el("div", { style: "display:flex;gap:4px;margin-right:4px" });
-  const buttons = options.map(([label, value]) => {
-    const button = el("button", { class: "chip" }, label);
-    button.addEventListener("click", () => {
-      chosen = value;
-      for (const other of buttons) other.classList.remove("on");
-      button.classList.add("on");
-    });
-    return button;
-  });
-  buttons[0]?.classList.add("on");
-  root.append(...buttons);
-  return { root, value: () => chosen };
 }
 
 function sectionHead(label: string, note: string): HTMLElement {

@@ -75,10 +75,11 @@ export const api = {
   /* Both streams are POST + SSE, so EventSource (GET-only) cannot be used:
    * the body stream is read and the `event:`/`data:` frames parsed here. */
   ask(question: string, repo: string | undefined,
+      content: "code" | "docs" | undefined,
       onEvent: (event: string, data: unknown) => void): {
     done: Promise<void>; abort: () => void;
   } {
-    return stream("/ask/stream", { question, repo }, onEvent);
+    return stream("/ask/stream", { question, repo, content }, onEvent);
   },
 
   index(repo: string, onEvent: (event: string, data: unknown) => void): {

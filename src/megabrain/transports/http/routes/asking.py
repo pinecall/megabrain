@@ -14,6 +14,7 @@ from threading import Thread
 from typing import Any, Iterator
 
 from ...._errors import MegabrainError
+from ...._types import Content
 from ....usecases.ask import ask
 from ..messages import Reply, Request, error_reply
 
@@ -27,10 +28,15 @@ def ask_stream(request: Request) -> Reply:
     if not question.strip():
         return error_reply(400, "question is required", "bad_request")
     repo = Path(request.param("repo") or ".")
-    return Reply(stream=lambda: _run(question, repo))
+    # Defaults to code, like the use case: a walkthrough diluted with prose
+    # explains the documentation instead of the mechanism.
+    asked = request.param("content")
+    content: Content = "docs" if asked == "docs" else "code"
+    return Reply(stream=lambda: _run(question, repo, content))
 
 
-def _run(question: str, repo: Path) -> Iterator[tuple[str, object]]:
+def _run(question: str, repo: Path,
+         content: "Content") -> Iterator[tuple[str, object]]:
     """Ask on a worker thread, forwarding its events as SSE frames.
 
     A thread and a queue for the same reason indexing needs them: the engine is
@@ -42,7 +48,8 @@ def _run(question: str, repo: Path) -> Iterator[tuple[str, object]]:
 
     def work() -> None:
         try:
-            outcome["text"] = ask(repo, question, emit=events.put)
+            outcome["text"] = ask(repo, question, content=content,
+                                  emit=events.put)
         except MegabrainError as err:
             outcome["error"] = {"error": str(err), "code": err.code}
         except Exception as err:                     # noqa: BLE001

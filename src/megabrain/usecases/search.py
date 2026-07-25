@@ -53,8 +53,8 @@ def _judged(bundle: Bundle) -> Bundle:
     No provider configured is not an error here: the lane is an optimisation,
     so an unconfigured deployment simply does not get it.
     """
-    from ..enrich import rerank as judge
-    from ..providers.chat import resolve
+    from ..enrich.rerank import judge_provider
+    from ..enrich.rerank import rerank as judge
 
-    provider = resolve()
+    provider = judge_provider()
     return judge(bundle, provider) if provider is not None else bundle

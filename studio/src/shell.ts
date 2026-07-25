@@ -29,14 +29,15 @@ export function mountShell(host: HTMLElement, config: Config,
                            onIndex: () => void, onSettings: () => void): Shell {
   const rail = el("aside", { class: "rail" });
   const repos = el("div", { class: "rail-section" });
-  const crumb = el("div", { class: "crumb" });
+  const crumb = el("div", { class: "crumb mono" });
   const viewport = el("div", { class: "viewport" });
   const tabs = el("div", { class: "tabs" });
   let onTabPick: (tab: TabName) => void = () => {};
 
   const buttons = new Map<TabName, HTMLElement>();
   for (const name of TABS) {
-    const button = el("button", { class: "tab" }, name.toUpperCase());
+    const button = el("button", { class: "tab" },
+                      name[0]!.toUpperCase() + name.slice(1));
     button.addEventListener("click", () => onTabPick(name));
     buttons.set(name, button);
     tabs.append(button);
@@ -45,9 +46,15 @@ export function mountShell(host: HTMLElement, config: Config,
   rail.append(brand(), repos, foot(config, onIndex, onSettings));
   const scrim = el("div", { class: "rail-scrim" });
   scrim.addEventListener("click", () => host.classList.remove("rail-open"));
+  /* The topbar is `space-between` with exactly TWO children: everything you
+   * navigate with on the left, the status chip on the right. Five direct
+   * children spread across the bar instead, which is what left the tabs
+   * floating away from the breadcrumb. */
   host.append(rail, scrim, el("div", { class: "main" },
-    el("div", { class: "topbar" }, burger(host), crumb,
-       el("div", { class: "divider" }), tabs, chip(config)),
+    el("header", { class: "topbar" },
+      el("div", { style: "display:flex;align-items:center;gap:14px;min-width:0;flex:1" },
+         burger(host), crumb, el("div", { class: "divider" }), tabs),
+      chip(config)),
     viewport));
 
   return {

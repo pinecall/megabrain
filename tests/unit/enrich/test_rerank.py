@@ -15,7 +15,8 @@ from dataclasses import asdict
 
 import pytest
 
-from megabrain.enrich.rerank import RERANK_BATCH, rerank
+from megabrain.enrich._batches import RERANK_BATCH
+from megabrain.enrich.rerank import rerank
 from megabrain.providers.chat.base import Answer
 from tests.unit.ask.test_splice import chunk
 

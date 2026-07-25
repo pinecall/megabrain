@@ -9,6 +9,7 @@ import { api } from "../api.js";
 import { el, fill } from "../dom.js";
 import { icon } from "../icons.js";
 import { renderMarkdown } from "../markdown.js";
+import { scopePicker } from "../scope.js";
 
 export interface AskView {
   root: HTMLElement;
@@ -22,6 +23,9 @@ export function askView(repo: () => string | undefined,
     placeholder: "how does retry and backoff work end to end?",
   }) as HTMLInputElement;
   const trace = el("div", {});
+  /* Defaults to CODE, unlike search: a walkthrough diluted with prose explains
+   * the documentation instead of the mechanism. */
+  const scope = scopePicker("code");
   const answer = el("div", { class: "synth", style: "display:none;margin-top:22px" });
   let running: { done: Promise<void>; abort: () => void } | null = null;
 
@@ -33,7 +37,7 @@ export function askView(repo: () => string | undefined,
     answer.style.display = "none";
     const markdown: string[] = [];
     try {
-      running = api.ask(input.value.trim(), repo(), (name, data) =>
+      running = api.ask(input.value.trim(), repo(), scope.value(), (name, data) =>
         onEvent(name, data, trace, answer, markdown));
       await running.done;
     } catch (failure) {
@@ -52,7 +56,7 @@ export function askView(repo: () => string | undefined,
   return {
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
-        el("div", { class: "query-icon" }, icon("brain")), input, go),
+        el("div", { class: "query-icon" }, icon("brain")), input, scope.root, go),
       trace, answer),
     focus: () => input.focus(),
   };

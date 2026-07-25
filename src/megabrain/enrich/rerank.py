@@ -6,20 +6,6 @@ survives, because cosine cannot tell "implements scoring" from "tests
 scoring". This lane fixes exactly that. The model returns IDS; the engine
 keeps and reorders its own verbatim chunks. It selects, it never writes.
 
-WHAT THE JUDGE SEES was measured rather than assumed (6 ground-truth queries
-× 4 views × 3 repetitions):
-
-    view                          target kept   median rank
-    1 query-aware line               18/18           2
-    6-line window                    12/18           —
-    full bodies, ONE call            15/18           1
-    full bodies, batches of 8        18/18           1
-
-Partial evidence is worse than little evidence: on the cross-subsystem query
-every mid-size view dropped the answer, while the one-line and the batched
-views kept it. Small pools per call stop the judge ruling files out
-confidently — the price is a looser keep, and completeness beats ordering.
-
 Fail-open everywhere, all-or-nothing across batches. No provider, a timeout, a
 malformed reply, an unknown id: the deterministic bundle is returned
 untouched. The model is an OPTIMISATION, never a dependency.
@@ -27,18 +13,42 @@ untouched. The model is an OPTIMISATION, never a dependency.
 
 from __future__ import annotations
 
+import os
+
 from ..contracts import Bundle, Tier2File
 from ..providers.chat import ChatProvider
+from ._batches import RERANK_TIMEOUT, verdict_of
 from ._cards import listing
 from ._prompt import PROMPT
-from ._verdict import ids_in, round_robin
+from ._verdict import ids_in
 
-__all__ = ["rerank", "RERANK_BATCH"]
+__all__ = ["rerank", "judge_provider", "RERANK_MODEL"]
 
-# Measured: one 29-candidate call missed 3 of 18 targets that batches of 8 all
-# kept. The batch size is the finding, not a tuning knob.
-RERANK_BATCH = 8
 MAX_TOKENS = 300
+
+# A SMALL fast model, and bigger is measurably WORSE here — not just slower:
+#   flash-lite      recall 19/19 · rank1 19/19 · ~1.13s
+#   a frontier model                            ~5s per call, and it fails open
+#   on empty replies more often, because the task is "return a JSON array" and
+#   reasoning models editorialise.
+# The judge returns ids. It needs speed and obedience, not intelligence — which
+# is why it must NOT inherit the narration model: that one is chosen to explain
+# code well and costs seconds per call. Three batches through it took 16s.
+RERANK_MODEL = os.environ.get("MEGABRAIN_RERANK_MODEL", "google/gemini-3.5-flash-lite")
+
+def judge_provider() -> ChatProvider | None:
+    """A provider tuned for JUDGING, not for narrating.
+
+    Built here rather than inherited: the lane's model and its timeout are the
+    lane's business, and sharing the narrator's meant sharing a model chosen to
+    explain code — seconds per call, for a task whose whole output is a JSON
+    array of integers.
+    """
+    from ..providers.chat import OpenAICompatible
+
+    provider = OpenAICompatible(model=RERANK_MODEL, timeout=RERANK_TIMEOUT)
+    return provider if provider.available() else None
+
 
 def rerank(bundle: Bundle, provider: ChatProvider) -> Bundle:
     """Reorder tier 2 by the judge's verdict. Never drops, never rewrites."""
@@ -46,25 +56,10 @@ def rerank(bundle: Bundle, provider: ChatProvider) -> Bundle:
     if len(related) < 2:
         return bundle
     try:
-        order = _verdict(provider, bundle["query"], related)
+        order = verdict_of(_judge, provider, bundle["query"], related)
     except Exception:                         # noqa: BLE001 — fail open, always
         return bundle
     return {**bundle, "tier2": _reordered(related, order)}
-
-
-def _verdict(provider: ChatProvider, question: str,
-             related: list[Tier2File]) -> list[int]:
-    """Every batch judged, merged round-robin. Raises to fail the whole lane.
-
-    All-or-nothing: a partial verdict is a ranking derived from half the
-    evidence, which is worse than the deterministic order it would replace.
-    """
-    batches = [related[start:start + RERANK_BATCH]
-               for start in range(0, len(related), RERANK_BATCH)]
-    offsets = range(0, len(related), RERANK_BATCH)
-    ranked = [_judge(provider, question, batch, start)
-              for batch, start in zip(batches, offsets)]
-    return round_robin(ranked)
 
 
 def _judge(provider: ChatProvider, question: str, batch: list[Tier2File],
