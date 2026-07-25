@@ -24,6 +24,7 @@ from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
 from ._headers import test_preambles
 from ._operations import operations_from
+from ._pinned import exercising_tests
 from ._quote import quote_citations
 from ._surface import apply_block
 from ._taskprompt import build_task_prompt
@@ -69,8 +70,8 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
         operations = operations_from(answer.text, store)
         # The preamble is appended to the RAW text so its citation is quoted
         # by the same pass as every other one.
-        widened = answer.text + test_preambles(
-            store, [op["file"] for op in operations])
+        widened = (answer.text + exercising_tests(store, answer.text)
+                   + test_preambles(store, [op["file"] for op in operations]))
         surface = quote_citations(widened, store) + apply_block(operations)
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a

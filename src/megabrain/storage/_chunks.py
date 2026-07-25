@@ -64,6 +64,17 @@ class ChunkTable:
             f"SELECT {_READ} FROM chunks WHERE vec IS NOT NULL ORDER BY id").fetchall()
         return [_meta(r) for r in rows], to_matrix([r[9] for r in rows])
 
+    def read_metas(self) -> list[ChunkMeta]:
+        """Every chunk's metadata WITH its text, and without its vector.
+
+        Between `read_texts` (no line numbers) and `read_matrix` (the whole
+        embedding matrix): a caller that must cite what it finds needs the
+        spans, and loading the index's heaviest structure to get them is a
+        price nothing here pays.
+        """
+        return [_meta(r) for r in
+                self.db.execute(f"SELECT {_READ} FROM chunks ORDER BY id")]
+
     def read_texts(self) -> list[tuple[str, str]]:
         """(file, text) for every chunk — no vectors, no metadata.
 
