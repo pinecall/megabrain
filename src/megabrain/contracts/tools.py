@@ -17,7 +17,7 @@ from typing import Annotated, TypedDict
 
 from .._types import Content
 
-__all__ = ["AskParams", "SearchParams"]
+__all__ = ["AskParams", "CodeParams", "SearchParams"]
 
 Repo = Annotated[str, "path to the indexed repository root; a path INSIDE it "
                       "also works — the root is found from .megabrain"]
@@ -36,24 +36,11 @@ class _Target(TypedDict):
     repo_path: Repo
 
 
-class AskParams(_Target, total=False):
-    """Send exactly ONE of `query` or `task` — they want opposite answers.
+class _AskRequired(_Target):
+    query: Annotated[str, "a how/where/why question, in natural language"]
 
-    Declared rather than guessed. The engine can read the shape of a sentence,
-    and a caller that says which one it meant is never wrong: "how do I add a
-    cache header" says "add" and is a question.
-    """
 
-    query: Annotated[str, "a how/where/why QUESTION. Returns the flow narrated "
-                          "across subsystems with the real code spliced in — "
-                          "use it to understand a mechanism before touching it"]
-    task: Annotated[str, "a CHANGE you are about to make, in the imperative "
-                         "('add a redirect_back helper that…'). Returns the "
-                         "EDIT SURFACE instead of a walkthrough: every file to "
-                         "touch, the exact line to touch it at, the existing "
-                         "code around it quoted verbatim, and the neighbouring "
-                         "test to imitate. The narrator opens the files itself, "
-                         "so you go straight from this to editing"]
+class AskParams(_AskRequired, total=False):
     scope_path: Scope
     content: Annotated[Content, "'code' (the default) or 'docs'. A code "
                                 "walkthrough diluted with prose explains the "
@@ -92,3 +79,14 @@ class SearchParams(_SearchRequired, total=False):
                             "round adds nothing. Buys RECALL where rerank buys "
                             "ORDER: reach for it when the answer plainly is not "
                             "in the list, not by default"]
+
+
+class _CodeRequired(_Target):
+    task: Annotated[str, "the CHANGE you are about to make, in the imperative: "
+                         "'add a redirect_back helper that falls back to a "
+                         "given path'. Describe the outcome, not the file — "
+                         "finding the file is what this does"]
+
+
+class CodeParams(_CodeRequired, total=False):
+    scope_path: Scope

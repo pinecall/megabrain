@@ -15,10 +15,10 @@ from typing import Any
 
 from ..._types import Content
 from ._missing import Missing
-from ._payload import operations, optional, request
+from ._payload import first_of, operations, optional
 
 __all__ = ["Missing", "repo", "text", "scope", "content", "limit", "flag",
-           "request", "optional", "operations"]
+           "first_of", "optional", "operations"]
 
 _CONTENT = ("code", "docs")
 BRIEF_LIMIT = 10

@@ -25,16 +25,23 @@ Handler = Callable[[dict[str, Any]], str]
 
 def _ask(args: dict[str, Any]) -> str:
     """Buffered, never streamed: MCP is request/response, and the consuming
-    agent reads the final text only. Events would be written to nobody.
+    agent reads the final text only. Events would be written to nobody."""
+    return ask(arg.repo(args), arg.first_of(args, "query", "question"),
+               path_filter=arg.scope(args), content=arg.content(args) or "code",
+               task=False)
 
-    `task` and `query` are the SAME verb with opposite deliverables, so the
-    caller declares which one it meant rather than having the engine read the
-    shape of the sentence. A declared intent is never wrong: "how do I add a
-    cache header" says "add" and is a question.
+
+def _code(args: dict[str, Any]) -> str:
+    """The same verb, the opposite deliverable — and TWO tools rather than one
+    with a mode flag.
+
+    A tool name is what a model chooses by, and the choice is the point: an
+    agent that knows it is about to change something picks this without having
+    to notice a parameter. `task=True` is declared here, not inferred from the
+    sentence, so "how do I add a cache header" cannot be read as a change.
     """
-    return ask(arg.repo(args), arg.request(args), path_filter=arg.scope(args),
-               content=arg.content(args) or "code",
-               task=bool(arg.optional(args, "task")))
+    return ask(arg.repo(args), arg.first_of(args, "task", "query"),
+               path_filter=arg.scope(args), content="code", task=True)
 
 
 def _replace(args: dict[str, Any]) -> str:
@@ -63,6 +70,7 @@ def _search(args: dict[str, Any]) -> str:
 
 HANDLERS: dict[str, Handler] = {
     "megabrain_ask": _ask,
+    "megabrain_code": _code,
     "megabrain_search": _search,
     "megabrain_replace": _replace,
     "megabrain_index": _index,

@@ -13,9 +13,8 @@ from typing import Any
 
 from ._missing import Missing
 
-__all__ = ["optional", "request", "operations"]
+__all__ = ["optional", "first_of", "operations"]
 
-_REQUEST = ("task", "query", "question")
 _OPERATIONS = ("operations", "edits", "ops")
 
 
@@ -25,20 +24,18 @@ def optional(arguments: dict[str, Any], name: str) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-def request(arguments: dict[str, Any]) -> str:
-    """What was asked, under whichever key the caller used.
+def first_of(arguments: dict[str, Any], *names: str) -> str:
+    """The first of `names` the caller actually filled.
 
-    `task` wins when both arrive: a caller that filled both meant to change
-    something and described it twice, and answering the question is the reading
-    that leaves them without an edit surface. `question` stays accepted because
-    it is what this argument was called before.
+    Each tool has ONE canonical field; the rest are the spellings a model
+    reaches for anyway — `question` because that is what ask took before, and
+    each tool accepting the other's word because a model that picked the right
+    tool and the wrong noun has still said what it wants.
     """
-    for name in _REQUEST:
+    for name in names:
         if found := optional(arguments, name):
             return found
-    raise Missing("send `task` for a change you are about to make, or `query` "
-                  "for a how/where/why question — one of them, as a non-empty "
-                  "string")
+    raise Missing(f"`{names[0]}` is required, as a non-empty string")
 
 
 def operations(arguments: dict[str, Any]) -> list[dict[str, Any]]:

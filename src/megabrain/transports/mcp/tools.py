@@ -1,4 +1,4 @@
-"""The tools an agent can see — four, and each one earns its slot.
+"""The tools an agent can see — five, and each one earns its slot.
 
 Every tool costs the calling agent context and a decision, so the surface is
 the shortest one that CLOSES the loop: understand it, map it, change it, and
@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ...contracts.tools import AskParams, SearchParams
+from ...contracts.tools import AskParams, CodeParams, SearchParams
 from ...contracts.tools_write import IndexParams, ReplaceParams
 from .schema import json_schema
 
@@ -35,21 +35,29 @@ class Tool:
 
 TOOLS: tuple[Tool, ...] = (
     Tool("megabrain_ask",
-         "THE primary tool, and it answers two different shapes of request. "
-         "Send `query` for a how/where/why QUESTION: you get a walkthrough of "
-         "the whole relevant flow with the REAL code spliced in at each step — "
-         "verbatim from disk, true line numbers, so the CODE is never "
-         "invented; the prose around it is model narration, so check its "
-         "claims against the code it quotes. Send `task` instead when you are "
-         "about to CHANGE something: you get the EDIT SURFACE — every file to "
-         "touch, the exact line, the existing code quoted verbatim and the "
-         "neighbouring test to imitate — because a walkthrough tells you how "
-         "the code works and still leaves you hunting for where to type. "
-         "Retrieval runs no model either way. Use this INSTEAD OF opening "
-         "files one by one, and do not chain one call per sub-question: one "
-         "covers a flow. Afterwards read only what you will edit — or edit it "
-         "with megabrain_replace, which needs no re-read.",
+         "UNDERSTAND an indexed repository: a how/where/why question gets a "
+         "walkthrough of the whole relevant flow with the REAL code spliced in "
+         "at each step — verbatim from disk, true line numbers, so the CODE is "
+         "never invented; the prose around it is model narration, so check its "
+         "claims against the code it quotes, especially on a root-cause "
+         "question. Retrieval itself runs no model. Use this INSTEAD OF "
+         "opening files one by one, and do not chain one call per "
+         "sub-question: one ask covers a flow. If you already know you are "
+         "going to CHANGE something, use megabrain_code instead — this "
+         "explains how the code works and still leaves you hunting for where "
+         "to type.",
          AskParams),
+    Tool("megabrain_code",
+         "CHANGE an indexed repository: describe the change and get its EDIT "
+         "SURFACE — every file you must touch, the exact line to touch it at, "
+         "the existing code around it quoted VERBATIM, the new lines to add, "
+         "and the neighbouring test to imitate. The engine opens the files "
+         "itself, so this is one call rather than one to understand plus one "
+         "to locate. Go straight from this to editing: apply it with "
+         "megabrain_replace, which needs no re-read of what you were just "
+         "shown. Describe the OUTCOME you want, not the file you guess it "
+         "lives in — finding that is the job.",
+         CodeParams),
     Tool("megabrain_search",
          "ONE call that MAPS a task's whole edit surface: the files that answer "
          "it ranked, each with its best span (true line numbers) and the "

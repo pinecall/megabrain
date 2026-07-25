@@ -1,4 +1,4 @@
-"""The MCP surface: two tools, one dispatch, JSON-RPC over stdio.
+"""The MCP surface: five tools, one dispatch, JSON-RPC over stdio.
 
 Driven the way a host drives it — a JSON-RPC message in, a response object out
 — because the protocol handling IS the surface. Calling the use cases directly
@@ -57,19 +57,24 @@ def _text(result: dict[str, Any]) -> str:
 
 # ── the surface ──────────────────────────────────────────────────────────
 
-def test_the_agent_sees_exactly_the_four_tools() -> None:
+def test_the_agent_sees_exactly_the_five_tools() -> None:
     """Every tool costs the calling agent context and a decision, so the
     surface stays the shortest one that closes the loop: understand it
-    (`ask`), map a task's docs and files (`search`), CHANGE it (`replace`),
-    and make a repository answerable at all (`index`).
+    (`ask`), get a change's edit surface (`code`), map its docs (`search`),
+    apply the change (`replace`), and make a repository answerable (`index`).
+
+    `ask` and `code` are the same verb with opposite deliverables, and they are
+    two TOOLS rather than one with a mode flag because a tool name is what a
+    model chooses by — an agent that knows it is about to change something
+    picks `code` without having to notice a parameter.
 
     `replace` earns its slot on arithmetic rather than capability — the host
     has an editor, but that editor requires a prior Read of the same file, so
     every body megabrain already rendered gets paid for twice.
     """
     assert {tool.name for tool in TOOLS} == {
-        "megabrain_ask", "megabrain_search", "megabrain_replace",
-        "megabrain_index"}
+        "megabrain_ask", "megabrain_code", "megabrain_search",
+        "megabrain_replace", "megabrain_index"}
 
 
 def test_every_schema_is_generated_from_its_contract() -> None:
