@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 
 from .citations import CITATION
+from .splice import BLOCK_HEADER
 
 __all__ = ["broken_references"]
 
@@ -29,7 +30,14 @@ _ANY_BRACKETED = re.compile(r"\[\[[^\]\n]*\]\]")
 
 
 def broken_references(answer: str) -> list[str]:
-    """Every fragment that names code but resolves to nothing."""
+    """Every fragment that names code but resolves to nothing.
+
+    The engine's OWN block headers are removed first. They have the same shape
+    as the mistake being hunted, and today this is only safe because detection
+    runs before splicing — one call on a rendered answer would flag every
+    correct block and send the whole thing back to be "repaired".
+    """
+    answer = BLOCK_HEADER.sub("", answer)
     resolved = {match.group(0) for match in CITATION.finditer(answer)}
     malformed = [match.group(0) for match in _ANY_BRACKETED.finditer(answer)
                  if match.group(0) not in resolved]

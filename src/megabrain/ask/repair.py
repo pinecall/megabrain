@@ -15,6 +15,13 @@ from __future__ import annotations
 import json
 import re
 
+from ..providers.chat import ChatProvider
+from ..storage.model import ChunkMeta
+from ._broken import broken_references
+from .citations import CITATION
+
+__all__ = ["repair", "MAX_TOKENS"]
+
 _PROMPT = """These references in a code walkthrough could not be resolved. \
 Each one names code the writer meant to show but did not cite properly.
 
@@ -27,13 +34,6 @@ REFERENCES:
 
 AVAILABLE CHUNKS:
 {chunks}"""
-
-from ..providers.chat import ChatProvider
-from ..storage.model import ChunkMeta
-from ._broken import broken_references
-from .citations import CITATION
-
-__all__ = ["repair", "MAX_TOKENS"]
 
 MAX_TOKENS = 400
 

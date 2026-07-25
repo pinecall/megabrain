@@ -15,11 +15,11 @@ from __future__ import annotations
 import os
 import re
 
-from ..retrieval.render import lang_of
 from ..storage.model import ChunkMeta
+from ._block import fenced_block
 from .citations import CITATION, Citation, parse_citations
 
-__all__ = ["splice", "SPLICE_CAP"]
+__all__ = ["splice", "SPLICE_CAP", "BLOCK_HEADER"]
 
 # A whole-chunk citation longer than this narrows to the cited region. The
 # prompt already asks for a sub-range on a big chunk; when the model ignores
@@ -28,6 +28,12 @@ __all__ = ["splice", "SPLICE_CAP"]
 SPLICE_CAP = int(os.environ.get("MEGABRAIN_ASK_SPLICE_CAP", "70"))
 
 _FENCE = re.compile(r"```[^\n]*\n.*?```", re.DOTALL)
+
+# The header written above every spliced block, defined HERE because this is
+# what writes it. Two other places have to RECOGNISE it — the broken-reference
+# detector, which would otherwise flag every correct block, and the flow cache,
+# which must strip it before a stored answer goes back to a model.
+BLOCK_HEADER = re.compile(r"\*\*`[^`\n]+`\s*L\d+(?:-\d+)?\*\*[^\n]*")
 
 
 def splice(answer: str, candidates: list[ChunkMeta]) -> str:
@@ -56,24 +62,9 @@ def _blocks(citation: Citation, candidates: list[ChunkMeta],
         return ""
     chunk = candidates[citation.index]
     ranges = citation.ranges or ((chunk.start_line, chunk.end_line),)
-    out = [_one(chunk, low, high, seen) for low, high in ranges]
+    out = [fenced_block(chunk, *_narrow(chunk, low, high), seen)
+           for low, high in ranges]
     return "\n".join(block for block in out if block)
-
-
-def _one(chunk: ChunkMeta, low: int, high: int,
-         seen: set[tuple[int, int, str]]) -> str:
-    low, high = _narrow(chunk, low, high)
-    key = (low, high, chunk.file)
-    if key in seen:
-        # Models cite their own evidence again when they summarise, and the
-        # reader scrolls the same forty lines a second time.
-        return ""
-    seen.add(key)
-    body = _lines(chunk, low, high)
-    if not body:
-        return ""
-    return (f"\n**`{chunk.file}` L{low}-{high}**\n"
-            f"```{lang_of(chunk.file)}\n{body}\n```\n")
 
 
 def _narrow(chunk: ChunkMeta, low: int, high: int) -> tuple[int, int]:
@@ -90,10 +81,3 @@ def _narrow(chunk: ChunkMeta, low: int, high: int) -> tuple[int, int]:
     if high - low + 1 > SPLICE_CAP:
         high = low + SPLICE_CAP - 1
     return low, high
-
-
-def _lines(chunk: ChunkMeta, low: int, high: int) -> str:
-    """The requested lines of the chunk's own text, verbatim."""
-    text = (chunk.text or "").split("\n")
-    start = max(0, low - chunk.start_line)
-    return "\n".join(text[start:start + (high - low + 1)]).rstrip()

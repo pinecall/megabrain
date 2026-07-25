@@ -137,3 +137,48 @@ def test_nothing_broken_means_NO_call_at_all() -> None:
     fixer = Fixer('["[[0]]"]')
     repair("the handler is [[0]]", CANDIDATES, fixer)
     assert fixer.calls == 0
+
+
+# ---- 4. the prompt that should prevent all of this --------------------------
+
+
+def test_the_prompt_forbids_BOTH_failures_by_example() -> None:
+    """The repair is a net. The prompt is the fix, and it must name both
+    mistakes in the exact form the model made them — a rule stated abstractly
+    ("cite properly") is one a model reads as already satisfied.
+
+    The first version of these rules INVITED the grouped form: it offered
+    `[[k:lo-hi, lo2-hi2]]` for several ranges of one chunk, and the model
+    generalised the comma to several chunks.
+    """
+    from megabrain.ask.prompt import RULES
+
+    assert "[[1:173-240], [2:241-307]]" in RULES, "the grouped form is not shown as WRONG"
+    assert "L688-757" in RULES, "the prose file reference is not shown as WRONG"
+    # Shown as PAIRS: a rule with only the forbidden form teaches the shape
+    # without the alternative, and the model picks the nearest thing it knows.
+    assert RULES.count("WRONG") >= 3 and RULES.count("RIGHT") >= 2
+
+
+def test_the_prompt_says_what_to_do_when_nothing_covers_it() -> None:
+    """The escape hatch, without which a model invents a reference: told only
+    that it may not name files, it names one anyway rather than admit a gap."""
+    from megabrain.ask.prompt import RULES
+
+    assert "no chunk below contains" in RULES
+
+
+def test_the_ENGINES_OWN_block_headers_are_not_mistaken_for_broken_refs() -> None:
+    """The splice writes `**`file.py` L10-20**` above every block it pastes,
+    which is the same shape as the mistake this module hunts for.
+
+    Detection is safe only because it runs on the RAW model output, before
+    splicing. Run on the rendered answer it would flag every correct block and
+    send the whole thing back for "repair" — so this pins the distinction that
+    keeps that from being a silent disaster.
+    """
+    from megabrain.ask.splice import splice
+
+    rendered = splice("the handler is [[0]] here", CANDIDATES)
+    assert "**`svc.py`" in rendered, "the fixture stopped producing headers"
+    assert broken_references(rendered) == []

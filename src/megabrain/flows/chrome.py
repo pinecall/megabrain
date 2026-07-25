@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import re
 
+from ..ask.splice import BLOCK_HEADER
+
 __all__ = ["strip_chrome"]
 
 _CITATION = re.compile(r"\[\[[^\]]*\]\]")
 _FENCED = re.compile(r"```.*?```", re.DOTALL)
-_BLOCK_HEAD = re.compile(r"\*\*`[^`\n]+`\s*L\d+(?:-\d+)?\*\*[^\n]*")
 _BLANK_RUN = re.compile(r"\n{3,}")
 
 
@@ -37,6 +38,6 @@ def strip_chrome(answer: str) -> str:
     without being told which is which.
     """
     text = _FENCED.sub("", answer)
-    text = _BLOCK_HEAD.sub("", text)
+    text = BLOCK_HEADER.sub("", text)
     text = _CITATION.sub("", text)
     return _BLANK_RUN.sub("\n\n", text).strip()
