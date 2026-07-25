@@ -56,7 +56,14 @@ def rerank(bundle: Bundle, provider: ChatProvider) -> Bundle:
         order = verdict_of(_judge, provider, bundle["query"], related)
     except Exception:                         # noqa: BLE001 — fail open, always
         return bundle
-    return {**bundle, "tier2": _reordered(related, order)}
+    # The verdict TRAVELS. An empty order reorders nothing, and returning the
+    # bundle byte-identical made "judged and rejected everything" look exactly
+    # like "the lane never ran" — discarding the one signal the evidence band
+    # cannot compute, since the band reads the top-1 cosine and the top-1 is
+    # often right while the rest of the list is noise.
+    kept = len(dict.fromkeys(index for index in order if 0 <= index < len(related)))
+    return {**bundle, "tier2": _reordered(related, order),
+            "judge": {"kept": kept, "of": len(related)}}
 
 
 def _judge(provider: ChatProvider, question: str, batch: list[Tier2File],

@@ -26,6 +26,7 @@ from ..contracts import Tier2File
 __all__ = ["listing"]
 
 MAX_BODY = 2400
+DECLARED_SHOWN = 8
 
 
 def listing(batch: list[Tier2File], offset: int) -> str:
@@ -36,10 +37,26 @@ def listing(batch: list[Tier2File], offset: int) -> str:
 def _card(entry: Tier2File, identifier: int) -> str:
     best = entry["best_chunk"]
     if best is None:
-        return f'[{identifier}] {entry["file"]} · (no span)'
+        return f'[{identifier}] {entry["file"]} · (no span){_declares(entry)}'
     head = (f'[{identifier}] {entry["file"]}:L{best["start_line"]}-{best["end_line"]}'
-            f' · {best["name"] or "?"} ({best["kind"]})')
+            f' · {best["name"] or "?"} ({best["kind"]}){_declares(entry)}')
     # Truncated per card rather than by dropping cards: a candidate the judge
     # never sees cannot be ranked, and an id missing from every batch is
     # indistinguishable from one the judge rejected.
     return f'{head}\n{(best["text"] or "")[:MAX_BODY]}'
+
+
+def _declares(entry: Tier2File) -> str:
+    """The file's outline, on the header — evidence the span cannot carry.
+
+    Field case: a 2173-line file's best span for a "where is the DSL defined"
+    query was the dispatch loop, which never mentions `def get` — and the judge
+    correctly DROPPED the file, judging by the only evidence it was shown. The
+    outline (already on the entry) names the DSL verbs; the card was
+    withholding what retrieval had.
+    """
+    names = list(dict.fromkeys(
+        str(symbol["name"]).rsplit(".", 1)[-1] for symbol in entry["symbols"]))
+    if not names:
+        return ""
+    return f' · declares: {", ".join(names[:DECLARED_SHOWN])}'

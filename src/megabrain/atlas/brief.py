@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Callable
 
 from .._errors import StudyNotFound
 from ..contracts import Brief, Bundle
@@ -31,8 +32,16 @@ DEFAULT_LIMIT = 10
 
 
 def brief_repo(root: Path, question: str, *, limit: int = DEFAULT_LIMIT,
-               embedder: object = None) -> Brief:
-    """Answer `question` with the mental model: cards, relations, interfaces."""
+               embedder: object = None,
+               judge: Callable[[Bundle], Bundle] | None = None) -> Brief:
+    """Answer `question` with the mental model: cards, relations, interfaces.
+
+    `judge` reorders the bundle before selection — the same judge lane search
+    offers, injected rather than imported so this layer stays deterministic
+    and model-free by construction. Policy (which model, whether to spend the
+    call) lives with the caller, exactly as the module docstring demands:
+    ranking is the engine's job, the atlas only narrates.
+    """
     started = time.perf_counter()
     graph = load_graph(str(root))
     state = load_state(root)
@@ -43,6 +52,8 @@ def brief_repo(root: Path, question: str, *, limit: int = DEFAULT_LIMIT,
             raise StudyNotFound(f"no study cards at {root} — "
                                 f"run `megabrain study` once")
         bundle = search_with_state(state, question)
+        if judge is not None:
+            bundle = judge(bundle)
         ranked = _selection(bundle)[:limit]
         cards = state.store.cards.read_for([relpath for relpath, _ in ranked])
         skeletons = dict(zip(state.file_paths, state.file_skeletons))

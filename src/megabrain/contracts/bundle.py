@@ -24,9 +24,11 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from .chunk import ChunkHit, ChunkRef, Span, SymbolRef
+from .chunk import ChunkHit, ChunkRef, SymbolRef
+from .lanes import AnchorHit, FlowHit
 
-__all__ = ["Bundle", "Tier1File", "Tier2File", "FlowHit", "AnchorHit"]
+__all__ = ["JudgeVerdict", "Bundle", "Tier1File", "Tier2File",
+           "FlowHit", "AnchorHit"]
 
 
 class Tier1File(TypedDict):
@@ -55,23 +57,11 @@ class Tier2File(_Tier2Required, total=False):
     via_flow: bool                # surfaced by the cached-walkthrough lane
 
 
-class FlowHit(TypedDict):
-    """A cached ask synthesis that matched. `sha` pins the code it described,
-    so a flow dies with the source it cited."""
+class JudgeVerdict(TypedDict):
+    """What the judge lane decided about the RELATED tier."""
 
-    question: str
-    text: str
-    files: list[str]
-    sha: dict[str, str]
-    score: float                  # question+prose similarity (ATTACH lane)
-    qscore: float                 # question-only similarity (SERVE lane)
-
-
-class AnchorHit(Span):
-    """A chunk the lexical anchor floor pulled in: a rare identifier the query
-    quoted lives verbatim in its text. A pure addition — never displaces."""
-
-    terms: list[str]
+    kept: int
+    of: int
 
 
 class Bundle(TypedDict):
@@ -84,6 +74,15 @@ class Bundle(TypedDict):
     tier2: list[Tier2File]
     flows: list[FlowHit]
     anchors: list[AnchorHit]
+    judge: "JudgeVerdict | None"
+    """The judge lane's verdict, when it ran: how many RELATED files it kept.
+
+    None and kept-0 are DIFFERENT answers. None means the lane never spoke —
+    off, no provider, failed open. kept-0 means it spoke and rejected every
+    candidate: the list below merely shares vocabulary with the task. That
+    verdict was being discarded (an empty reorder changes nothing), and it is
+    exactly the signal the evidence band cannot see — the band reads the top-1
+    cosine, which is often RIGHT while the rest of the list is noise."""
     evidence: str
     """"strong" | "weak" | "none" — how much the index actually offered.
 

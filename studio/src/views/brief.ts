@@ -10,6 +10,7 @@ import { ApiFailure, api } from "../api.js";
 import type { Brief, BriefFile } from "../contracts.js";
 import { el, fill } from "../dom.js";
 import { icon } from "../icons.js";
+import { judgeToggle } from "../judge.js";
 import { suggestionStrip } from "../suggestions.js";
 
 export interface BriefView {
@@ -30,6 +31,7 @@ export function briefView(repo: () => string | undefined,
   }) as HTMLInputElement;
   const results = el("div", {});
   const stats = el("div", { class: "stats-row" });
+  const judge = judgeToggle();
 
   const run = async (): Promise<void> => {
     if (!input.value.trim()) return;
@@ -37,7 +39,9 @@ export function briefView(repo: () => string | undefined,
                      "reading the map…"));
     fill(stats);
     try {
-      render(await api.brief(input.value.trim(), repo()), results, stats, onOpen);
+      render(await api.brief(input.value.trim(), repo(), undefined,
+                             judge.on() || undefined),
+             results, stats, onOpen);
     } catch (failure) {
       /* A repo nobody studied is the expected first visit, not a fault: it
        * gets the one command that fixes it, in the panel, instead of a toast
@@ -63,7 +67,7 @@ export function briefView(repo: () => string | undefined,
   return {
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
-        el("div", { class: "query-icon" }, icon("brain")), input, go),
+        el("div", { class: "query-icon" }, icon("brain")), input, judge.root, go),
       suggestions.root, stats, results),
     focus: () => input.focus(),
     refresh: () => suggestions.reload(),

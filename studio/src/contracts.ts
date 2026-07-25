@@ -67,6 +67,9 @@ export interface Bundle {
    * RAW top cosine: the fused scores' scale is offset, so they cannot say it. */
   evidence: string;
   top_cosine: number;
+  /* The judge lane's verdict when it ran. null = the lane never spoke;
+   * kept 0 = it read every RELATED file and rejected them all. */
+  judge: { kept: number; of: number } | null;
 }
 
 export interface BriefSymbol {

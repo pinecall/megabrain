@@ -51,7 +51,7 @@ class Judge:
 def bundle_of(*files: str) -> dict[str, object]:
     return {
         "query": "how does scoring work", "repo": "r", "ms": 5,
-        "tier1": [], "flows": [], "anchors": [],
+        "tier1": [], "flows": [], "anchors": [], "judge": None,
         "tier2": [{"file": name, "score": 1.0 - index / 100, "via_graph": False,
                    "matched": [], "doc": None, "symbols": [],
                    "best_chunk": asdict(chunk(index, f"def f{index}(): pass\n",
@@ -135,3 +135,64 @@ def test_the_prompt_asks_for_the_EDIT_SURFACE_not_the_answer() -> None:
     prompt = judge.prompts[0].lower()
     assert "constructor" in prompt and "serialization" in prompt
     assert "test files" in prompt, "it must say what to drop, too"
+
+
+def test_the_verdict_TRAVELS_on_the_bundle() -> None:
+    """FOUND IN USE, and the information lost was the best signal in the run.
+
+    On a real corpus the judge returned `[]` — "none of these RELATED files
+    serve the task" — and `rerank` returned the bundle byte-identical, so the
+    caller could not tell a judged-and-rejected list from a lane that never
+    ran. Meanwhile the evidence band said "strong", because the band reads the
+    top-1 cosine and the top-1 WAS right. The two signals together said "the
+    first file is good, the rest is vocabulary" — and the verdict half was
+    being thrown away.
+    """
+    out = rerank(bundle_of("a.py", "b.py", "c.py"), Judge("[2, 0]"))  # type: ignore[arg-type]
+    assert out["judge"] == {"kept": 2, "of": 3}
+
+
+def test_an_EMPTY_verdict_is_said_not_swallowed() -> None:
+    out = rerank(bundle_of("a.py", "b.py"), Judge("[]"))  # type: ignore[arg-type]
+    assert out["judge"] == {"kept": 0, "of": 2}
+    assert len(out["tier2"]) == 2, "saying it is not dropping it"
+
+
+def test_a_FAILED_lane_reports_no_verdict_at_all() -> None:
+    """None and kept-0 are different answers: one means the judge never spoke,
+    the other means it spoke and rejected. Conflating them is the same bug as
+    `[]`-means-nothing, one level up."""
+    out = rerank(bundle_of("a.py", "b.py"), Judge("BOOM"))  # type: ignore[arg-type]
+    assert out["judge"] is None
+
+
+def test_a_duplicated_id_counts_ONCE_in_the_verdict() -> None:
+    """A model that repeats an id must not inflate `kept` past reality."""
+    out = rerank(bundle_of("a.py", "b.py"), Judge("[1, 1, 0]"))  # type: ignore[arg-type]
+    assert out["judge"] == {"kept": 2, "of": 2}
+
+
+def test_the_card_names_what_the_file_DECLARES_beyond_the_span() -> None:
+    """FOUND IN USE: the judge dropped the file that defines the routing DSL.
+
+    `base.rb` is 2173 lines; its best-scoring span for the query was the
+    dispatch loop at L994-1144, which never mentions `def get`. Judging by that
+    card alone, "drop" was the RIGHT call — the card was wrong, not the judge.
+    The file's outline (already on the tier-2 entry) names `get`, `post` and
+    `route`; putting it on the card gives the judge the evidence retrieval
+    already had.
+    """
+    from megabrain.enrich._cards import _card
+
+    entry = bundle_of("base.rb")["tier2"][0]              # type: ignore[index]
+    entry["symbols"] = [
+        {"name": "Sinatra.Base.self.get", "kind": "method", "line": 1531,
+         "end_line": 1537, "signature": "def get(path, opts = {}, &block)",
+         "doc": None},
+        {"name": "Sinatra.Base.self.route", "kind": "method", "line": 1776,
+         "end_line": 1783, "signature": "def route(verb, path, ...)", "doc": None},
+    ]
+    card = _card(entry, 0)                                # type: ignore[arg-type]
+    assert "get" in card and "route" in card
+    assert card.index("declares:") < card.index("def f0"), \
+        "the outline belongs in the header, before the body"

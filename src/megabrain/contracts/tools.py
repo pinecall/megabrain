@@ -77,3 +77,8 @@ class _BriefRequired(_Target):
 
 class BriefParams(_BriefRequired, total=False):
     limit: Annotated[int, "files in the answer (default 10, capped at 30)"]
+    rerank: Annotated[bool, "default false. true runs the same judge lane as "
+                            "search on the underlying bundle before the brief "
+                            "selects its files — one chat call, and the "
+                            "deterministic order stands whenever the judge "
+                            "cannot answer"]

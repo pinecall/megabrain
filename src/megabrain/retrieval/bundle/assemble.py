@@ -54,6 +54,7 @@ def search_with_state(state: SearchState, query: str, *,
     return Bundle(
         query=query,
         repo=state.repo,
+        judge=None,               # the judge lane fills this when it runs
         evidence=evidence_of(scored.top_cosine),
         top_cosine=round(scored.top_cosine, 3),
         tier1=[_core(state, f, ranking, metas, fused, candidates + neighbours)

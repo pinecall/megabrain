@@ -2267,5 +2267,6 @@
  "repo": "megabrain-v2",
  "ms": 241,
  "evidence": "strong",
- "top_cosine": 0.645
+ "top_cosine": 0.645,
+ "judge": null
 }

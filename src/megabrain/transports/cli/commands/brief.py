@@ -20,13 +20,17 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
                         help="anywhere inside the repo (default: .)")
     parser.add_argument("--limit", type=int, default=10, metavar="N",
                         help="files in the answer (default: 10)")
+    parser.add_argument("--rerank", action="store_true",
+                        help="one judge call reorders the files by the task's "
+                             "edit surface — same lane as `search --rerank`")
     parser.add_argument("--json", action="store_true",
                         help="the Brief contract as JSON, for piping")
     parser.set_defaults(run=run)
 
 
 def run(args: argparse.Namespace) -> str:
-    result = brief(args.path, args.query, limit=args.limit)
+    result = brief(args.path, args.query, limit=args.limit,
+                   rerank=args.rerank)
     if args.json:
         return json.dumps(result, indent=2)
     return render_brief(result)

@@ -44,7 +44,8 @@ def brief_route(request: Request) -> Reply:
     if not query.strip():
         return error_reply(400, "query is required", "bad_request")
     try:
-        answer = brief(request.repo(), query, limit=_limit(request))
+        answer = brief(request.repo(), query, limit=_limit(request),
+                       rerank=bool(request.body.get("rerank")))
     except MegabrainError as err:
         return from_engine(err)
     return json_reply(answer)

@@ -69,19 +69,19 @@ export const api = {
   /* The census: what indexing WOULD read. Free, so it always comes first. */
   scan: (path: string) => request<ScanReport>(`/scan${query({ path })}`),
 
-  search: (q: string, repo?: string, content?: "code" | "docs") =>
+  search: (q: string, repo?: string, content?: "code" | "docs", rerank?: boolean) =>
     request<Bundle>("/search", {
       method: "POST",
-      body: JSON.stringify({ query: q, repo, content }),
+      body: JSON.stringify({ query: q, repo, content, rerank }),
     }),
 
   /* The mental map for a question: prose written at study time, relations read
    * live from the graph. No model runs here — a 404 `study_not_found` means the
    * repo was never studied, which the view reports as an action, not an error. */
-  brief: (q: string, repo?: string, limit?: number) =>
+  brief: (q: string, repo?: string, limit?: number, rerank?: boolean) =>
     request<Brief>("/brief", {
       method: "POST",
-      body: JSON.stringify({ query: q, repo, limit }),
+      body: JSON.stringify({ query: q, repo, limit, rerank }),
     }),
 
   file: (file: string, repo?: string, symbol?: string) =>

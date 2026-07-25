@@ -42,7 +42,8 @@ def _search(args: dict[str, Any]) -> str:
 
 def _brief(args: dict[str, Any]) -> str:
     return render_brief(brief(arg.repo(args), arg.text(args, "question"),
-                              limit=arg.limit(args)))
+                              limit=arg.limit(args),
+                              rerank=arg.flag(args, "rerank", default=False)))
 
 
 HANDLERS: dict[str, Handler] = {

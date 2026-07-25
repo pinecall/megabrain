@@ -10,6 +10,7 @@ import { api } from "../api.js";
 import type { Bundle, Tier1File, Tier2File } from "../contracts.js";
 import { code, el, fill } from "../dom.js";
 import { icon } from "../icons.js";
+import { judgeToggle } from "../judge.js";
 import { scopePicker } from "../scope.js";
 import { suggestionStrip } from "../suggestions.js";
 
@@ -35,13 +36,15 @@ export function searchView(repo: () => string | undefined,
    * guessed from the wording. "Both" stays the default: it is the honest
    * answer when nobody has said which they want. */
   const scope = scopePicker();
+  const judge = judgeToggle();
 
   const run = async (): Promise<void> => {
     if (!input.value.trim()) return;
     fill(results, el("div", { class: "empty" }, el("div", { class: "spinner" }),
                      "searching…"));
     try {
-      render(await api.search(input.value.trim(), repo(), scope.value()),
+      render(await api.search(input.value.trim(), repo(), scope.value(),
+                              judge.on() || undefined),
              results, stats, onOpen);
     } catch (failure) {
       onError(failure);
@@ -60,7 +63,8 @@ export function searchView(repo: () => string | undefined,
   return {
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
-        el("div", { class: "query-icon" }, icon("search")), input, scope.root, go),
+        el("div", { class: "query-icon" }, icon("search")), input, scope.root,
+        judge.root, go),
       suggestions.root, stats, results),
     focus: () => input.focus(),
     refresh: () => suggestions.reload(),
@@ -78,6 +82,11 @@ function evidenceBanner(bundle: Bundle): HTMLElement[] {
       el("b", {}, "thin evidence"),
       ` — the closest match is weak (top cosine ${bundle.top_cosine.toFixed(2)}). `
       + "Verify before relying on it.")];
+  }
+  if (bundle.judge !== null && bundle.judge.kept === 0 && bundle.tier2.length) {
+    return [el("div", { class: "warn-bar" },
+      el("b", {}, `the judge kept none of the ${bundle.judge.of} RELATED files`),
+      " — they merely share vocabulary with the task. CORE stands on its own.")];
   }
   if (bundle.evidence === "none") {
     return [el("div", { class: "warn-bar" },
