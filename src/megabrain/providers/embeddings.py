@@ -12,6 +12,7 @@ from typing import Callable, Sequence
 
 from .._arrays import Vector
 from .._types import NotGiven, is_given, not_given
+from ._batching import batches, fit
 from ._config import DEFAULT_BATCH, EmbedConfig
 from ._retry import request_with_retry
 from ._wire import decode_batch
@@ -55,8 +56,7 @@ class Embedder:
         cached, missing = split_cached(self.cache, self.config.model, texts)
         if missing:
             self.config.require_key()
-        for start in range(0, len(missing), self.config.batch_size):
-            batch = missing[start:start + self.config.batch_size]
+        for batch in batches(missing, self.config.batch_size):
             for text, vector in zip(batch, self._embed_one(batch)):
                 cached[text] = vector
                 remember(self.cache, self.config.model, text, vector)
@@ -70,7 +70,10 @@ class Embedder:
         return [cached[t] for t in texts]
 
     def _embed_one(self, batch: Sequence[str]) -> list[Vector]:
-        body = json.dumps({"model": self.config.model, "input": list(batch),
+        # Clipped HERE and nowhere else: the caller's text stays the key it
+        # reads its vector back by, and only the wire sees the shortened one.
+        body = json.dumps({"model": self.config.model,
+                           "input": [fit(text) for text in batch],
                            "encoding_format": "base64"}).encode()
         payload = request_with_retry(
             self._require_transport(), self.config.endpoint, body,

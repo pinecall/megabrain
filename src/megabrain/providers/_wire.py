@@ -16,6 +16,7 @@ import numpy as np
 
 from .._arrays import Vector
 from .._provider_errors import ProviderError
+from ._replies import bad_shape
 from ._width import decode_all
 
 __all__ = ["decode_batch"]
@@ -24,9 +25,10 @@ __all__ = ["decode_batch"]
 def decode_batch(payload: bytes, expected: int) -> list[Vector]:
     """Parse one response into normalised float32 vectors, in REQUEST order."""
     try:
-        rows: list[Any] = json.loads(payload)["data"]
+        body = json.loads(payload)
+        rows: list[Any] = body["data"]
     except (ValueError, KeyError, TypeError) as err:
-        raise ProviderError(f"embeddings response was not the expected shape: {err}") from err
+        raise bad_shape(payload, err) from err
     if len(rows) != expected:
         raise ProviderError(f"embeddings returned {len(rows)} vectors for {expected} texts")
     vectors = _vectors([row.get("embedding") for row in _ordered(rows)])

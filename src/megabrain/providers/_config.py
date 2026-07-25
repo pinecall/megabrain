@@ -12,9 +12,12 @@ from dataclasses import dataclass
 
 from .._provider_errors import MissingCredential
 from .._types import NotGiven, is_given, not_given
+from ._budget import MAX_BATCH_TOKENS, estimate_tokens
 from ._local import is_local_url
 
-__all__ = ["EmbedConfig"]
+# Re-exported: callers ask this module about a request's shape, and
+# splitting a file is not a reason to make them learn a second name.
+__all__ = ["EmbedConfig", "MAX_BATCH_TOKENS", "estimate_tokens"]
 
 DEFAULT_MODEL = "perplexity/pplx-embed-v1-0.6b"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
