@@ -13,7 +13,27 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-__all__ = ["EditOp", "EditRow", "EditResult"]
+__all__ = ["EditOp", "EditRow", "EditResult", "NEW_CODE"]
+
+NEW_CODE = "<<<WRITE THE NEW CODE HERE>>>"
+"""The hole a prepared batch leaves for the CALLER's own code.
+
+MEASURED, and it is why the engine stopped writing code at all. Asked to guard
+the `write` tool against non-regular files, `megabrain_code` found both files
+and both insertion points in a 1 220-file repository — and then authored a
+guard that ran AFTER the write it was guarding, inside an unclosed `try:` that
+does not compile. The agent spent four retrieval calls and two reads undoing
+it, and finished slower than the arm that had no megabrain at all.
+
+The split that came out of it: the engine supplies what it can be exactly
+right about — which file, which line, the anchor text verbatim from the index —
+and the caller supplies the one thing it alone knows, the change. The caller
+also runs the tests, so the code and its verification stay with the same party.
+
+Declared in the contract because two layers must agree on it: `ask` writes the
+hole and `edits` REFUSES any operation that still contains it. A batch applied
+with the placeholder intact would write this string into the source.
+"""
 
 
 class _EditRequired(TypedDict):

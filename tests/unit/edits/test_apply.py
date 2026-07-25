@@ -129,3 +129,46 @@ def test_success_tells_the_caller_to_run_the_GATES(repo) -> None:
     result = apply_edits(repo, [
         {"file": "util.py", "find": "Flatten one level.", "replace": "Done."}])
     assert "gates" in render_edits(result).lower()
+
+
+def test_an_UNFILLED_placeholder_is_refused(repo) -> None:
+    """A prepared batch leaves a hole for the caller's own code. Applied with
+    the hole intact it would write the marker string into the source — the one
+    failure that is silent, because the edit "succeeds"."""
+    from megabrain.contracts.edits import NEW_CODE
+
+    before = (repo / "util.py").read_text(encoding="utf-8")
+    result = apply_edits(repo, [{"file": "util.py", "find": "def flatten(xs):",
+                                 "replace": f"def flatten(xs):\n{NEW_CODE}"}])
+    assert not result["ok"] and NEW_CODE in result["report"][0]["error"]
+    assert (repo / "util.py").read_text(encoding="utf-8") == before
+
+
+def test_an_edit_that_BREAKS_the_syntax_is_refused(repo) -> None:
+    """MEASURED: a generated batch inserted a guard inside a `try:` it never
+    closed. The only thing between that and the working tree was an agent
+    noticing — and this check is one the engine can run itself."""
+    before = (repo / "util.py").read_text(encoding="utf-8")
+    result = apply_edits(repo, [{"file": "util.py", "find": "def flatten(xs):",
+                                 "replace": "def flatten(xs):\n    try:"}])
+    assert not result["ok"] and "unparseable" in result["report"][0]["error"]
+    assert (repo / "util.py").read_text(encoding="utf-8") == before
+
+
+def test_a_file_that_ALREADY_did_not_parse_is_not_blocked(repo) -> None:
+    """Fail-open, and this direction is the one that matters: otherwise a
+    repository with one broken file becomes uneditable, and the edit that FIXES
+    it is precisely the one refused."""
+    (repo / "broken.py").write_text("def f(:\n    pass\n", encoding="utf-8")
+    result = apply_edits(repo, [{"file": "broken.py", "find": "def f(:",
+                                 "replace": "def f():"}])
+    assert result["ok"], result["report"]
+    assert (repo / "broken.py").read_text(encoding="utf-8").startswith("def f():")
+
+
+def test_a_language_with_no_parser_is_not_blocked(repo) -> None:
+    """The gate says "this got worse", never "I could not tell"."""
+    (repo / "notes.xyz").write_text("anything at all\n", encoding="utf-8")
+    result = apply_edits(repo, [{"file": "notes.xyz", "find": "anything",
+                                 "replace": "{{{ unbalanced"}])
+    assert result["ok"], result["report"]

@@ -1,85 +1,73 @@
 """The edit surface, turned into operations `megabrain_replace` can apply.
 
-MEASURED: with the surface as prose, an agent spent two `replace` calls and a
-`Read` applying a two-file change it had already been handed. The surface said
-where to type; turning that into exact-string operations was left as an
-exercise, and the agent did it one file at a time.
+The engine supplies the half it can be exactly right about — which file, which
+lines, and the anchor text VERBATIM from the index — and leaves a hole where
+the caller's own code goes. `find` is never typed by a model, so an edit can
+never fail on a mistyped anchor; and the code is never written by this engine,
+so an edit can never carry a mistake this engine had no way to check.
 
-The `find` is built HERE, from the index — never by the model. That is the
-whole reason this is safe: `replace` matches exact text, so a model retyping
-the anchor with one space wrong turns a valid edit into a refusal. The model
-names a SPAN it has already cited and the lines to add; the engine reads that
-span out of the index and makes it the `find`. Exact by construction.
-
-What the model still authors is the NEW code, which is the one thing it must:
-nobody else knows what the change is.
+That division is measured, not tidy-minded. When the engine did author the
+code, it produced a guard placed AFTER the write it was guarding, inside an
+unclosed `try:`, and the agent spent four retrieval calls and two reads undoing
+it — finishing slower than the arm with no megabrain at all. On an easier
+change the same mechanism had cut 11 turns to 5. Nobody can tell in advance
+which of the two a task is, which is what made it unusable as a default.
 """
 
 from __future__ import annotations
 
 import re
 
+from ..contracts.edits import NEW_CODE
 from ..storage import Store
 from ._quote import lines_of
 
 __all__ = ["operations_from", "APPLY"]
 
-# [[path:lo-hi]] · APPLY <mode> · a fenced block of the new lines.
+# [[path:lo-hi]] followed by APPLY <mode>. No fenced block: the model marks
+# WHERE the change goes and describes it in prose, and writing it is the
+# caller's job.
 APPLY = re.compile(
-    r"\[\[([^\]:]+):(\d+)-(\d+)\]\]\s*\n\s*APPLY\s+(insert_after|replace_span)\s*\n"
-    r"```[a-zA-Z0-9_+-]*\n(.*?)```",
-    re.DOTALL)
+    r"\[\[([^\]:]+):(\d+)-(\d+)\]\]\s*\n\s*"
+    r"APPLY\s+(insert_after|insert_before|replace_span)\b")
 
 
 def operations_from(surface: str, store: Store) -> list[dict[str, str]]:
-    """Every marked edit in `surface`, as {file, find, replace}.
+    """Every marked edit in `surface`, as {file, find, replace} with a hole.
 
-    Silent about what it cannot build: a malformed marker means the caller gets
-    prose and applies it by hand, which is where they already were. A wrong
-    operation would be worse than none — it edits.
+    Silent about what it cannot build: a marker whose range is not real yields
+    no operation. A wrong operation would be worse than none — it edits.
     """
     operations: list[dict[str, str]] = []
-    for path, start, end, mode, added in APPLY.findall(surface):
+    for path, start, end, mode in APPLY.findall(surface):
         anchor = _span(store, path.strip(), int(start), int(end))
         if not anchor:
             continue
-        after = mode == "insert_after"
-        lines = anchor.split("\n")
-        new = _reindent(added.strip("\n"), lines[-1] if after else lines[0])
         operations.append({
             "file": path.strip(),
             "find": anchor,
-            "replace": f"{anchor}\n{new}" if after else new,
+            # The anchor is repeated into `replace` on an insert so the caller
+            # never retypes it either — they fill the hole and nothing else.
+            "replace": _placed(anchor, mode),
         })
     return operations
 
 
-def _reindent(new: str, sibling: str) -> str:
-    """Shift `new` so its first line sits at `sibling`'s indentation.
+def _placed(anchor: str, mode: str) -> str:
+    """Where the hole sits relative to the anchor.
 
-    Done in the ENGINE because asking for it did not work: told twice, in
-    rules and by example, to match the anchor's indentation, the model
-    produced `def redirect_back` two spaces deeper than the `def back` it sat
-    beside. Ruby did not care and a linter would have.
-
-    The whole block moves by ONE delta, so the code's own internal structure is
-    preserved — this straightens a block, it never reformats one. A shift that
-    would go negative is clamped: losing indentation is worse than keeping it.
+    `insert_before` exists because its absence produced a wrong edit. Guarding
+    an operation means adding code BEFORE the thing it guards, and with only
+    `insert_after` the model cited the whole function body and said "after" —
+    which puts the guard after the write it was supposed to prevent. The prose
+    said "before" and the marker said "after"; the mode it needed did not
+    exist.
     """
-    lines = new.split("\n")
-    first = next((line for line in lines if line.strip()), "")
-    delta = _indent(sibling) - _indent(first)
-    if delta == 0:
-        return new
-    if delta > 0:
-        return "\n".join(" " * delta + line if line.strip() else line
-                         for line in lines)
-    cut = min(-delta, *(_indent(line) for line in lines if line.strip()))
-    return "\n".join(line[cut:] if line.strip() else line for line in lines)
-
-
-def _indent(line: str) -> int:
-    return len(line) - len(line.lstrip())
+    if mode == "insert_before":
+        return f"{NEW_CODE}\n{anchor}"
+    if mode == "insert_after":
+        return f"{anchor}\n{NEW_CODE}"
+    return NEW_CODE
 
 
 def _span(store: Store, path: str, lo: int, hi: int) -> str:
