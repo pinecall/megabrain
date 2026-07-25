@@ -7,9 +7,14 @@
 import type { Config, RepoEntry } from "./contracts.js";
 import { el, fill } from "./dom.js";
 import { icon } from "./icons.js";
+import { currentTheme, toggleTheme } from "./theme.js";
 
-export type TabName = "search" | "ask" | "graph";
-export const TABS: TabName[] = ["search", "ask", "graph"];
+export type TabName = "ask" | "search" | "graph";
+
+/* ASK first, and that ordering is the product's: it is the feature people come
+ * for. Search sits beside it because ask is built ON it — every walkthrough is
+ * a retrieval the model then explains. */
+export const TABS: TabName[] = ["ask", "search", "graph"];
 
 export interface Shell {
   viewport: HTMLElement;
@@ -92,7 +97,16 @@ function foot(config: Config, onIndex: () => void,
   if (config.readonly) index.setAttribute("disabled", "true");
   const settings = el("button", { class: "rail-foot-btn" }, icon("gear"), "Settings");
   settings.addEventListener("click", onSettings);
-  return el("div", { class: "rail-foot" }, index, settings);
+  return el("div", { class: "rail-foot" }, index, themeButton(), settings);
+}
+
+function themeButton(): HTMLElement {
+  const label = el("span", {}, currentTheme() === "dark" ? "Light theme" : "Dark theme");
+  const button = el("button", { class: "rail-foot-btn" }, icon("spark"), label);
+  button.addEventListener("click", () => {
+    label.textContent = toggleTheme() === "dark" ? "Light theme" : "Dark theme";
+  });
+  return button;
 }
 
 function chip(config: Config): HTMLElement {

@@ -25,13 +25,20 @@ export function searchView(repo: () => string | undefined,
   }) as HTMLInputElement;
   const results = el("div", {});
   const stats = el("div", { class: "stats-row" });
+  /* CODE or DOCS, never a blend — the engine's own rule, surfaced. With both
+   * indexed, a long README wins on prose-shaped questions and buries the
+   * implementation it describes, so the choice is explicit rather than
+   * guessed from the wording. "Both" stays the default: it is the honest
+   * answer when nobody has said which they want. */
+  const scope = scopePicker();
 
   const run = async (): Promise<void> => {
     if (!input.value.trim()) return;
     fill(results, el("div", { class: "empty" }, el("div", { class: "spinner" }),
                      "searching…"));
     try {
-      render(await api.search(input.value.trim(), repo()), results, stats, onOpen);
+      render(await api.search(input.value.trim(), repo(), scope.value()),
+             results, stats, onOpen);
     } catch (failure) {
       onError(failure);
     }
@@ -45,7 +52,7 @@ export function searchView(repo: () => string | undefined,
   return {
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
-        el("div", { class: "query-icon" }, icon("search")), input, go),
+        el("div", { class: "query-icon" }, icon("search")), input, scope.root, go),
       stats, results),
     focus: () => input.focus(),
   };
@@ -65,6 +72,30 @@ function render(bundle: Bundle, results: HTMLElement, stats: HTMLElement,
          el("div", { class: "split-2" },
             ...bundle.tier2.map((file) => relatedCard(file, onOpen)))]
       : []));
+}
+
+interface Scope {
+  root: HTMLElement;
+  value(): "code" | "docs" | undefined;
+}
+
+function scopePicker(): Scope {
+  const options: [string, "code" | "docs" | undefined][] = [
+    ["Both", undefined], ["Code", "code"], ["Docs", "docs"]];
+  let chosen: "code" | "docs" | undefined;
+  const root = el("div", { style: "display:flex;gap:4px;margin-right:4px" });
+  const buttons = options.map(([label, value]) => {
+    const button = el("button", { class: "chip" }, label);
+    button.addEventListener("click", () => {
+      chosen = value;
+      for (const other of buttons) other.classList.remove("on");
+      button.classList.add("on");
+    });
+    return button;
+  });
+  buttons[0]?.classList.add("on");
+  root.append(...buttons);
+  return { root, value: () => chosen };
 }
 
 function sectionHead(label: string, note: string): HTMLElement {

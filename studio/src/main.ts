@@ -13,6 +13,7 @@ import { graphView } from "./views/graph.js";
 import { openFile } from "./views/files.js";
 import { indexOverlay } from "./views/indexing.js";
 import { searchView } from "./views/search.js";
+import { applyTheme, currentTheme } from "./theme.js";
 
 let selected: string | undefined;
 const repo = (): string | undefined => selected;
@@ -41,6 +42,7 @@ function select(shell: Shell, tab: TabName): void {
 }
 
 async function boot(): Promise<void> {
+  applyTheme(currentTheme());   // before first paint: no dark flash for a light user
   const host = need("app");
   const config = await api.config();
   const shell = mountShell(host, config,
@@ -62,7 +64,7 @@ async function boot(): Promise<void> {
   };
   shell.setRepos(repos, pick);
   pick(repos[0]!);
-  select(shell, "search");
+  select(shell, "ask");
 }
 
 boot().catch(toast);
