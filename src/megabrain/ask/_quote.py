@@ -49,11 +49,26 @@ def _block(store: Store, path: str, lo: int, hi: int) -> str:
     if not lines:
         return f"_(no file `{path}` in the index)_"
     lo, hi = max(1, lo), min(len(lines), max(lo, hi))
+    lo = _with_decorators(lines, lo)
     shown = min(hi, lo + MAX_QUOTE_LINES - 1)
     body = "\n".join(lines[lo - 1:shown])
     cut = (f"\n… cut at L{shown} of L{lo}-{hi}" if shown < hi else "")
     lang = _LANG.get(path.rsplit(".", 1)[-1].lower(), "")
     return f"**`{path}` L{lo}-{hi}**\n```{lang}\n{body}\n```{cut}"
+
+
+def _with_decorators(lines: list[str], lo: int) -> int:
+    """Widen a citation upward over the decorators attached to its first line.
+
+    MEASURED: a "complete sibling" cited from `async def test_…` left
+    `@needs_pydantic_v2` on the line above, and the agent went and opened the
+    file to find out what decorated every test in it. A decorated declaration
+    BEGINS at its first decorator — citing from the `def` shows a function the
+    file does not contain.
+    """
+    while lo > 1 and lines[lo - 2].lstrip().startswith("@"):
+        lo -= 1
+    return lo
 
 
 def lines_of(store: Store, path: str) -> list[str]:

@@ -61,3 +61,22 @@ def test_a_file_that_is_not_indexed_says_so_instead_of_inventing(tmp_path) -> No
     with indexed(tmp_path) as store:
         out = quote_citations("[[nope.rb:1-3]]", store)
     assert "no file" in out and "```" not in out
+
+
+def test_a_citation_INCLUDES_the_decorators_above_it(tmp_path) -> None:
+    """MEASURED: a "complete sibling" cited from `async def test_…` left
+    `@needs_pydantic_v2` on the line above, and the agent opened the file to
+    find out what decorated every test in it. A decorated declaration BEGINS at
+    its first decorator — citing from the `def` shows a function the file does
+    not contain."""
+    source = ("import pytest\n\n@pytest.mark.skipif(True)\n@needs_v2\n"
+              "def test_thing():\n    assert 1\n")
+    store = Store(tmp_path)
+    store.files.upsert("t.py", "sha", "", None)
+    store.chunks.insert([Chunk(file="t.py", kind="file", name=None, part=None,
+                               start_line=1, end_line=6, text=source,
+                               breadcrumb="t.py")], None)
+    with store:
+        out = quote_citations("[[t.py:5-6]]", store)
+    assert "@needs_v2" in out and "@pytest.mark.skipif" in out
+    assert "import pytest" not in out, "widened past the decorators"

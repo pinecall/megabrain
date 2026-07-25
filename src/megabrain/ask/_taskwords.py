@@ -54,12 +54,16 @@ spanning from its own first line to its own end, never the class, describe or \
 module that contains it. A container is the whole suite and costs more than \
 opening the file would.
 
-For production code, ONE sibling is enough. For a TEST, cite TWO OR THREE, and \
-choose them to show the file's IDIOMS rather than its subject: how it skips a \
-platform, how it builds its fixture, how it asserts. A test is written by \
-imitation, and one example shows the shape while three show the conventions — \
-measured, an agent given one still went hunting with grep for how this file \
-spells a platform skip.
+When the change MIRRORS something the codebase already does — the same guard on \
+a sibling function, the same option on a sibling class — cite that original in \
+full, every occurrence of it. It is the specification: its exact wording, its \
+comment, its error string are what "the same as" means, and the reader will go \
+and open the file to get them if you only describe them. Measured, that is one \
+of the reads this section exists to prevent.
+
+For a TEST, cite TWO OR THREE siblings, chosen to show the file's IDIOMS rather \
+than its subject: how it skips a platform, how it builds its fixture, how it \
+asserts. One example shows the shape; three show the conventions.
 
 Never cite the same range twice anywhere in your answer.
 
