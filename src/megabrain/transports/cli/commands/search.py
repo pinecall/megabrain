@@ -26,6 +26,9 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
                         help="code bodies for RELATED files too, not just a map")
     parser.add_argument("--compact", action="store_true",
                         help="no code bodies at all — the map only")
+    parser.add_argument("--rerank", action="store_true",
+                        help="let a model reorder RELATED by the task's edit "
+                             "surface (costs a call; never drops a file)")
     parser.add_argument("--json", action="store_true",
                         help="the bundle as JSON, for piping into another tool")
     parser.set_defaults(run=run, content=None)
@@ -35,7 +38,7 @@ def run(args: argparse.Namespace) -> str:
     """`--json` emits the CONTRACT, not a rendering of it: a caller piping
     this is writing against `contracts/`, the same shape MCP and HTTP serve."""
     bundle = search(args.path, args.query, path_filter=args.path_filter,
-                    content=args.content)
+                    content=args.content, rerank=args.rerank)
     if args.json:
         return json.dumps(bundle, indent=2)
     return render(bundle, compact=args.compact, related_code=args.full)

@@ -24,7 +24,8 @@ def search_route(request: Request) -> Reply:
     try:
         bundle = search(_repo(request), query,
                         path_filter=request.param("path_filter") or None,
-                        content=_content(request))
+                        content=_content(request),
+                        rerank=bool(request.body.get("rerank")))
     except MegabrainError as err:
         return _from_engine(err)
     return json_reply(bundle)
