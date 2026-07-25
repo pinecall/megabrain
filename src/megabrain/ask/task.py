@@ -24,7 +24,7 @@ from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
 from ._operations import operations_from
 from ._quote import quote_citations
-from ._surface import apply_block, full_files
+from ._surface import apply_block
 from ._taskprompt import build_task_prompt
 from ._toolcall import assistant_turn, tool_result
 from .events import Emit, emit_nothing
@@ -44,7 +44,7 @@ MAX_TOKENS = 3000
 
 
 def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
-              full: bool = False, emit: Emit = emit_nothing) -> str:
+              emit: Emit = emit_nothing) -> str:
     """The edit surface for `task`, with every cited line spliced verbatim.
 
     Opens the index itself and holds it for the whole loop: the tool reads
@@ -66,8 +66,7 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
         # here, and quoting turns them into code blocks that no longer say
         # which lines they were.
         operations = operations_from(answer.text, store)
-        surface = (quote_citations(answer.text, store) + apply_block(operations)
-                   + (full_files(store, operations) if full else ""))
+        surface = quote_citations(answer.text, store) + apply_block(operations)
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a
     # path that only returns its text arrives as a blank answer everywhere.

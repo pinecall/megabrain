@@ -90,10 +90,3 @@ class _CodeRequired(_Target):
 
 class CodeParams(_CodeRequired, total=False):
     scope_path: Scope
-    full: Annotated[bool, "default false: you get the edit surface — the "
-                          "anchors, the new lines, and the ready-to-apply "
-                          "batch — at about 500 tokens. true appends every "
-                          "file the change touches IN FULL, which on a real "
-                          "two-file change measured ~21 500 tokens against "
-                          "~475. Ask for it when you intend to review the "
-                          "whole file before applying, not by default"]
