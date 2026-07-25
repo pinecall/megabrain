@@ -45,18 +45,28 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:            # noqa: N802
         self._serve("POST")
 
-    def _serve(self, method: str) -> None:
+    def do_HEAD(self) -> None:            # noqa: N802
+        """Same headers as the GET, no body.
+
+        Not optional: monitors, proxies and link checkers send HEAD, and the
+        stdlib answers an unimplemented method with 501 — so a health check
+        written the normal way reported the server as broken.
+        """
+        self._serve("GET", body=False)
+
+    def _serve(self, method: str, *, body: bool = True) -> None:
         path, query = split_target(self.path)
         refusal = self.guard.refuse(path, authorization=self.headers.get("Authorization", ""),
                                     caller=self.client_address[0])
         if refusal:
-            return self._write(error_reply(refusal[0], refusal[1]))
+            return self._write(error_reply(refusal[0], refusal[1]), body=body)
         try:
-            body = self._read_body() if method == "POST" else {}
+            payload = self._read_body() if method == "POST" else {}
         except ValueError as err:
-            return self._write(error_reply(400, str(err), "bad_request"))
+            return self._write(error_reply(400, str(err), "bad_request"), body=body)
         self._write(dispatch(Request(method=method, path=path, query=query,
-                                     body=body, policy=self.guard.policy)))
+                                     body=payload, policy=self.guard.policy)),
+                    body=body)
 
     def _read_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length") or 0)
@@ -71,5 +81,5 @@ class Handler(BaseHTTPRequestHandler):
         # this narrowing is a fact about JSON rather than an assumption.
         return cast("dict[str, Any]", loaded)
 
-    def _write(self, reply: Reply) -> None:
-        write_reply(self, reply)
+    def _write(self, reply: Reply, *, body: bool = True) -> None:
+        write_reply(self, reply, body=body)

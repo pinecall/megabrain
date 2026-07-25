@@ -17,12 +17,9 @@ __all__ = ["Request", "Reply", "Route", "Frames", "json_reply", "error_reply",
            "split_target"]
 
 Frames = Callable[[], Iterator[tuple[str, object]]]
-"""A lazy source of SSE frames: (event name, JSON-serialisable data).
-
-A callable rather than an iterator, so nothing starts running until the
-response headers are on the wire — a stream that begins computing during
-routing can no longer report its own failure as an HTTP status.
-"""
+"""SSE frames — (event name, data) — behind a callable, so nothing runs until
+the headers are on the wire. A stream that starts computing during routing can
+no longer report its own failure as an HTTP status."""
 
 
 def _no_query() -> dict[str, str]:
@@ -59,11 +56,19 @@ class Request:
 
 @dataclass(frozen=True, slots=True)
 class Reply:
-    """A finished answer. `stream` is set instead of `payload` for SSE."""
+    """A finished answer, in exactly one of three shapes.
+
+    `payload` is JSON, `stream` is SSE, `body` is raw bytes. Three fields
+    rather than one `object` because the writer has to know which one it is
+    holding, and inferring that from the value's type is how a bytes payload
+    ends up JSON-encoded as a list of integers.
+    """
 
     status: int = 200
     payload: object = None
     stream: Frames | None = None      # set INSTEAD of payload, for SSE
+    body: bytes | None = None         # set INSTEAD of payload, for a file
+    content_type: str = "application/json"
 
 
 Route = Callable[[Request], Reply]

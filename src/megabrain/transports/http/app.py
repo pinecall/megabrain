@@ -11,11 +11,12 @@ from __future__ import annotations
 import sys
 from http.server import ThreadingHTTPServer
 from socketserver import BaseServer
+from typing import cast
 
 from ._handler import Handler
 from .security import Guard, Policy
 
-__all__ = ["build_server", "serve", "LOOPBACK"]
+__all__ = ["build_server", "serve", "bound_port", "LOOPBACK"]
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", ""})
 
@@ -57,6 +58,16 @@ def build_server(host: str, port: int, policy: Policy | None = None) -> BaseServ
             f"indexing, would be open to the network. Pass a token, or bind "
             f"127.0.0.1 and put a reverse proxy in front.")
     return _Server((host, port), Guard(policy))
+
+
+def bound_port(server: BaseServer) -> int:
+    """The port actually in use.
+
+    Worth a function: `port=0` asks the OS to choose, so the number is only
+    knowable after binding — and the stdlib types `server_address` as a union
+    because AF_UNIX servers have no port at all.
+    """
+    return cast("tuple[str, int]", server.server_address)[1]
 
 
 def serve(host: str = "127.0.0.1", port: int = 2137,

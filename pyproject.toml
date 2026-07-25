@@ -59,6 +59,9 @@ where = ["src"]
 include = ["megabrain*"]
 
 [tool.setuptools.package-data]
+# The studio's built bundle ships INSIDE the package, so an install serves the
+# UI without a node toolchain. A path outside would work from a checkout and
+# 404 from a wheel — the worst possible split.
 megabrain = ["py.typed", "transports/http/ui/*", "transports/http/ui/icons/*"]
 
 [tool.setuptools.dynamic]

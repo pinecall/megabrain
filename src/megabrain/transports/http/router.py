@@ -12,6 +12,7 @@ from .routes.graph import graph_route
 from .routes.indexing import index_stream
 from .routes.meta import config, health, repos
 from .routes.query import get_route, search_route, symbols_route
+from .routes.static import static_route
 
 __all__ = ["ROUTES", "dispatch"]
 
@@ -24,6 +25,7 @@ ROUTES: dict[tuple[str, str], Route] = {
     ("GET", "/graph"): graph_route,
     ("POST", "/search"): search_route,
     ("POST", "/index/stream"): index_stream,
+    ("GET", "/"): static_route,
 }
 
 
@@ -37,6 +39,10 @@ def dispatch(request: Request) -> Reply:
     route = ROUTES.get((request.method, request.path))
     if route is not None:
         return route(request)
+    # Assets are a PREFIX, not a fixed path: the table cannot enumerate every
+    # file a build produces, and this is the only route with that shape.
+    if request.method == "GET" and request.path.startswith("/ui"):
+        return static_route(request)
     if any(path == request.path for _, path in ROUTES):
         allowed = sorted({m for m, p in ROUTES if p == request.path})
         return error_reply(405, f"{request.path} accepts {', '.join(allowed)}",

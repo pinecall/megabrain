@@ -7,7 +7,7 @@ of anything, and no fourth runtime dependency.
 
 from __future__ import annotations
 
-from .app import build_server, serve
+from .app import bound_port, build_server, serve
 from .security import Policy
 
-__all__ = ["serve", "build_server", "Policy"]
+__all__ = ["serve", "build_server", "bound_port", "Policy"]

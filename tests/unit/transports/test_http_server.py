@@ -184,3 +184,24 @@ def test_binding_beyond_localhost_without_a_token_is_refused() -> None:
 def test_binding_beyond_localhost_WITH_a_token_is_allowed() -> None:
     server = build_server("0.0.0.0", 0, Policy(token="s3cret"))
     server.server_close()
+
+
+def test_HEAD_returns_the_headers_of_the_GET(client: Client) -> None:
+    """Monitors, proxies and link checkers send HEAD, and the stdlib answers
+    an unimplemented method with 501 — so a health check written the normal way
+    reported this server as broken."""
+    connection = HTTPConnection("127.0.0.1", client.port, timeout=10)
+    connection.request("HEAD", "/health")
+    response = connection.getresponse()
+    assert response.status == 200
+    assert response.getheader("Content-Type") == "application/json"
+    assert int(response.getheader("Content-Length") or 0) > 0, \
+        "the length must describe the body a GET would send"
+    assert response.read() == b"", "HEAD must not send a body"
+    connection.close()
+
+
+def test_the_studio_page_is_served_from_the_root(client: Client) -> None:
+    status, body = client.get("/")
+    assert status == 200
+    assert "megabrain" in body and "ui/app.js" in body

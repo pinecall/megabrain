@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>megabrain studio</title>
+  <link rel="stylesheet" href="ui/style.css">
+</head>
+<body>
+  <header>
+    <h1>megabrain</h1>
+    <div id="repos" class="repos"></div>
+    <span id="status" class="dim">loading…</span>
+  </header>
+  <div class="ask">
+    <input id="q" type="search" placeholder="how does the SSE decoder feed the typed stream?"
+           autocomplete="off" spellcheck="false">
+    <button id="go">search</button>
+    <button id="graph" class="ghost">graph</button>
+  </div>
+  <main id="view"></main>
+  <script type="module" src="ui/app.js"></script>
+</body>
+</html>

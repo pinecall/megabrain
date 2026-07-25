@@ -43,6 +43,25 @@ jobs:
       # the suite is fully offline — no API key, no network, no private corpus
       - run: python -m pytest -q
 
+  # The studio's bundle is COMMITTED, so `pip install -e .` works from a clone
+  # with no node installed. This job is the other half of that deal: it rebuilds
+  # from studio/src and fails if the result differs from what was committed.
+  # Without it the committed bundle silently goes stale, which is the one real
+  # cost of checking build output into a repository.
+  studio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --prefix studio || npm install --prefix studio
+      - run: npm run --prefix studio build
+      - name: the committed bundle must match its source
+        run: |
+          git diff --stat --exit-code src/megabrain/transports/http/ui \
+            || { echo "::error::studio bundle is stale — run: cd studio && npm run build"; exit 1; }
+
   build:
     runs-on: ubuntu-latest
     steps:
