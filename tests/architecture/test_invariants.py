@@ -138,3 +138,17 @@ def test_no_function_exceeds_the_line_budget(module: str) -> None:
 
     over = long_functions(module, MAX_FUNC_LINES)
     assert not over, f"{module}: {over} (max {MAX_FUNC_LINES} lines)"
+
+
+def test_retrieval_never_imports_a_chat_backend() -> None:
+    """HARD RULE #1, now that a chat backend exists to import.
+
+    The earlier version of this checked a package that did not exist yet, so
+    it could not have failed. `providers.chat` is real from this phase on, and
+    an import of it from anywhere under retrieval/ is the rule breaking.
+    """
+    for module in modules_under("retrieval"):
+        for imported in imports_of(module):
+            assert "providers.chat" not in imported, f"{module}: hard rule #1"
+            assert "providers._stream" not in imported, \
+                f"{module}: the streaming seam belongs to chat, not retrieval"
