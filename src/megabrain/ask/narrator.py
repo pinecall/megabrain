@@ -16,6 +16,8 @@ from ..storage.model import ChunkMeta
 from ._candidates import candidates_of
 from .events import Emit, emit_nothing
 from .prompt import build_prompt
+from .repair import broken_references, repair
+from .splice import splice
 from .stream import Splicer
 
 __all__ = ["narrate"]
@@ -41,13 +43,32 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
             parts.append(ready)
             emit({"type": "delta", "text": ready})
 
-    provider.stream_chat(_body(provider, question, candidates, context),
-                         on_delta=on_delta)
+    answer = provider.stream_chat(_body(provider, question, candidates, context),
+                                  on_delta=on_delta)
     if tail := splicer.flush():
         parts.append(tail)
         emit({"type": "delta", "text": tail})
+    parts.extend(_repaired(provider, answer.text, candidates, emit))
     emit({"type": "narrated", "ms": int((time.perf_counter() - started) * 1000)})
     return "".join(parts)
+
+
+def _repaired(provider: ChatProvider, raw: str, candidates: list[ChunkMeta],
+              emit: Emit) -> list[str]:
+    """Rescue the references the splice could not resolve.
+
+    Checked against the RAW model output rather than the spliced text: by then
+    a resolved citation has become a code block, and what is left is exactly
+    what failed. One extra call, only when something broke, and only the broken
+    fragments go back — a second full narration would replace prose the reader
+    is already reading.
+    """
+    broken = broken_references(raw)
+    if not broken:
+        return []
+    emit({"type": "repairing", "references": broken})
+    fixed = splice(repair(raw, candidates, provider), candidates)
+    return [f"\n{fixed}"] if fixed.strip() else []
 
 
 def _body(provider: ChatProvider, question: str, candidates: list[ChunkMeta],

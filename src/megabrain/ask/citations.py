@@ -18,8 +18,17 @@ __all__ = ["Citation", "parse_citations", "CITATION", "PARTIAL"]
 # prompt read "L1-172", so models mirror that as [[0:L1-172]].
 _RANGE = r"[Ll]?\d+(?:\s*-\s*[Ll]?\d+)?"
 
+# One reference inside the brackets: `3`, `3:10-20`, `3:10-20, 30-40`.
+_ONE = rf"(\d+)((?::\s*{_RANGE})(?:\s*,\s*{_RANGE})*)?"
+
 # DOUBLE brackets, so the model can still write [1] in prose without collision.
-CITATION = re.compile(rf"\[\[(\d+)((?::\s*{_RANGE})(?:\s*,\s*{_RANGE})*)?\s*\]\]")
+#
+# And the GROUPED form — `[[1:173-240], [2:241-307]]` — because models write it
+# unprompted and rejecting it printed both citations as prose: the reader was
+# given two file/line ranges and no code. Accepting it costs one alternation;
+# refusing it cost a whole answer.
+CITATION = re.compile(rf"\[\[\s*{_ONE}(?:\s*\]?\s*,\s*\[?\s*{_ONE})*\s*\]?\s*\]\]")
+_INNER = re.compile(_ONE)
 
 # A citation that is still ARRIVING, at the tail of a stream buffer. Held back
 # rather than emitted: a half-written `[[3:70` printed as prose cannot be taken
@@ -36,11 +45,21 @@ class Citation:
 
 
 def parse_citations(text: str) -> list[Citation]:
-    return [_build(match) for match in CITATION.finditer(text)]
+    """Every reference in the text, in order.
+
+    One bracket pair can hold SEVERAL — the grouped form — so this is a flat
+    list rather than one citation per match.
+    """
+    out: list[Citation] = []
+    for match in CITATION.finditer(text):
+        out.extend(_references(match.group(0)))
+    return out
 
 
-def _build(match: "re.Match[str]") -> Citation:
-    return Citation(index=int(match.group(1)), ranges=_ranges(match.group(2)))
+def _references(bracketed: str) -> list[Citation]:
+    inner = bracketed.strip("[] \t")
+    return [Citation(index=int(part.group(1)), ranges=_ranges(part.group(2)))
+            for part in _INNER.finditer(inner)]
 
 
 def _ranges(spec: str | None) -> tuple[tuple[int, int], ...]:

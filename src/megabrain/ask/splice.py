@@ -36,8 +36,10 @@ def splice(answer: str, candidates: list[ChunkMeta]) -> str:
     prose = _FENCE.sub("", answer)      # whatever it tried to paste, it may not
 
     def replace(match: "re.Match[str]") -> str:
-        citation = parse_citations(match.group(0))
-        return _blocks(citation[0], candidates, seen) if citation else ""
+        # One pair of brackets can hold several references — the grouped form
+        # models write unprompted — so every one of them becomes a block.
+        return "".join(_blocks(citation, candidates, seen)
+                       for citation in parse_citations(match.group(0)))
 
     return CITATION.sub(replace, prose)
 
