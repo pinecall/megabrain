@@ -54,12 +54,18 @@ spanning from its own first line to its own end, never the class, describe or \
 module that contains it. A container is the whole suite and costs more than \
 opening the file would.
 
+CITE EVERY HELPER YOU TELL THEM TO REUSE. Naming one is not enough — the \
+reader needs its signature, its defaults and what it does to the response \
+before they can call it correctly. Measured: told to reuse `content_type`, \
+`attachment` and `halt`, an agent had to ask a second question to learn that \
+the body setter DELETES content-length, without which it would have set that \
+header by hand and been silently wrong.
+
 When the change MIRRORS something the codebase already does — the same guard on \
 a sibling function, the same option on a sibling class — cite that original in \
 full, every occurrence of it. It is the specification: its exact wording, its \
 comment, its error string are what "the same as" means, and the reader will go \
-and open the file to get them if you only describe them. Measured, that is one \
-of the reads this section exists to prevent.
+and open the file to get them if you only describe them.
 
 For a TEST, cite TWO OR THREE siblings, chosen to show the file's IDIOMS rather \
 than its subject: how it skips a platform, how it builds its fixture, how it \
