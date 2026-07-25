@@ -29,8 +29,20 @@ def health(request: Request) -> Reply:
         return error_reply(err.http_status, str(err), err.code)
     with Store(root) as store:
         stats = store.stats()
+    # Freshness is computed only when asked for: it hashes every file, which is
+    # the right cost for a button and the wrong one for a liveness probe.
+    behind = _freshness(root) if request.param("freshness") else {}
     return json_reply({"ok": stats["chunks"] > 0, "version": __version__,
-                       "repo": root.name, "root": str(root), **stats})
+                       "repo": root.name, "root": str(root), **stats, **behind})
+
+
+def _freshness(root: Path) -> dict[str, object]:
+    from ....usecases import freshness
+
+    behind = freshness(root)
+    return {"stale": behind.stale, "changed": behind.changed,
+            "added": behind.added, "removed": behind.removed,
+            "freshness": behind.describe()}
 
 
 def config(request: Request) -> Reply:

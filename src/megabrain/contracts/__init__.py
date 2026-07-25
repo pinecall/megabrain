@@ -23,6 +23,7 @@ from .graph import (
 )
 from .prune import NoiseSpan, PruneResult, RelatedDoc, RelatedTest
 from .repo import RepoEntry
+from .scan import ScanReport, SkippedFile
 
 __all__ = [
     # chunk level
@@ -33,6 +34,8 @@ __all__ = [
     "FileView",
     # the machine's indexed repositories
     "RepoEntry",
+    # the pre-index census
+    "ScanReport", "SkippedFile",
     # the dependency graph
     "GraphMap", "GraphNode", "GraphLink", "Community", "Neighbourhood", "GraphPath",
     # the flat projection

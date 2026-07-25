@@ -14,11 +14,11 @@ from typing import Sequence
 
 from ..._errors import MegabrainError
 from ..._version import __version__
-from .commands import ask, get, graph, index, search, studio
+from .commands import ask, get, graph, index, scan, search, studio
 
 __all__ = ["main", "build_parser"]
 
-_COMMANDS = (index, search, ask, get, graph, studio)
+_COMMANDS = (index, scan, search, ask, get, graph, studio)
 
 
 def build_parser() -> argparse.ArgumentParser:

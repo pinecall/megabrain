@@ -125,6 +125,23 @@ export interface Health {
   chunks?: number;
   symbols?: number;
   edges?: number;
+  stale?: boolean;
+  freshness?: string;
+}
+
+export interface SkippedFile {
+  file: string;
+  reason: string;
+}
+
+export interface ScanReport {
+  path: string;
+  name: string;
+  indexed: boolean;
+  would_index: number;
+  skipped: SkippedFile[];
+  by_extension: Record<string, number>;
+  ignore: string[];
 }
 
 export interface Project {

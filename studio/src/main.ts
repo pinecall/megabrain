@@ -11,7 +11,7 @@ import { mountShell, type Shell, type TabName } from "./shell.js";
 import { askView } from "./views/ask.js";
 import { graphView } from "./views/graph.js";
 import { openFile } from "./views/files.js";
-import { indexOverlay } from "./views/indexing.js";
+import { addRepoOverlay } from "./views/adding.js";
 import { searchView } from "./views/search.js";
 import { applyTheme, currentTheme } from "./theme.js";
 
@@ -41,12 +41,23 @@ function select(shell: Shell, tab: TabName): void {
   if (tab === "graph") void views.graph.load();
 }
 
+async function refreshRail(shell: Shell, pick: (entry: RepoEntry) => void): Promise<void> {
+  const { repos } = await api.repos();
+  shell.setRepos(repos, pick);
+}
+
+
 async function boot(): Promise<void> {
   applyTheme(currentTheme());   // before first paint: no dark flash for a light user
   const host = need("app");
   const config = await api.config();
+  let pick: (entry: RepoEntry) => void = () => {};
   const shell = mountShell(host, config,
-    () => indexOverlay(repo(), toast), () => toast("settings: coming with phase 16"));
+    /* "Index a repo" opens the ADD flow — a path, a census, then indexing.
+     * It used to re-index whatever was selected, which is neither what the
+     * label says nor what anyone with one repository already indexed wants. */
+    () => addRepoOverlay(repo(), () => void refreshRail(shell, pick), toast),
+    () => toast("settings: coming with phase 16"));
   shell.onTab((tab) => select(shell, tab));
 
   const { repos } = await api.repos();
@@ -57,10 +68,17 @@ async function boot(): Promise<void> {
          "megabrain index <path>")));
     return;
   }
-  const pick = (entry: RepoEntry): void => {
+  pick = (entry: RepoEntry): void => {
     selected = entry.path;
     shell.markRepo(entry.path);
     shell.setCrumb(entry.name, `${entry.files} files · ${entry.chunks} chunks`);
+    // Asked once per selection, never per query: it hashes every file. The
+    // answer is shown, and the decision to re-index stays with the reader —
+    // a search that silently spent a minute and some money because a file
+    // changed is a search nobody can predict the cost of.
+    void api.health(entry.path, true).then((health) => {
+      if (health.stale) shell.setStale(health.freshness ?? "index is behind disk");
+    }).catch(() => {});
   };
   shell.setRepos(repos, pick);
   pick(repos[0]!);

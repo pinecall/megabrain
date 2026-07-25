@@ -21,6 +21,7 @@ export interface Shell {
   setRepos(entries: RepoEntry[], onPick: (entry: RepoEntry) => void): void;
   markRepo(path: string): void;
   setCrumb(text: string, detail?: string): void;
+  setStale(summary: string): void;
   onTab(handler: (tab: TabName) => void): void;
   select(tab: TabName): void;
 }
@@ -70,6 +71,13 @@ export function mountShell(host: HTMLElement, config: Config,
     },
     setCrumb(text, detail) {
       fill(crumb, el("b", {}, text), ...(detail ? [` · ${detail}`] : []));
+    },
+    setStale(summary) {
+      /* Appended to the breadcrumb rather than raised as a toast: it is a
+       * FACT about what you are looking at, not an event that just happened,
+       * and it should still be there in ten minutes. */
+      crumb.append(el("span", { class: "index-tag chg", style: "margin-left:8px" },
+                      summary));
     },
     onTab(handler) { onTabPick = handler; },
     select(tab) {

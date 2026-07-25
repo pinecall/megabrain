@@ -6,6 +6,7 @@
  */
 import type {
   Bundle, Config, FileView, GraphMap, Health, Neighbourhood, Project, RepoEntry,
+  ScanReport,
 } from "./contracts.js";
 
 /* Same-origin and PREFIX-AWARE: the studio may be mounted under a sub-path
@@ -55,12 +56,18 @@ const query = (params: Record<string, string | undefined>): string => {
 
 export const api = {
   config: () => request<Config>("/config"),
-  health: (repo?: string) => request<Health>(`/health${query({ repo })}`),
+  /* `freshness` hashes every file, so it is asked for explicitly — the right
+   * cost for a button, the wrong one for a liveness probe. */
+  health: (repo?: string, withFreshness = false) =>
+    request<Health>(`/health${query({ repo, freshness: withFreshness ? "1" : undefined })}`),
   repos: () => request<{ repos: RepoEntry[] }>("/repos"),
 
   /* Per REPO, unlike /config which describes the deployment: the questions a
    * repository authored about itself, and the models it chose. */
   project: (repo?: string) => request<Project>(`/project${query({ repo })}`),
+
+  /* The census: what indexing WOULD read. Free, so it always comes first. */
+  scan: (path: string) => request<ScanReport>(`/scan${query({ path })}`),
 
   search: (q: string, repo?: string, content?: "code" | "docs") =>
     request<Bundle>("/search", {
