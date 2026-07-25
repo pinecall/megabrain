@@ -508,6 +508,24 @@ blob, or a class of many tiny methods that all merge together. There, `--special
 you write a tighter chunker for *those files only*, and it installs only if the
 measurement agrees.
 
+**It looks broken by language, and it is not.** Count the share of chunks that are a
+function or a method and the spread is alarming — Python **49%**, TypeScript **14 / 11 /
+2%**, Ruby **0%** (147 sinatra files, not one method chunk). The cause is real and simple:
+a file *smaller than the budget* is never opened at all, so `link_header.rb` (2 667
+non-whitespace chars, five methods) is **one chunk**. Ruby and TS files are small, Python
+files are not. Lowering the budget moves TS (4% → 27%) and does not move Ruby, because for
+Ruby the seam is never reached — and `merge` folds the pieces straight back up to the same
+4 000 anyway. *The budget governs both halves.*
+
+That reads like a bug, so it was measured rather than fixed: sinatra re-indexed with every
+declared member opened (285 → **1 342** chunks, leading comments attached to their method,
+partition still exact), scored on 16 hand-verified questions. **Better on 2, worse on 5,
+one truth file lost entirely.** Same repo, same queries, same retrieval code. The sixth
+"smarter chunking" attempt, and the sixth to lose, for the reason the paragraph above
+gives: the ranking fuses a file's chunks, so one rich vector per small file *is* the
+signal, and twelve thin ones dilute it. **Zero method chunks in Ruby is not costing you
+recall — it is what buys it.**
+
 ### Scoping and multi-repo
 
 ```bash
