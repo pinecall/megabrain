@@ -36,11 +36,9 @@ if TYPE_CHECKING:
         EmptyIndex,
         IndexNotFound,
         MegabrainError,
-        MissingAPIKey,
-        MissingCredential,
         ModelMismatch,
-        ProviderError,
     )
+    from ._provider_errors import MissingAPIKey, MissingCredential, ProviderError
     from .chunkers import Chunk, FileResult, Symbol, validate_partition
     from .indexing import Registry, Strategy, discover, index_repo
     from .retrieval import load_state, score_chunks, search, search_with_state
@@ -67,9 +65,9 @@ _EXPORTS = {
     "MegabrainError": "._errors",
     "IndexNotFound": "._errors",
     "EmptyIndex": "._errors",
-    "MissingCredential": "._errors",
-    "MissingAPIKey": "._errors",
-    "ProviderError": "._errors",
+    "MissingCredential": "._provider_errors",
+    "MissingAPIKey": "._provider_errors",
+    "ProviderError": "._provider_errors",
     "ModelMismatch": "._errors",
 }
 # Spelled out rather than derived from _EXPORTS: a type checker cannot follow

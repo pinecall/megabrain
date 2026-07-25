@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Iterator, cast
 
-from ..._errors import ProviderError
+from ..._provider_errors import ProviderError
 from .base import Answer, OnDelta, ToolCall
 
 __all__ = ["read_stream"]

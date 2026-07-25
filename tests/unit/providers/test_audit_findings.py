@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from megabrain._errors import ProviderError
+from megabrain._provider_errors import ProviderError
 from megabrain.providers import Attempt, RetryPolicy, request_with_retry
 from megabrain.providers._wire import decode_batch
 from megabrain.providers.cache import EmbedCache

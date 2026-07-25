@@ -15,15 +15,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .._errors import MissingCredential
+from .._provider_errors import MissingCredential
 from .._types import Content
 from ..ask.events import Emit, emit_nothing
 from ..ask.narrator import narrate
 from ..contracts import Bundle, FlowHit
 from ..project import load_project
 from ..providers.chat import ChatProvider, OpenAICompatible
+from ..storage.locate import resolve_root
 from ._flows import matched_flows, remember_answer, served
-from ._root import resolve_root
 from .search import search
 
 __all__ = ["ask"]
@@ -75,7 +75,7 @@ def _with_flows(bundle: Bundle, flows: list[FlowHit]) -> Bundle:
 def _narrator(root: Path) -> ChatProvider | None:
     """The model the REPOSITORY chose to narrate with.
 
-    Per project, not per shell: `.megabrain.json` is committed, so everyone
+    Per project, not per shell: `megabrain.json` is committed, so everyone
     working on that repo gets the same walkthroughs.
     """
     provider = OpenAICompatible(model=load_project(root).narrator_model)

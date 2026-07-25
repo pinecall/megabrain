@@ -14,12 +14,16 @@ from megabrain._errors import (
     EmptyIndex,
     IndexNotFound,
     MegabrainError,
-    MissingCredential,
     ModelMismatch,
-    ProviderError,
+    NothingToIndex,
 )
+from megabrain._provider_errors import MissingCredential, ProviderError
 
-ALL = [IndexNotFound, EmptyIndex, ModelMismatch, MissingCredential, ProviderError]
+# Both halves of the taxonomy: the index failures and the environment ones. They
+# live in two modules — layer 0 may import nothing, so the provider errors moved
+# one layer up — and every rule below has to hold across both.
+ALL = [IndexNotFound, EmptyIndex, ModelMismatch, NothingToIndex,
+       MissingCredential, ProviderError]
 
 
 @pytest.mark.parametrize("cls", ALL)

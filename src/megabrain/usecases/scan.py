@@ -15,8 +15,9 @@ from ..contracts import ScanReport, SkippedFile
 from ..indexing import discover
 from ..indexing.builtin import default_registry
 from ..indexing.discover import Found
+from ..indexing.unsupported import unsupported_sources
 from ..project import load_project
-from ._root import INDEX_FILE
+from ..storage.locate import INDEX_FILE
 
 __all__ = ["scan"]
 
@@ -41,7 +42,10 @@ def scan(path: Path | str) -> ScanReport:
         skipped=[SkippedFile(file=entry.relpath, reason=entry.reason)
                  for entry in found.skipped[:MAX_LISTED]],
         by_extension=_by_extension(found.files),
-        ignore=list(project.ignore))
+        ignore=list(project.ignore),
+        # Why an empty census is empty, answered where the question is asked.
+        supported=sorted(registry.extensions),
+        unsupported=unsupported_sources(root, registry.extensions))
 
 
 def _by_extension(files: tuple[Found, ...]) -> dict[str, int]:

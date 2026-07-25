@@ -66,11 +66,18 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
     store.graph.set_meta("embed_model", embedder.model)
     store.graph.set_meta("last_index", {"at": time.time(), "files": len(found)})
     store.commit()
+    # The DELTA and the TOTALS, both. A re-index of an unchanged repository
+    # writes nothing, so the delta is all zeros — which is also exactly what a
+    # total failure looks like, and it was read that way. The totals are what
+    # make "nothing to do" legible as success.
+    totals = store.stats()
     return {"files": len(found), "changed": len(planned.pending),
             "unchanged": len(planned.unchanged), "removed": removed,
             "chunks": chunks, "edges": edges, "skipped": len(found.skipped),
             "stale_flows": stale_flows,
-            "partition_violations": planned.violations}
+            "partition_violations": planned.violations,
+            "total_files": totals["files"], "total_chunks": totals["chunks"],
+            "total_symbols": totals["symbols"], "total_edges": totals["edges"]}
 
 
 def _model_changed(store: Store, embedder: Embeddable) -> bool:

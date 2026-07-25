@@ -25,4 +25,12 @@ class ScanReport(TypedDict):
     would_index: int
     skipped: list[SkippedFile]
     by_extension: dict[str, int]
-    ignore: list[str]        # the patterns in effect, from .megabrain.json
+    ignore: list[str]        # the patterns in effect, from megabrain.json
+    supported: list[str]     # the extensions THIS build can read
+    unsupported: dict[str, int]
+    """Source files walked past because no chunker claims their extension.
+
+    The answer to "why is this census empty", given where the question is asked.
+    Data files are left out of it — `package.json` in the list turns the finding
+    into noise, and what matters is the SOURCE this build cannot read.
+    """

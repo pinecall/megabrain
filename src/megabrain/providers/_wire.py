@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 
 from .._arrays import Vector
-from .._errors import ProviderError
+from .._provider_errors import ProviderError
 from ._width import decode_all
 
 __all__ = ["decode_batch"]

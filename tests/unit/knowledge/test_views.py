@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from megabrain.knowledge import graph_map, graph_node, graph_path
+from megabrain.storage import Store
 from megabrain.usecases import build_index
 from tests.unit.indexing.fake import write
 from tests.unit.knowledge.fake import WordEmbedder
@@ -97,8 +98,9 @@ def test_a_node_view_of_an_EMPTY_index_says_so(tmp_path: Path) -> None:
     """Concept resolution always has a nearest file, so the only term that
     genuinely matches nothing is any term at all against an empty index — and
     that must be an error, not the first path in an empty list."""
-    write(tmp_path, {"notes.txt": "no code here\n"})
-    build_index(tmp_path, embedder=WordEmbedder())
+    with Store(tmp_path):
+        pass                     # an index with no files: `build_index` refuses
+                                 # to make one, but an interrupted run leaves it
     with pytest.raises(FileNotFoundError):
         graph_node(tmp_path, "anything", embedder=WordEmbedder())
 

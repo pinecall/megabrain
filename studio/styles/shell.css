@@ -58,3 +58,9 @@
   .dotlive{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
   .viewport{flex:1;overflow-y:auto;min-height:0}
   .view-wrap{margin:0 auto;padding:48px 48px;width:100%}
+
+  /* An index with no chunks. Dimmed rather than hidden: it is still a
+     repository somebody registered, and hiding it would make the fix
+     unreachable from the place the problem is visible. */
+  .repo-row.empty-repo .repo-meta{color:var(--bad)}
+  .repo-row.empty-repo .repo-dot{opacity:.45}

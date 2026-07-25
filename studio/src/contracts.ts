@@ -245,6 +245,11 @@ export interface ScanReport {
   skipped: SkippedFile[];
   by_extension: Record<string, number>;
   ignore: string[];
+  /* The extensions this build can read. */
+  supported: string[];
+  /* Source files walked past because nothing can chunk them — the answer to
+   * "why is this census empty", which is a question a TypeScript repo asks. */
+  unsupported: Record<string, number>;
 }
 
 export interface Project {

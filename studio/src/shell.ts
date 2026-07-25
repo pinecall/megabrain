@@ -98,11 +98,18 @@ function brand(): HTMLElement {
 }
 
 function repoRow(entry: RepoEntry, onPick: (entry: RepoEntry) => void): HTMLElement {
-  const row = el("button", { class: "repo-row" },
+  /* An index with no chunks answers every question with nothing, so the row
+   * says so instead of showing "0 files · 0 chunks" as though it were a state
+   * somebody chose. It stays clickable: it is still a repository, and the fix
+   * is one click away in the same list. */
+  const empty = entry.chunks === 0;
+  const row = el("button", { class: empty ? "repo-row empty-repo" : "repo-row" },
     el("div", { class: "repo-dot" }, entry.name.slice(0, 2)),
     el("div", { style: "min-width:0;flex:1" },
       el("div", { class: "repo-name" }, entry.name),
-      el("div", { class: "repo-meta" }, `${entry.files} files · ${entry.chunks} chunks`)));
+      el("div", { class: "repo-meta" },
+         empty ? "empty index — nothing indexed yet"
+           : `${entry.files} files · ${entry.chunks} chunks`)));
   row.dataset["path"] = entry.path;
   row.addEventListener("click", () => onPick(entry));
   return row;

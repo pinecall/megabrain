@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .._errors import MissingCredential
+from .._provider_errors import MissingCredential
 from .._types import NotGiven, is_given, not_given
 from ._local import is_local_url
 

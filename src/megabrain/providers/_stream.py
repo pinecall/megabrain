@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Iterator, Protocol
 
-from .._errors import ProviderError
+from .._provider_errors import ProviderError
 from .http import Attempt, RetryPolicy
 
 __all__ = ["Streamed", "StreamTransport", "open_with_retry"]

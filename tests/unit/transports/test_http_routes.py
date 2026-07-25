@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from megabrain.storage import Store
 from megabrain.transports.http.messages import Request
 from megabrain.transports.http.router import dispatch
 from megabrain.transports.http.security import Policy
@@ -48,8 +49,14 @@ def test_health_without_a_repo_is_just_liveness() -> None:
 
 def test_health_reports_an_EMPTY_index_as_not_ok(tmp_path: Path) -> None:
     """"The server is up" is not the question anyone is asking: an empty index
-    answers every query with nothing and looks healthy from outside."""
-    build_index(tmp_path, embedder=CountingEmbedder())        # no files at all
+    answers every query with nothing and looks healthy from outside.
+
+    Built through the store rather than through `build_index`, which now refuses
+    to produce one — an index of nothing is a failure, not a state. It can still
+    EXIST (an interrupted run, an older build), so health still has to say so.
+    """
+    with Store(tmp_path):
+        pass                                                  # an index, no files
     reply = dispatch(_get("/health", repo=str(tmp_path)))
     assert reply.payload["ok"] is False                       # type: ignore[index]
     assert reply.payload["chunks"] == 0                       # type: ignore[index]

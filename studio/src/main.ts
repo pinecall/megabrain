@@ -85,7 +85,14 @@ async function boot(): Promise<void> {
     }).catch(() => {});
   };
   shell.setRepos(repos, pick);
-  pick(repos[0]!);
+  /* The BIGGEST index, not the first one. The registry is ordered by name, so
+   * "first" is alphabetical chance — and it selected a repository whose index
+   * held zero files, which then answered every query with nothing and reported
+   * a re-index as "0 chunks · 0 edges". An empty index is never the sensible
+   * default when a real one is registered. */
+  const usable = repos.filter((entry) => entry.chunks > 0);
+  pick([...(usable.length ? usable : repos)]
+       .sort((one, two) => two.chunks - one.chunks)[0]!);
   select(shell, "ask");
 }
 

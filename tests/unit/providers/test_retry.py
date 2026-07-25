@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from megabrain._errors import ProviderError
+from megabrain._provider_errors import ProviderError
 from megabrain.providers import RetryPolicy, request_with_retry
 from tests.unit.providers.fake import FakeTransport, ok, status
 

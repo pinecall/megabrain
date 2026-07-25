@@ -66,7 +66,7 @@ class Excluder:
 
 
 def load_ignore(root: Path) -> list[str]:
-    """The repository's own exclusions, from `.megabrain.json` and the legacy
+    """The repository's own exclusions, from `megabrain.json` and the legacy
     `.megabrainignore` — merged, because a repo mid-migration has both and
     preferring one would quietly drop half the exclusions."""
     from ..project import load_project

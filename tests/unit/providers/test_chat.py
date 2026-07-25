@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from megabrain._errors import ProviderError
+from megabrain._provider_errors import ProviderError
 from megabrain.providers.chat import ChatProvider, resolve
 from megabrain.providers.chat.openai_compat import OpenAICompatible
 from tests.unit.providers.fake import FakeTransport, ok, status

@@ -97,3 +97,20 @@ def test_stats_report_what_the_pass_actually_did(repo: Path) -> None:
     assert stats["chunks"] > 0
     assert stats["partition_violations"] == 0
     assert stats["seconds"] >= 0
+
+
+def test_the_report_says_what_the_INDEX_HOLDS_not_only_what_changed(repo: Path) -> None:
+    """The delta alone is indistinguishable from a failure.
+
+    A re-index of an unchanged repository writes nothing, so `chunks` and
+    `edges` are 0 — which is also exactly what a total failure looks like. It
+    was reported that way, and read that way: "0 chunks · 0 edges" on a
+    perfectly good index. The totals are what make the difference legible, and
+    they belong in the report rather than in each surface's own second query.
+    """
+    index_repo(repo, embedder=CountingEmbedder())
+    again = index_repo(repo, embedder=CountingEmbedder())
+    assert again["chunks"] == 0 and again["changed"] == 0      # nothing to do
+    assert int(again["total_chunks"]) > 0                      # and yet: an index
+    assert int(again["total_files"]) == int(again["files"])
+    assert int(again["total_edges"]) >= 0
