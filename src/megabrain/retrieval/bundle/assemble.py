@@ -55,6 +55,7 @@ def search_with_state(state: SearchState, query: str, *,
                              via_graph=f in neighbours, params=params)
                for f in related],
         flows=[],
+        expanded=[],              # the expander lane fills this when it runs
         anchors=render_anchors(query, metas, fused, params),
         ms=int((time.perf_counter() - started) * 1000),
     )

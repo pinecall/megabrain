@@ -72,3 +72,10 @@ class SearchParams(_SearchRequired, total=False):
                             "the related files by the task's edit surface — a "
                             "chat call, a second or two, and it never drops a "
                             "file"]
+    expand: Annotated[bool, "default false. true asks a model to name the "
+                            "identifiers your wording MISSED — the method or "
+                            "class the code itself uses — and searches again "
+                            "for them, up to three rounds, stopping when a "
+                            "round adds nothing. Buys RECALL where rerank buys "
+                            "ORDER: reach for it when the answer plainly is not "
+                            "in the list, not by default"]

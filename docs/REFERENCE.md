@@ -43,6 +43,7 @@ index yet is the whole point.
 | | `--code` / `--docs` | code only, or prose only — never a blend. Omit to let them compete |
 | | `--full` | include the code bodies (default: the map only — files, spans, symbols) |
 | | `--rerank` | one judge call reorders RELATED by the task's edit surface; never drops a file |
+| | `--expand` | a model names the identifiers your wording missed; the symbol table adds the files defining them. Buys RECALL where `--rerank` buys ORDER; only ever ADDS. Measured safe but not yet measured useful — see GUIDE §`--expand` |
 | | `--json` | the `Bundle` contract |
 | `ask` | `--path-filter PREFIX` | only files under PREFIX |
 | | `--docs` | explain markdown instead of code |
@@ -83,7 +84,7 @@ Every tool takes `repo_path` (any sub-path works — the root is auto-detected).
 | tool | returns | parameters |
 |---|---|---|
 | **`megabrain_ask`** | A narrated walkthrough of the whole relevant flow with the real code spliced in verbatim — the code cannot be invented; the prose around it is narration, so check its claims against the code it quotes. | `question` *(req)* · `scope_path` · `content` (`code` default · `docs`) |
-| **`megabrain_search`** | The task's whole edit surface as a MAP: the files that answer it ranked, each with its best span (true line numbers) and the symbols it declares, plus the anchors a change must touch and the tests that pin the behaviour. ~2 700 tokens against ~8 100 with bodies. | `task` *(req)* · `scope_path` · `content` · `bodies` *(default `false`)* · `rerank` *(default `false`)* |
+| **`megabrain_search`** | The task's whole edit surface as a MAP: the files that answer it ranked, each with its best span (true line numbers) and the symbols it declares, plus the anchors a change must touch and the tests that pin the behaviour. ~2 700 tokens against ~8 100 with bodies. | `task` *(req)* · `scope_path` · `content` · `bodies` *(default `false`)* · `rerank` *(default `false`)* · `expand` *(default `false`)* |
 
 ---
 
@@ -103,7 +104,7 @@ repo.
 | `GET /get?file=&symbol=` | one file's real code |
 | `GET /symbols?file=` | that file's outline alone — what a file tree draws |
 | `GET /graph?mode=&node=&source=&target=` | the knowledge graph (`map` · `node` · `path`) |
-| `POST /search {query, repo?, path_filter?, content?, rerank?}` | the CORE/RELATED `Bundle` |
+| `POST /search {query, repo?, path_filter?, content?, rerank?, expand?}` | the CORE/RELATED `Bundle` |
 | `POST /ask/stream` | the narrated answer as SSE |
 | `POST /index/stream {path, force?}` | (re)index with per-file SSE progress |
 

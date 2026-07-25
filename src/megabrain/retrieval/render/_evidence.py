@@ -20,7 +20,7 @@ def evidence_banner(bundle: Bundle) -> list[str]:
     wording on "none" names what the reader should DO with the list that
     follows: treat it as nearest vocabulary, not as an answer.
     """
-    lines = _judge_line(bundle)
+    lines = _judge_line(bundle) + _expanded_line(bundle)
     band = bundle.get("evidence", "strong")
     if band == "weak":
         lines.append("> ⚠ **thin evidence** — the closest match is weak "
@@ -47,5 +47,22 @@ def _judge_line(bundle: Bundle) -> list[str]:
     return [f'> ⚠ **the judge kept none of the {verdict["of"]} RELATED files** '
             "— they merely share vocabulary with the task. CORE stands on its "
             "own.\n"]
+
+
+def _expanded_line(bundle: Bundle) -> list[str]:
+    """Which words were not the reader's.
+
+    Part of the list below answers a term a model proposed, not the question as
+    asked — and the reader cannot tell which part by looking. Naming the terms
+    is what keeps the widening honest: it is also the fastest way to see that a
+    disappointing result came from a bad guess at vocabulary.
+    """
+    terms = bundle.get("expanded") or []
+    if not terms:
+        return []
+    return ["> ↔ **widened** — a model named "
+            + ", ".join(f"`{t}`" for t in terms)
+            + " as identifiers the question did not say, and the files defining "
+              "them were added below.\n"]
 
 

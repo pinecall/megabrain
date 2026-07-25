@@ -91,4 +91,9 @@ class Bundle(TypedDict):
     comes from the RAW top cosine, calibrated in `scoring/evidence.py`, and it
     is what lets a surface stop writing confident prose over nothing."""
     top_cosine: float
+    expanded: list[str]
+    """Terms the expander lane named — empty when it did not run, or found the
+    search already complete. The reader is owed it: a file that arrived this
+    way did not answer the question as asked, it answered a term a model
+    proposed after seeing what the question missed."""
     ms: int

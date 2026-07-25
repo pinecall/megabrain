@@ -34,7 +34,8 @@ def _search(args: dict[str, Any]) -> str:
     either way, so a caller that wants the map back pays no recall for it."""
     bundle = search(arg.repo(args), arg.text(args, "task"),
                     path_filter=arg.scope(args), content=arg.content(args),
-                    rerank=arg.flag(args, "rerank", default=False))
+                    rerank=arg.flag(args, "rerank", default=False),
+                    expand=arg.flag(args, "expand", default=False))
     bodies = arg.flag(args, "bodies", default=False)
     return render(bundle, compact=not bodies, related_code=bodies)
 

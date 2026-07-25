@@ -130,6 +130,30 @@ ordered; the engine then reorders its **own verbatim chunks**. The model selects
 writes. Fail-open in every branch — no key, timeout or junk reply returns the
 deterministic list untouched. *(On this repo's scoring query: 21 signal chunks → 6.)*
 
+**`--expand`** buys RECALL where `--rerank` buys ORDER. The judge can only reorder what
+cosine found; when the answer never enters the pool, no reordering rescues it. So one call
+asks a model to name the **identifiers your wording missed** — the method or class the code
+itself uses — and the **symbol table** resolves them to the files that define them. It
+loops, up to three rounds, stopping as soon as a round adds nothing. Only ever ADDS.
+
+*Why the symbol table and not another search.* Asked what sinatra's early-exit mechanism
+was missing, a model named exactly the right identifiers — `halt`, `pass`, `redirect`,
+`error`. Feeding those back through the **embedder** found none of the ground truth, in any
+arrangement: query+terms returned `CHANGELOG.md` and two rack-protection middlewares, terms
+alone returned five more of the same, one-search-per-term returned 25 files and none of the
+answer. A bare identifier is a terrible sentence, and a sentence is what an embedding space
+places. `symbols.find("halt")` answers with one hit and the line it is defined on. A name
+the table cannot resolve is therefore **dropped, not guessed at** — the arms above are what
+guessing looks like.
+
+> **Measured safe, not yet measured useful.** Across 15 hand-verified sinatra questions ×3
+> runs each, expansion never lost a case — and never rescued one either, because the
+> deterministic baseline already held the ground-truth file in **15/15**. That is a finding
+> about the test set as much as the lane: sinatra's `base.rb` answers nearly everything, and
+> the contrib/rack-protection questions were found without help. Recall was not the
+> bottleneck there. Reach for `--expand` when the answer plainly is not in the list; it is
+> off by default because an unproven optimisation should cost nobody a model call.
+
 ### `ask` — the repo, explained
 
 ```bash
