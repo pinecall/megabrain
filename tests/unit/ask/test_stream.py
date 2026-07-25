@@ -73,3 +73,25 @@ def test_a_fence_that_never_closes_is_dropped_at_flush() -> None:
     out = drive("look:\n```python\ndef fake():\n    DROP_TABLE()")
     assert "DROP_TABLE" not in out
     assert "def fake" not in out
+
+
+def test_a_GROUPED_citation_split_at_the_comma_never_leaks() -> None:
+    """The grammar accepts [[1:173-240], [2:241-307]] — but the stream holder
+    predated it. Split at the comma, `[[0:1-2], ` flushed as prose and the
+    second half arrived as litter: the exact reported failure, resurrected one
+    layer down. A delta boundary is an accident of the network; it must not be
+    able to change what the reader sees.
+    """
+    whole = drive("the fallback [[0]] handles it")
+    del whole  # the fixture chunks are small; what matters is the split below
+
+    whole_text = "the fallback [[0:1-2], [1:10-11]] handles it"
+    out = drive("the fallback [[0:1-2], ", "[1:10-11]] handles it")
+    assert "[[0:1-2]" not in out and "[1:10-11]" not in out
+    assert out == drive(whole_text) == drive(*whole_text), \
+        "the partition changed the rendered answer"
+
+
+def test_a_stream_dying_MID_GROUP_leaves_no_litter() -> None:
+    out = drive("see [[0:1-2], [1:10")
+    assert "[[" not in out and "[1:10" not in out

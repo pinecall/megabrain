@@ -33,7 +33,16 @@ _INNER = re.compile(_ONE)
 # A citation that is still ARRIVING, at the tail of a stream buffer. Held back
 # rather than emitted: a half-written `[[3:70` printed as prose cannot be taken
 # back once the reader has seen it.
-PARTIAL = re.compile(r"\[(?:\[(?:\d+[\dLl\s:,-]*\]?)?)?$")
+#
+# The rule is the grammar's own terminator: a citation ends ONLY at `]]`, so
+# everything from the last `[[` with no `]]` after it is undecidable. Spelled
+# that way — rather than as a list of valid prefixes — because the prefix list
+# went stale the day the grammar grew the grouped form: `[[1:173-240], ` has a
+# lone `]` inside it, the old pattern read that as "not a citation tail", and
+# the exact reported failure came back one layer down, only when a delta
+# boundary fell inside the group. Bounded to one line: a `[[` the model
+# abandons mid-answer must flush at the newline, not jam the stream forever.
+PARTIAL = re.compile(r"\[\[(?:[^\]\n]|\](?!\]))*$|\[$")
 
 
 @dataclass(frozen=True, slots=True)
