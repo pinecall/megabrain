@@ -19,6 +19,9 @@ export interface GraphView {
   root: HTMLElement;
   focus(): void;
   load(): Promise<void>;
+  /* The whole map belongs to one repository: a selection change invalidates it
+   * completely, so the next visit rebuilds rather than showing the old graph. */
+  refresh(): void;
 }
 
 interface State {
@@ -166,6 +169,7 @@ export function graphView(repo: () => string | undefined,
       el("div", { class: "query-bar" }, input, stats),
       el("div", { class: "graph-layout" }, stage.root, panel)),
     focus: () => input.focus(),
+    refresh: () => { state.map = undefined; overview(); },
     async load(): Promise<void> {
       fill(panel, el("div", { class: "empty" }, el("div", { class: "spinner" }),
                      "building the graph…"));

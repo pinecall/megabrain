@@ -7,11 +7,19 @@
 import { api } from "./api.js";
 import { el, fill } from "./dom.js";
 
+export interface Suggestions {
+  root: HTMLElement;
+  /* Called whenever the selected repository changes. The strip used to load
+   * ONCE at construction, so it showed the first repo's questions for the rest
+   * of the session — which read as "the suggestions never change". */
+  reload(): void;
+}
+
 export function suggestionStrip(repo: () => string | undefined,
-                                onPick: (question: string) => void): HTMLElement {
+                                onPick: (question: string) => void): Suggestions {
   const strip = el("div", { class: "stats-row", style: "gap:6px" });
   void load();
-  return strip;
+  return { root: strip, reload: () => void load() };
 
   async function load(): Promise<void> {
     try {
@@ -22,15 +30,20 @@ export function suggestionStrip(repo: () => string | undefined,
           `${project.config_file} could not be parsed — defaults are in use`));
         return;
       }
-      if (!project.queries.length) return;
-      fill(strip, el("span", { class: "dim" }, "try:"),
+      if (!project.queries.length) {
+        fill(strip);        // CLEARED, not left alone: stale chips from the
+        return;            // previously selected repo are the bug itself
+      }
+      const label = project.queries_source === "file"
+        ? "this repo asks:" : "from this repo's graph:";
+      fill(strip, el("span", { class: "dim" }, label),
         ...project.queries.slice(0, 6).map((question) => {
           const chip = el("button", { class: "chip" }, question);
           chip.addEventListener("click", () => onPick(question));
           return chip;
         }));
     } catch {
-      // A repo with no config is the common case, not a failure to report.
+      fill(strip);         // and never leave another repo's questions behind
     }
   }
 }

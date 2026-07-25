@@ -106,6 +106,8 @@ export interface RepoEntry {
   name: string;
   files: number;
   chunks: number;
+  /* Files with a mental-map card. 0 means the Brief tab cannot answer yet. */
+  cards: number;
 }
 
 export interface GraphNode {
@@ -260,6 +262,9 @@ export interface Project {
   repo: string;
   config_file: string;
   queries: string[];
+  /* "file" (the repo committed them) · "derived" (from its own graph, no model)
+   * · "none". Shown, because a guess must not look like a declaration. */
+  queries_source: string;
   models: { narrator: string; rerank: string; study: string };
   malformed: boolean;
 }

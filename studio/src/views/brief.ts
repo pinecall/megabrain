@@ -13,6 +13,8 @@ import { icon } from "../icons.js";
 import { suggestionStrip } from "../suggestions.js";
 
 export interface BriefView {
+  /* Re-read anything per-repo — called when the selection changes. */
+  refresh(): void;
   root: HTMLElement;
   focus(): void;
 }
@@ -62,8 +64,9 @@ export function briefView(repo: () => string | undefined,
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
         el("div", { class: "query-icon" }, icon("brain")), input, go),
-      suggestions, stats, results),
+      suggestions.root, stats, results),
     focus: () => input.focus(),
+    refresh: () => suggestions.reload(),
   };
 }
 

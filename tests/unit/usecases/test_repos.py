@@ -12,7 +12,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from megabrain.storage import Store
+from megabrain.usecases import build_index
 from megabrain.usecases.repos import known, registry_path, remember
+from tests.unit.indexing.fake import CountingEmbedder, write
 
 
 def write_registry(payload: object) -> None:
@@ -113,3 +116,22 @@ def test_a_repo_whose_index_is_gone_is_hidden_but_NOT_deleted(tmp_path: Path) ->
     write_registry({str(missing): {"path": str(missing), "name": "vanished"}})
     assert known() == []
     assert str(missing) in json.loads(registry_path().read_text(encoding="utf-8"))
+
+
+def test_a_repo_entry_says_whether_it_has_a_MENTAL_MAP(tmp_path: Path) -> None:
+    """FOUND IN USE: "no se sabe cuál tiene brief y cuál no".
+
+    Measured across a whole machine, exactly one of seventeen repositories had
+    cards — and the rail showed the seventeen identically, so the one tab that
+    only works after `study` looked equally available everywhere. The count is
+    already one SQL row; hiding it made the Brief tab a coin flip.
+    """
+    write(tmp_path, {"a.py": "def run():\n    return 1\n"})
+    build_index(tmp_path, embedder=CountingEmbedder())
+    entry = next(e for e in known() if e["path"] == str(tmp_path))
+    assert entry["cards"] == 0, "nothing has been studied yet"
+
+    with Store(tmp_path) as store:
+        store.cards.upsert("a.py", "key", "model", False, "It runs.")
+        store.commit()
+    assert next(e for e in known() if e["path"] == str(tmp_path))["cards"] == 1

@@ -109,7 +109,13 @@ function repoRow(entry: RepoEntry, onPick: (entry: RepoEntry) => void): HTMLElem
       el("div", { class: "repo-name" }, entry.name),
       el("div", { class: "repo-meta" },
          empty ? "empty index — nothing indexed yet"
-           : `${entry.files} files · ${entry.chunks} chunks`)));
+           : `${entry.files} files · ${entry.chunks} chunks`)),
+    /* The Brief tab silently needs `megabrain study`. Without this badge every
+     * repository looked equally ready and only one of seventeen actually was. */
+    ...(!empty && entry.cards > 0
+      ? [el("span", { class: "index-tag chg", title:
+             `${entry.cards} mental-map cards — the Brief tab works here` }, "brief")]
+      : []));
   row.dataset["path"] = entry.path;
   row.addEventListener("click", () => onPick(entry));
   return row;

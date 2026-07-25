@@ -19,6 +19,8 @@ import { applyTheme, currentTheme } from "./theme.js";
 let selected: string | undefined;
 const repo = (): string | undefined => selected;
 
+const LAST_REPO = "mb-last-repo";
+
 function toast(failure: unknown): void {
   const message = failure instanceof ApiFailure
     ? `${failure.message} (${failure.code})` : String(failure);
@@ -74,7 +76,12 @@ async function boot(): Promise<void> {
   }
   pick = (entry: RepoEntry): void => {
     selected = entry.path;
+    localStorage.setItem(LAST_REPO, entry.path);
     shell.markRepo(entry.path);
+    // Every view holding a per-repo strip re-reads it: the suggestions used to
+    // load once at construction and then showed the first repo's questions for
+    // the rest of the session.
+    for (const view of Object.values(views)) view.refresh();
     shell.setCrumb(entry.name, `${entry.files} files · ${entry.chunks} chunks`);
     // Asked once per selection, never per query: it hashes every file. The
     // answer is shown, and the decision to re-index stays with the reader —
@@ -85,14 +92,14 @@ async function boot(): Promise<void> {
     }).catch(() => {});
   };
   shell.setRepos(repos, pick);
-  /* The BIGGEST index, not the first one. The registry is ordered by name, so
-   * "first" is alphabetical chance — and it selected a repository whose index
-   * held zero files, which then answered every query with nothing and reported
-   * a re-index as "0 chunks · 0 edges". An empty index is never the sensible
-   * default when a real one is registered. */
+  /* LAST CHOICE first, then the biggest index. Ranking by size alone kept
+   * selecting whichever repo happened to be largest — a corpus root nobody was
+   * working on — so every reload threw away the reader's actual choice. An
+   * empty index is never the default: it answers every query with nothing. */
   const usable = repos.filter((entry) => entry.chunks > 0);
-  pick([...(usable.length ? usable : repos)]
-       .sort((one, two) => two.chunks - one.chunks)[0]!);
+  const pool = usable.length ? usable : repos;
+  const remembered = pool.find((entry) => entry.path === localStorage.getItem(LAST_REPO));
+  pick(remembered ?? [...pool].sort((one, two) => two.chunks - one.chunks)[0]!);
   select(shell, "ask");
 }
 

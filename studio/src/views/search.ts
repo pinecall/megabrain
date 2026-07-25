@@ -14,6 +14,8 @@ import { scopePicker } from "../scope.js";
 import { suggestionStrip } from "../suggestions.js";
 
 export interface SearchView {
+  /* Re-read anything per-repo — called when the selection changes. */
+  refresh(): void;
   root: HTMLElement;
   focus(): void;
 }
@@ -59,8 +61,9 @@ export function searchView(repo: () => string | undefined,
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
         el("div", { class: "query-icon" }, icon("search")), input, scope.root, go),
-      suggestions, stats, results),
+      suggestions.root, stats, results),
     focus: () => input.focus(),
+    refresh: () => suggestions.reload(),
   };
 }
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from ...._errors import MegabrainError
 from ....project import CONFIG_FILE, load_project
-from ....usecases import resolve_root
+from ....usecases import resolve_root, starters_for
 from ..messages import Reply, Request
 from ..replies import from_engine, json_reply
 
@@ -21,10 +21,15 @@ def project_route(request: Request) -> Reply:
     except MegabrainError as err:
         return from_engine(err)
     project = load_project(root)
+    # Derived from the index when the repo declares none — and the SOURCE is
+    # reported, so the studio can label a guess as a guess instead of passing
+    # it off as something the repository asked for.
+    starters = starters_for(root)
     return json_reply({
         "repo": root.name,
         "config_file": CONFIG_FILE,
-        "queries": list(project.queries),
+        "queries": starters["queries"],
+        "queries_source": starters["source"],
         "models": {"narrator": project.narrator_model,
                    "rerank": project.rerank_model,
                    "study": project.study_model},
