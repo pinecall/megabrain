@@ -42,22 +42,14 @@ def search_with_state(state: SearchState, query: str, *,
     metas, fused = scored.metas, scored.fused
     ranking = rank_files(metas, fused)
     params = state.params
-
-    candidates = ranking.top(params.cand_files)
-    neighbours = neighbours_of(state, candidates, ranking, params)
-    core = core_files(ranking, params)
-    floor = file_floor(metas=metas, all_metas=state.metas, all_chunks=state.chunks,
-                       query_vector=scored.query_vector,
-                       already=set(candidates) | set(neighbours), params=params)
-
-    related = [f for f in candidates if f not in core] + neighbours + floor
+    core, related, neighbours = _tiers(state, query, scored, ranking)
     return Bundle(
         query=query,
         repo=state.repo,
         judge=None,               # the judge lane fills this when it runs
         evidence=evidence_of(scored.top_cosine),
         top_cosine=round(scored.top_cosine, 3),
-        tier1=[_core(state, f, ranking, metas, fused, candidates + neighbours)
+        tier1=[_core(state, f, ranking, metas, fused, related + neighbours)
                for f in core],
         tier2=[related_entry(state, f, ranking, metas,
                              via_graph=f in neighbours, params=params)
@@ -66,6 +58,26 @@ def search_with_state(state: SearchState, query: str, *,
         anchors=render_anchors(query, metas, fused, params),
         ms=int((time.perf_counter() - started) * 1000),
     )
+
+
+def _tiers(state: SearchState, query: str, scored: Scored,
+           ranking: Ranking) -> tuple[list[str], list[str], list[str]]:
+    """Which files go in CORE, which in RELATED, and which arrived by graph.
+
+    Assembled here rather than inline so the bundle's construction reads as one
+    statement: the ORDER is the contract — candidates rank, neighbours extend,
+    and the floor only ever appends.
+    """
+    params = state.params
+    candidates = ranking.top(params.cand_files)
+    neighbours = neighbours_of(state, candidates, ranking, params)
+    core = core_files(ranking, params)
+    floor = file_floor(metas=scored.metas, all_metas=state.metas,
+                       all_chunks=state.chunks, query_vector=scored.query_vector,
+                       already=set(candidates) | set(neighbours), params=params,
+                       query=query)
+    related = [f for f in candidates if f not in core] + neighbours + floor
+    return core, related, neighbours
 
 
 def _core(state: SearchState, relpath: str, ranking: Ranking, metas: list[ChunkMeta],

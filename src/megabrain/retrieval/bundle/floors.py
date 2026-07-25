@@ -16,6 +16,7 @@ import numpy as np
 
 from ..._arrays import Matrix, Vector
 from ...storage.model import ChunkMeta
+from ..intent import wants_tests
 from ..params import RetrievalParams
 from ..paths import is_demo, is_test
 
@@ -27,7 +28,8 @@ _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]{3,}")
 
 
 def file_floor(*, metas: list[ChunkMeta], all_metas: list[ChunkMeta], all_chunks: Matrix,
-               query_vector: Vector, already: set[str], params: RetrievalParams) -> list[str]:
+               query_vector: Vector, already: set[str], params: RetrievalParams,
+               query: str = "") -> list[str]:
     """Files owning a top-N RAW-DENSE chunk that the fused ranking dropped.
 
     File fusion lifts every chunk of a file that matches as a whole, which
@@ -37,9 +39,14 @@ def file_floor(*, metas: list[ChunkMeta], all_metas: list[ChunkMeta], all_chunks
     among the nearest by raw cosine is owed a slot regardless of what fusion
     thought of its neighbours.
 
-    Tests are skipped: they are deliberately down-weighted elsewhere, and
-    re-admitting them here would undo that on purpose-built vocabulary matches.
+    Tests are skipped — UNLESS the question asked for tests. The exclusion
+    exists so the floor does not undo the down-weight on purpose-built
+    vocabulary matches, but it also made the one query where a test IS the
+    answer the one query the floor could not rescue. A floor whose whole
+    purpose is that an opinion cannot become a recall gate must not carry a
+    gate of its own.
     """
+    keep_tests = wants_tests(query)
     if not params.recall_floor_top:
         return []
     row_of = {m.id: i for i, m in enumerate(all_metas)}
@@ -54,7 +61,7 @@ def file_floor(*, metas: list[ChunkMeta], all_metas: list[ChunkMeta], all_chunks
     # not depend on how numpy happened to partition a run of equal cosines.
     for position in np.argsort(-dense, kind="stable")[:params.recall_floor_top]:  # pyright: ignore[reportUnknownMemberType]
         relpath = metas[int(present[int(position)])].file
-        if relpath in seen or is_test(relpath):
+        if relpath in seen or (is_test(relpath) and not keep_tests):
             continue
         owed.append(relpath)
         seen.add(relpath)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..._arrays import Matrix
+from ..intent import wants_tests
 from ..paths import ident_tokens
 from ._fusion import DenseFileFusion
 from .context import QueryContext
@@ -24,12 +25,18 @@ class TestPenalty:
     every query about it. Excluding them outright would lose the one place that
     shows a mechanism being USED; a penalty keeps them findable without letting
     them fill the answer.
+
+    It STANDS DOWN when the question asked for tests. Applied blind it took the
+    best-matching chunk in a repository — the four `halt` tests, rank #0 of
+    2 700 by raw cosine — and delivered it at #115 for "where are the tests for
+    halt?". A down-weight aimed at the thing the reader asked for is not a
+    tie-break, it is an answer being withheld.
     """
 
     name = "test-penalty"
 
     def applies(self, ctx: QueryContext) -> bool:
-        return True
+        return not wants_tests(ctx.query)
 
     def apply(self, ctx: QueryContext, fused: Matrix) -> Matrix:
         return np.where(ctx.is_test, fused * ctx.params.test_penalty, fused)  # pyright: ignore[reportUnknownMemberType]
