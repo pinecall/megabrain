@@ -48,11 +48,17 @@ def parse_with(spec: LangSpec, relpath: str, source: str) -> Parsed:
         return Parsed(units=(), symbols=(), skeleton="", ok=False)
     raw = source.encode()
     symbols = tuple(symbols_of(spec, relpath, tree.root_node, raw))
-    return Parsed(units=tuple(_units(spec, tree.root_node)), symbols=symbols,
+    # CLAMPED to the file's real length. A grammar reading a file it half
+    # understands reports nodes that end one line PAST the content — C++ parsed
+    # by the C grammar does it, and so did PHP's mixed-HTML text nodes. The
+    # chunk then claims a line the file does not have, which breaks the
+    # partition invariant and puts an unopenable line number in a citation.
+    total = len(source.split("\n")) - (1 if source.endswith("\n") else 0)
+    return Parsed(units=tuple(_units(spec, tree.root_node, total)), symbols=symbols,
                   skeleton=skeleton_of(relpath, symbols), ok=not tree.root_node.has_error)
 
 
-def _units(spec: LangSpec, node: Any) -> list[Unit]:
+def _units(spec: LangSpec, node: Any, total: int) -> list[Unit]:
     """Top-level declarations, with their members as cut points.
 
     Only declarations: a chunk that starts halfway through a function body is
@@ -62,19 +68,19 @@ def _units(spec: LangSpec, node: Any) -> list[Unit]:
     for child in node.named_children:
         declared = unwrap(spec, child)
         if declared.type in spec.def_types:
-            found.append(_unit(spec, declared))
+            found.append(_unit(spec, declared, total))
     return found
 
 
-def _unit(spec: LangSpec, node: Any) -> Unit:
+def _unit(spec: LangSpec, node: Any, total: int) -> Unit:
     body = node.child_by_field_name(spec.body_field)
     children: tuple[Unit, ...] = ()
     if body is not None and node.type in spec.container_types:
-        children = tuple(_unit(spec, unwrap(spec, inner))
+        children = tuple(_unit(spec, unwrap(spec, inner), total)
                          for inner in body.named_children
                          if unwrap(spec, inner).type in spec.def_types)
-    return Unit(start_line=node.start_point[0] + 1,
-                end_line=node.end_point[0] + 1,
+    start = min(node.start_point[0] + 1, total)
+    return Unit(start_line=start, end_line=max(start, min(node.end_point[0] + 1, total)),
                 kind=spec.def_types[node.type],
                 name=name_of(spec, node), children=children)
 

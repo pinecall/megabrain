@@ -64,12 +64,24 @@ class Report:
 def load_cases(golden: Path, scope: str, repo_name: str) -> list[Case]:
     """Golden queries for one scope, expected paths normalised to repo-relative."""
     raw = json.loads(golden.read_text(encoding="utf-8"))["queries"]
-    marker = f"{repo_name}/"
     return [
         Case(q["id"], q["query"],
-             tuple(f.split(marker)[-1] for f in q["expected_files"]))
+             tuple(_relative(f, repo_name) for f in q["expected_files"]))
         for q in raw if q["scope"] == scope
     ]
+
+
+def _relative(path: str, repo_name: str) -> str:
+    """Drop a LEADING `repo_name/`, and only that.
+
+    `split(marker)[-1]` took the last occurrence, so a corpus whose root and
+    whose package share a name — `pinecall` containing `src/pinecall/` — had
+    every expected path truncated to its tail. The gate then reported R@1 = 0.00
+    with correct top-1 hits listed as misses: the loudest possible failure from
+    a string operation that is right most of the time.
+    """
+    marker = f"{repo_name}/"
+    return path[len(marker):] if path.startswith(marker) else path
 
 
 def run(search: SearchFn, repo: Path, cases: Sequence[Case]) -> Report:

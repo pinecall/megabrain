@@ -23,6 +23,13 @@ DIRECTORIES = frozenset({
     ".git", ".venv", "venv", "node_modules", "__pycache__", "dist", "build",
     "coverage", ".next", ".nuxt", ".pytest_cache", ".tox", ".mypy_cache",
     ".ruff_cache", "target", "vendor", ".megabrain",
+    # The mobile and native ecosystems' names for `node_modules`. MEASURED the
+    # day C and C++ were added: `ios/Pods` alone contributed 17 864 headers —
+    # boost, folly, prebuilt React frameworks — turning a 400-file project into
+    # a 19 575-file index that buried its own source under vendored template
+    # metaprogramming. Nothing that ships a Podfile wants its pods searchable.
+    "Pods", "Carthage", "DerivedData", ".gradle", "third_party", "thirdparty",
+    "Godeps", ".build", ".dart_tool", "Packages",
 })
 
 # Instructions for whoever is READING the repository, not content of it.

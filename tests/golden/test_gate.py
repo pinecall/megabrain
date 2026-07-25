@@ -12,6 +12,7 @@ Point it at the corpus and it runs:
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -90,3 +91,28 @@ def test_the_gate_can_resolve_its_engine_without_a_corpus() -> None:
     from evals.harness.gate import resolve_search
 
     assert callable(resolve_search())
+
+
+def test_expected_paths_strip_only_a_LEADING_repo_prefix(tmp_path: Path) -> None:
+    """FOUND IN USE, and it read as a total retrieval failure: R@1 = 0.00.
+
+    The corpus root is `pinecall` and the package inside it is ALSO `pinecall`
+    (`sdk-server/src/pinecall/...`). Splitting on every occurrence of the marker
+    took the LAST one, so `sdk-server/src/pinecall/domain/transcript.py` became
+    `domain/transcript.py` — a path no retrieval can return — and every case
+    reported a miss whose top-1 was in fact correct.
+
+    A prefix is a prefix. Stripping one anywhere in the string is a different
+    operation that happens to coincide most of the time.
+    """
+    golden = tmp_path / "golden.json"
+    golden.write_text(json.dumps({"queries": [
+        {"id": "q1", "scope": "python", "query": "where is the turn controller",
+         "expected_files": ["sdk-server/src/pinecall/domain/transcript.py"]},
+        {"id": "q2", "scope": "python", "query": "the client",
+         "expected_files": ["pinecall/client.py"]},
+    ]}), encoding="utf-8")
+    cases = load_cases(golden, "python", "pinecall")
+    assert cases[0].expected == ("sdk-server/src/pinecall/domain/transcript.py",), \
+        "an inner directory sharing the repo's name was mistaken for the prefix"
+    assert cases[1].expected == ("client.py",), "a real leading prefix must still go"

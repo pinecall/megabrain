@@ -7,15 +7,13 @@ disk sound rather than a guess.
 
 from __future__ import annotations
 
-import json
 from typing import Callable, Sequence
 
 from .._arrays import Vector
 from .._types import NotGiven, is_given, not_given
-from ._batching import batches, fit
+from ._batching import batches
 from ._config import DEFAULT_BATCH, EmbedConfig
-from ._retry import request_with_retry
-from ._wire import decode_batch
+from ._send import send_batch
 from .cache import EmbedCache, remember, split_cached
 from .http import RetryPolicy, Transport
 
@@ -57,7 +55,7 @@ class Embedder:
         if missing:
             self.config.require_key()
         for batch in batches(missing, self.config.batch_size):
-            for text, vector in zip(batch, self._embed_one(batch)):
+            for text, vector in zip(batch, self._send(batch)):
                 cached[text] = vector
                 remember(self.cache, self.config.model, text, vector)
             # Reported per batch, not once at the end: indexing a large
@@ -69,18 +67,10 @@ class Embedder:
             on_batch(len(texts), len(texts))
         return [cached[t] for t in texts]
 
-    def _embed_one(self, batch: Sequence[str]) -> list[Vector]:
-        # Clipped HERE and nowhere else: the caller's text stays the key it
-        # reads its vector back by, and only the wire sees the shortened one.
-        body = json.dumps({"model": self.config.model,
-                           "input": [fit(text) for text in batch],
-                           "encoding_format": "base64"}).encode()
-        payload = request_with_retry(
-            self._require_transport(), self.config.endpoint, body,
-            headers=self.config.headers(),
-            timeout=self.config.timeout, policy=self.policy)
+    def _send(self, batch: Sequence[str]) -> list[Vector]:
+        """One batch out, with the size recovery `_send` owns."""
         self.tokens += sum(len(t) for t in batch) // 4    # rough, for reporting only
-        return decode_batch(payload, len(batch))
+        return send_batch(self._require_transport(), self.config, self.policy, batch)
 
     def _require_transport(self) -> Transport:
         """Imported on first use, not at module load — nothing that merely

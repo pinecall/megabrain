@@ -252,3 +252,27 @@ def test_the_skeleton_holds_declarations_and_no_bodies(case: Case) -> None:
     skeleton = case.parsed().skeleton                       # type: ignore[attr-defined]
     assert "Invoice" in skeleton
     assert "return" not in skeleton, "a body leaked into the file-level vector"
+
+
+def test_a_unit_can_never_end_PAST_the_last_line() -> None:
+    """FOUND IN USE, on 16 files of a real index.
+
+    A grammar reading a file it half-understands can report a node whose
+    `end_point` is one line past the content — C++ parsed by the C grammar does
+    it on `folly/Uri.h`, and so did PHP's mixed-HTML text nodes in the version
+    this was ported from. The chunk then claims a line the file does not have,
+    which breaks the partition invariant (hard rule #4) and puts a line number
+    in a citation that cannot be opened.
+
+    v2 clamped it in `segment()`. The port dropped the clamp, and only a sweep
+    over 18 191 real headers surfaced it: the guarantee has to hold for a file
+    the grammar gets WRONG, not just for one it gets right.
+    """
+    source = "namespace folly {\nclass Uri {};\n}\n#include <folly/Uri-inl.h>\n"
+    total = len(source.split("\n")) - 1                  # the trailing \n is a terminator
+    for parse in (c.parse, cpp.parse, java.parse, csharp.parse, go.parse,
+                  rust.parse, ruby.parse, php.parse):
+        parsed = parse("Uri.h", source)
+        overruns = [(unit.name, unit.end_line) for unit in parsed.units
+                    if unit.end_line > total]
+        assert not overruns, f"{parse.__module__} reported {overruns} past L{total}"
