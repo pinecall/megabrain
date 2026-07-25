@@ -1,0 +1,18 @@
+{
+  "ignore": [
+    "evals/private",
+    "studio/node_modules"
+  ],
+  "queries": [
+    "how does a query get scored against the index?",
+    "how are import and call edges extracted?",
+    "where is the retry backoff and Retry-After handled?",
+    "how does the citation splice stop the model inventing code?",
+    "what makes the chunker's output an exact line partition?",
+    "how do the sub-agents run in parallel and what happens when one hangs?"
+  ],
+  "models": {
+    "narrator": "google/gemini-3.1-flash-lite",
+    "rerank": "google/gemini-3.5-flash-lite"
+  }
+}

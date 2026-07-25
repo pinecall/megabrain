@@ -11,6 +11,7 @@ import type { Bundle, Tier1File, Tier2File } from "../contracts.js";
 import { code, el, fill } from "../dom.js";
 import { icon } from "../icons.js";
 import { scopePicker } from "../scope.js";
+import { suggestionStrip } from "../suggestions.js";
 
 export interface SearchView {
   root: HTMLElement;
@@ -50,11 +51,15 @@ export function searchView(repo: () => string | undefined,
   const go = el("button", { class: "badge" }, icon("spark", 13), "SEARCH");
   go.addEventListener("click", () => void run());
 
+  const suggestions = suggestionStrip(repo, (question) => {
+    input.value = question; void run();
+  });
+
   return {
     root: el("div", { class: "view-wrap" },
       el("div", { class: "query-wrap" },
         el("div", { class: "query-icon" }, icon("search")), input, scope.root, go),
-      stats, results),
+      suggestions, stats, results),
     focus: () => input.focus(),
   };
 }

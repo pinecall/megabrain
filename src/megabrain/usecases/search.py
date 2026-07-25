@@ -38,23 +38,25 @@ def search(start: Path | str, query: str, *, path_filter: str | None = None,
     `embedder` is an injection seam for tests; production leaves it alone and
     gets the configured one.
     """
-    state = load_state(resolve_root(start))
+    root = resolve_root(start)
+    state = load_state(root)
     if embedder is not None:
         state.embedder = embedder    # type: ignore[assignment]
     with state:
         bundle = search_with_state(state, query, path_filter=path_filter,
                                    content=content)
-    return _judged(bundle) if rerank else bundle
+    return _judged(bundle, root) if rerank else bundle
 
 
-def _judged(bundle: Bundle) -> Bundle:
-    """Reorder through the judge lane, or hand back what retrieval decided.
+def _judged(bundle: Bundle, root: Path) -> Bundle:
+    """Reorder through the judge lane with the model this REPO chose.
 
     No provider configured is not an error here: the lane is an optimisation,
     so an unconfigured deployment simply does not get it.
     """
     from ..enrich.rerank import judge_provider
     from ..enrich.rerank import rerank as judge
+    from ..project import load_project
 
-    provider = judge_provider()
+    provider = judge_provider(load_project(root).rerank_model)
     return judge(bundle, provider) if provider is not None else bundle

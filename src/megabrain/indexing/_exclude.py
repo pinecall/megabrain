@@ -66,9 +66,9 @@ class Excluder:
 
 
 def load_ignore(root: Path) -> list[str]:
-    """Patterns from `<root>/.megabrainignore`: one per line, `#` comments."""
-    path = root / IGNORE_FILE
-    if not path.is_file():
-        return []
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    return [stripped for line in lines if (stripped := line.split("#", 1)[0].strip())]
+    """The repository's own exclusions, from `.megabrain.json` and the legacy
+    `.megabrainignore` — merged, because a repo mid-migration has both and
+    preferring one would quietly drop half the exclusions."""
+    from ..project import load_project
+
+    return list(load_project(root).ignore)

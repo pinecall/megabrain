@@ -12,6 +12,7 @@ from .routes.asking import ask_stream
 from .routes.graph import graph_route
 from .routes.indexing import index_stream
 from .routes.meta import config, health, repos
+from .routes.project import project_route
 from .routes.query import get_route, search_route, symbols_route
 from .routes.static import static_route
 
@@ -24,6 +25,7 @@ ROUTES: dict[tuple[str, str], Route] = {
     ("GET", "/get"): get_route,
     ("GET", "/symbols"): symbols_route,
     ("GET", "/graph"): graph_route,
+    ("GET", "/project"): project_route,
     ("POST", "/search"): search_route,
     ("POST", "/index/stream"): index_stream,
     ("POST", "/ask/stream"): ask_stream,

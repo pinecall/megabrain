@@ -127,6 +127,14 @@ export interface Health {
   edges?: number;
 }
 
+export interface Project {
+  repo: string;
+  config_file: string;
+  queries: string[];
+  models: { narrator: string; rerank: string };
+  malformed: boolean;
+}
+
 export interface Config {
   version: string;
   readonly: boolean;

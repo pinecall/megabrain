@@ -6,12 +6,31 @@ that would need any of those is testing the network, not this engine.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Iterator
 
 import pytest
 
 from megabrain._home import HOME_VAR
+
+
+@pytest.fixture(autouse=True)
+def hermetic_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every MEGABRAIN_* setting comes OUT of the environment, for every test.
+
+    The developer's own shell configures the engine — a model here, a provider
+    there — and those leaked in: a test asserting the built-in default failed
+    on the machine that had an override set, and passed everywhere else. A
+    suite whose result depends on whose shell ran it is not a suite.
+
+    The golden corpus variables are kept: they point the retrieval gate at a
+    real index, and stripping them would silently turn a measurement into a
+    skip.
+    """
+    for name in list(os.environ):
+        if name.startswith("MEGABRAIN_") and not name.startswith("MEGABRAIN_GOLDEN"):
+            monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture(autouse=True)

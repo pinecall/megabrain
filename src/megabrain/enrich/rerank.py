@@ -13,8 +13,7 @@ untouched. The model is an OPTIMISATION, never a dependency.
 
 from __future__ import annotations
 
-import os
-
+from .._models import RERANK_MODEL
 from ..contracts import Bundle, Tier2File
 from ..providers.chat import ChatProvider
 from ._batches import RERANK_TIMEOUT, verdict_of
@@ -26,18 +25,15 @@ __all__ = ["rerank", "judge_provider", "RERANK_MODEL"]
 
 MAX_TOKENS = 300
 
-# A SMALL fast model, and bigger is measurably WORSE here — not just slower:
-#   flash-lite      recall 19/19 · rank1 19/19 · ~1.13s
-#   a frontier model                            ~5s per call, and it fails open
-#   on empty replies more often, because the task is "return a JSON array" and
-#   reasoning models editorialise.
-# The judge returns ids. It needs speed and obedience, not intelligence — which
-# is why it must NOT inherit the narration model: that one is chosen to explain
-# code well and costs seconds per call. Three batches through it took 16s.
-RERANK_MODEL = os.environ.get("MEGABRAIN_RERANK_MODEL", "google/gemini-3.5-flash-lite")
 
-def judge_provider() -> ChatProvider | None:
+
+def judge_provider(model: str | None = None) -> ChatProvider | None:
     """A provider tuned for JUDGING, not for narrating.
+
+    The default and its measurements live in `_models`; a repository overrides
+    it in `.megabrain.json`. It must NOT inherit the narration model — that one
+    is chosen to explain code well and costs seconds per call, and three
+    batches through it took 16s for a JSON array of integers.
 
     Built here rather than inherited: the lane's model and its timeout are the
     lane's business, and sharing the narrator's meant sharing a model chosen to
@@ -46,7 +42,8 @@ def judge_provider() -> ChatProvider | None:
     """
     from ..providers.chat import OpenAICompatible
 
-    provider = OpenAICompatible(model=RERANK_MODEL, timeout=RERANK_TIMEOUT)
+    provider = OpenAICompatible(model=model or RERANK_MODEL,
+                                timeout=RERANK_TIMEOUT)
     return provider if provider.available() else None
 
 

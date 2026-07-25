@@ -5,7 +5,7 @@
  * handle a 401 differently from its neighbours.
  */
 import type {
-  Bundle, Config, FileView, GraphMap, Health, Neighbourhood, RepoEntry,
+  Bundle, Config, FileView, GraphMap, Health, Neighbourhood, Project, RepoEntry,
 } from "./contracts.js";
 
 /* Same-origin and PREFIX-AWARE: the studio may be mounted under a sub-path
@@ -57,6 +57,10 @@ export const api = {
   config: () => request<Config>("/config"),
   health: (repo?: string) => request<Health>(`/health${query({ repo })}`),
   repos: () => request<{ repos: RepoEntry[] }>("/repos"),
+
+  /* Per REPO, unlike /config which describes the deployment: the questions a
+   * repository authored about itself, and the models it chose. */
+  project: (repo?: string) => request<Project>(`/project${query({ repo })}`),
 
   search: (q: string, repo?: string, content?: "code" | "docs") =>
     request<Bundle>("/search", {
