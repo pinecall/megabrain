@@ -31,18 +31,22 @@ def write_edges(store: Store, registry: Registry, sources: dict[str, str],
     if not targets:
         return 0
     written = 0
+    examined = False
     for strategy, paths in _by_strategy(registry, targets):
         context = strategy.edge_context(sources)
         for relpath in paths:
             edges = strategy.edges(relpath, sources[relpath], context)
             if edges is None:
                 continue            # not examined — leave what is stored alone
+            examined = True
             store.graph.replace_edges(relpath, edges)
             written += len(edges)
-    # Stamped only HERE, after the writing: a marker set by a pass that built
-    # no edges tells every later pass the graph is current and disables the
-    # rebuild above.
-    store.graph.set_meta("edge_schema", EDGE_SCHEMA)
+    # Stamped only after a file was actually EXAMINED — not merely claimed. A
+    # marker set by a pass that looked at nothing tells every later pass the
+    # graph is current and disables the rebuild above; a repository of only
+    # markdown claims its extension and still has no graph to be current about.
+    if examined:
+        store.graph.set_meta("edge_schema", EDGE_SCHEMA)
     return written
 
 

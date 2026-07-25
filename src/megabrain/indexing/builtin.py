@@ -2,16 +2,24 @@
 
 Each one is a few lines: a tuple of extensions and a parser. That is the point
 of the Protocol — a language is configuration, not code in the indexer.
+
+Python, TypeScript/JavaScript and Markdown are always on; their grammars are
+hard dependencies. The rest are gated on their grammar being importable, so a
+default install reads the languages most repositories are written in and
+`pip install megabrain[languages]` adds the others without changing a line.
 """
 
 from __future__ import annotations
 
-from ..chunkers import Parsed
+from ..chunkers import Parsed, markdown, typescript
 from ..chunkers import python as python_parser
+from ._languages import optional_strategies
 from .edges import ModuleIndex, module_index, python_edges
 from .strategies import Registry, Strategy
+from .ts_edges import TsFiles, ts_edges, ts_files
 
-__all__ = ["PythonStrategy", "default_registry"]
+__all__ = ["PythonStrategy", "TypeScriptStrategy", "DocumentStrategy",
+           "default_registry"]
 
 
 class PythonStrategy:
@@ -25,12 +33,52 @@ class PythonStrategy:
 
     def edges(self, relpath: str, source: str,
               context: object) -> list[tuple[str, str]] | None:
-        """The narrowing IS the type check: a context built by another
-        strategy is not this one's to read, and `isinstance` says so without
-        a cast that would only be true by convention."""
+        """The narrowing IS the type check: a context built by another strategy
+        is not this one's to read, and `isinstance` says so without a cast that
+        would only be true by convention."""
         return python_edges(relpath, context) if isinstance(context, ModuleIndex) else None
+
+
+class TypeScriptStrategy:
+    """One grammar for six extensions.
+
+    The TypeScript grammar is a superset of JavaScript, and the parser routes
+    `.tsx`/`.jsx` to the TSX variant — JSX is a syntax error to the plain one.
+    """
+
+    exts: tuple[str, ...] = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+
+    def parse(self, relpath: str, source: str) -> Parsed:
+        return typescript.parse(relpath, source)
+
+    def edge_context(self, sources: dict[str, str]) -> object:
+        return ts_files(sources)
+
+    def edges(self, relpath: str, source: str,
+              context: object) -> list[tuple[str, str]] | None:
+        return ts_edges(relpath, source, context) if isinstance(context, TsFiles) else None
+
+
+class DocumentStrategy:
+    """Markdown. No edges: a document has no imports, and returning an empty
+    list would claim it was examined and found to have none."""
+
+    exts: tuple[str, ...] = (".md", ".markdown", ".mdx")
+
+    def parse(self, relpath: str, source: str) -> Parsed:
+        return markdown.parse(relpath, source)
+
+    def edge_context(self, sources: dict[str, str]) -> object:
+        return None
+
+    def edges(self, relpath: str, source: str,
+              context: object) -> list[tuple[str, str]] | None:
+        return None
+
 
 
 def default_registry(extra: list[Strategy] | None = None) -> Registry:
     """The built-ins, with any caller-supplied strategies taking precedence."""
-    return Registry([PythonStrategy()], extra=extra or [])
+    builtin: list[Strategy] = [PythonStrategy(), TypeScriptStrategy(),
+                               DocumentStrategy(), *optional_strategies()]
+    return Registry(builtin, extra=extra or [])

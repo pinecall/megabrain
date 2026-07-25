@@ -29,65 +29,70 @@ from tests.unit.indexing.fake import CountingEmbedder, write
 
 
 @pytest.fixture
-def typescript(tmp_path: Path) -> Path:
+def unreadable(tmp_path: Path) -> Path:
+    """A Java/Swift project — languages this build has no grammar for.
+
+    The original fixture was TypeScript, which is exactly the repository that
+    provoked this whole check. It reads TypeScript now, so the fixture had to
+    move to a language that is still unclaimed; the RULE is unchanged.
+    """
     write(tmp_path, {
-        "src/app.ts": "export const run = () => 1;\n",
-        "src/util.ts": "export const help = () => 2;\n",
-        "src/page.tsx": "export default () => null;\n",
-        "README.md": "# a project\n",
+        "src/App.java": "class App { void run() {} }\n",
+        "src/Util.java": "class Util {}\n",
+        "ios/View.swift": "struct View {}\n",
         "package.json": '{"name":"x"}\n',
     })
     return tmp_path
 
 
-def test_the_census_names_what_it_CANNOT_read(typescript: Path) -> None:
+def test_the_census_names_what_it_CANNOT_read(unreadable: Path) -> None:
     """By extension and by count, so "why is this empty" is answered where the
     question is asked — before anything is indexed or paid for."""
-    report = scan(typescript)
+    report = scan(unreadable)
     assert report["would_index"] == 0
-    assert report["unsupported"][".ts"] == 2
-    assert report["unsupported"][".tsx"] == 1
-    assert report["unsupported"][".md"] == 1
+    assert report["unsupported"][".java"] == 2
+    assert report["unsupported"][".swift"] == 1
+    assert report["would_index"] == 0
 
 
-def test_the_census_says_which_extensions_this_build_DOES_read(typescript: Path) -> None:
+def test_the_census_says_which_extensions_this_build_DOES_read(unreadable: Path) -> None:
     """The other half of the same answer. A list of what was rejected without a
     list of what is accepted leaves the reader guessing at the rule."""
-    assert ".py" in scan(typescript)["supported"]
+    assert ".py" in scan(unreadable)["supported"]
 
 
 def test_a_json_or_lockfile_is_not_reported_as_a_missing_language(
-        typescript: Path) -> None:
+        unreadable: Path) -> None:
     """`package.json` is not a file anybody expects in a code index, and listing
     it as unsupported turns the finding into noise. What matters is the SOURCE
     this build cannot read."""
-    assert ".json" not in scan(typescript)["unsupported"]
+    assert ".json" not in scan(unreadable)["unsupported"]
 
 
-def test_indexing_a_repo_with_nothing_readable_is_an_ERROR(typescript: Path) -> None:
+def test_indexing_a_repo_with_nothing_readable_is_an_ERROR(unreadable: Path) -> None:
     with pytest.raises(NothingToIndex) as raised:
-        build_index(typescript, embedder=CountingEmbedder())
+        build_index(unreadable, embedder=CountingEmbedder())
     message = str(raised.value)
-    assert ".ts" in message and ".py" in message, \
+    assert ".java" in message and ".py" in message, \
         "it names what it found AND what it reads — either alone is a riddle"
 
 
 def test_the_error_is_not_raised_when_there_is_something_to_index(
-        typescript: Path) -> None:
+        unreadable: Path) -> None:
     """One readable file is a repository worth indexing. The check is about
     nothing being readable, not about everything being readable."""
-    write(typescript, {"tool.py": "def go():\n    return 1\n"})
-    report = build_index(typescript, embedder=CountingEmbedder())
+    write(unreadable, {"tool.py": "def go():\n    return 1\n"})
+    report = build_index(unreadable, embedder=CountingEmbedder())
     assert report["files"] == 1
 
 
 def test_an_UNCHANGED_reindex_of_a_real_repo_is_never_the_error(
-        typescript: Path) -> None:
+        unreadable: Path) -> None:
     """The two must not be confused: "nothing changed" is success and "nothing
     readable" is a failure, and they produce the same zeros in the delta."""
-    write(typescript, {"tool.py": "def go():\n    return 1\n"})
-    build_index(typescript, embedder=CountingEmbedder())
-    again = build_index(typescript, embedder=CountingEmbedder())
+    write(unreadable, {"tool.py": "def go():\n    return 1\n"})
+    build_index(unreadable, embedder=CountingEmbedder())
+    again = build_index(unreadable, embedder=CountingEmbedder())
     assert again["changed"] == 0 and int(again["total_chunks"]) > 0
 
 

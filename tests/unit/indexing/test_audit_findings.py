@@ -49,10 +49,11 @@ def test_a_pass_with_nothing_to_graph_does_not_claim_an_edge_schema(
 
     Stamping it after a pass that examined nothing makes every future pass
     believe the graph is current, so the rebuild the marker exists to trigger
-    never happens. Here no strategy claims the file, so the edge pass has no
-    target — and says so by not stamping.
+    never happens. Markdown is CLAIMED — it chunks, it is searchable — and has
+    no graph: a document has no imports. Being claimed is not being examined,
+    and only the second one may stamp.
     """
-    write(tmp_path, {"notes.md": "# not a language this registry knows\n"})
+    write(tmp_path, {"notes.md": "# a document, which has no imports\n"})
     index_repo(tmp_path, embedder=CountingEmbedder())
 
     with Store(tmp_path) as store:
