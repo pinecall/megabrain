@@ -10,8 +10,14 @@ from __future__ import annotations
 
 from .build import RepoGraph, load_graph
 from .communities import communities_of
+from .gods import god_nodes
+from .node import graph_node, neighbourhood
 from .paths import shortest_path
-from .views import graph_map, graph_path, neighbourhood
+from .resolve import resolve_node
+from .route import graph_path
+from .surprises import surprises_of
+from .views import graph_map
 
-__all__ = ["graph_map", "neighbourhood", "graph_path",
-           "RepoGraph", "load_graph", "communities_of", "shortest_path"]
+__all__ = ["graph_map", "neighbourhood", "graph_node", "graph_path",
+           "RepoGraph", "load_graph", "communities_of", "shortest_path",
+           "god_nodes", "surprises_of", "resolve_node"]

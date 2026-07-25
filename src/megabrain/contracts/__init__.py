@@ -10,19 +10,15 @@ is what lets every layer above depend on it freely.
 
 from __future__ import annotations
 
+from .brief import Brief, BriefFile, BriefSymbol
 from .bundle import AnchorHit, Bundle, FlowHit, Tier1File, Tier2File
 from .chunk import ChunkHit, ChunkRef, PrunedChunk, Span, SymbolRef
 from .file import FileView
-from .graph import (
-    Community,
-    GraphLink,
-    GraphMap,
-    GraphNode,
-    GraphPath,
-    Neighbourhood,
-)
+from .graph import Community, GodNode, GraphLink, GraphMap, GraphNode, Surprise
+from .node import Neighbourhood, NodeEdge, NodeView, SemanticTie
 from .prune import NoiseSpan, PruneResult, RelatedDoc, RelatedTest
 from .repo import RepoEntry
+from .route import CodeSnip, GraphPath, Hop, HopCode
 from .scan import ScanReport, SkippedFile
 
 __all__ = [
@@ -38,6 +34,10 @@ __all__ = [
     "ScanReport", "SkippedFile",
     # the dependency graph
     "GraphMap", "GraphNode", "GraphLink", "Community", "Neighbourhood", "GraphPath",
+    "GodNode", "Surprise", "Hop", "HopCode", "CodeSnip",
+    "NodeView", "NodeEdge", "SemanticTie",
+    # the mental model
+    "Brief", "BriefFile", "BriefSymbol",
     # the flat projection
     "PruneResult", "NoiseSpan", "RelatedDoc", "RelatedTest",
 ]

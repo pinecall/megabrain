@@ -44,6 +44,16 @@ def communities_of(graph: RepoGraph) -> dict[str, int]:
     return _renumber(labels)
 
 
+SEM_WEIGHT = 0.5
+"""What a semantic tie counts for, against 1.0 per structural kind.
+
+Half, because similarity is a WEAKER claim than an import: an import is a fact
+about execution, a cosine is an opinion about wording. But not zero — a file
+with no imports at all (a mirror implementation, a vendored twin) is exactly
+the one structure cannot place, and the semantic lane is its only anchor.
+"""
+
+
 def _round(graph: RepoGraph, labels: dict[str, int]) -> bool:
     """One sweep. Returns whether anything moved."""
     moved = False
@@ -54,6 +64,9 @@ def _round(graph: RepoGraph, labels: dict[str, int]) -> bool:
             # import alone, so the number of kinds is the weight.
             label = labels[neighbour]
             weights[label] = weights.get(label, 0.0) + len(kinds)
+        for neighbour, score in graph.sem.get(relpath, {}).items():
+            label = labels[neighbour]
+            weights[label] = weights.get(label, 0.0) + SEM_WEIGHT * score
         if not weights:
             continue                  # an isolated file keeps its own label
         best = min(weights, key=lambda label: (-weights[label], label))

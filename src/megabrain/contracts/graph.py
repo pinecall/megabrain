@@ -10,16 +10,17 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-__all__ = ["GraphLink", "GraphNode", "Community", "GraphMap",
-           "Neighbourhood", "GraphPath"]
+__all__ = ["GraphLink", "GraphNode", "Community", "GraphMap", "GodNode",
+           "Surprise"]
 
 
-class GraphLink(TypedDict):
+class GraphLink(TypedDict, total=False):
     """One dependency, undirected for drawing but labelled with its kinds."""
 
     source: str
     target: str
-    kind: str                # "import", "call", or "call/import" when both
+    kind: str                # "import", "call", "call/import", or "semantic"
+    score: float             # semantic links only — how close, for the opacity
 
 
 class GraphNode(TypedDict):
@@ -37,8 +38,37 @@ class Community(TypedDict):
     """
 
     id: int
+    label: str               # what the code DOES, named once by a model
     size: int
     files: list[str]         # most connected first
+
+
+class GodNode(TypedDict):
+    """A file everything touches, reported with the split that diagnoses it.
+
+    High `in` is load-bearing — everyone depends on it. High `out` is an
+    orchestrator — it drives everything. High both is the file whose refactor
+    nobody volunteers for.
+    """
+
+    file: str
+    degree: int
+    in_degree: int
+    out_degree: int
+    community: int
+
+
+class Surprise(TypedDict):
+    """Two files that do the same thing and have never met.
+
+    The finding no ranking surfaces: similar enough to be twins, no edge
+    between them, and in different clusters — which is what makes it worth
+    saying instead of something the map already draws.
+    """
+
+    a: str
+    b: str
+    score: float
 
 
 class GraphMap(TypedDict):
@@ -50,28 +80,6 @@ class GraphMap(TypedDict):
     links: list[GraphLink]
     communities: list[Community]
     hubs: list[GraphNode]    # most depended upon — where a change lands hardest
-    ms: int
-
-
-class Neighbourhood(TypedDict):
-    """One file and its immediate dependencies, both directions.
-
-    `imported_by` is half the value: "who calls this" is what turns a hit into
-    an understanding of why the code exists.
-    """
-
-    file: str
-    community: int
-    imports: list[str]
-    imported_by: list[str]
-    ms: int
-
-
-class GraphPath(TypedDict):
-    """How two files are connected, if they are."""
-
-    source: str
-    target: str
-    hops: list[str]          # source … target, empty when unreachable
-    found: bool
+    god_nodes: list[GodNode]
+    surprises: list[Surprise]
     ms: int

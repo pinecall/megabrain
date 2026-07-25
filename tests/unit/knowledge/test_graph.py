@@ -105,10 +105,10 @@ def test_a_path_crosses_the_bridge(repo: Path) -> None:
     """The question a graph answers that nothing else does: HOW are these two
     connected. The only route here runs through app.py."""
     result = graph_path(repo, "auth/session.py", "billing/invoice.py")
+    walked = [hop["file"] for hop in result["hops"]]
     assert result["found"] is True
-    assert result["hops"][0] == "auth/session.py"
-    assert result["hops"][-1] == "billing/invoice.py"
-    assert "app.py" in result["hops"]
+    assert walked[0] == "auth/session.py" and walked[-1] == "billing/invoice.py"
+    assert "app.py" in walked
 
 
 def test_a_path_to_an_unconnected_file_is_reported_not_invented(tmp_path: Path) -> None:
@@ -120,7 +120,8 @@ def test_a_path_to_an_unconnected_file_is_reported_not_invented(tmp_path: Path) 
 
 
 def test_a_path_to_itself_is_one_hop(repo: Path) -> None:
-    assert graph_path(repo, "app.py", "app.py")["hops"] == ["app.py"]
+    hops = graph_path(repo, "app.py", "app.py")["hops"]
+    assert [hop["file"] for hop in hops] == ["app.py"]
 
 
 def test_the_shortest_path_is_the_one_returned(tmp_path: Path) -> None:
