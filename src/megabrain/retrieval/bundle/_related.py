@@ -14,7 +14,30 @@ from ..state import SearchState
 from ._convert import OUTLINE_KINDS, to_outline, to_ref
 from ._rank import Ranking
 
-__all__ = ["neighbours_of", "related_entry"]
+__all__ = ["neighbours_of", "related_entry", "matched_names"]
+
+
+def matched_names(hits: list[ChunkMeta], params: RetrievalParams) -> list[str]:
+    """The few names this file matched on — capped by NAME, not by chunk.
+
+    A chunk's name is not one name. Where a language's small siblings get
+    packed into a single chunk, that chunk is named for everything inside it,
+    with the container repeated between every member:
+
+        "Sinatra.Helpers.cache_control, Sinatra.Helpers, Sinatra.Helpers.expires, …"
+
+    Capping chunks let ONE of those spend the whole line. Measured on the map
+    an agent receives: 2 700 of 5 924 chars — 45% of the render — were these
+    lines, and `base.rb` alone contributed 2 108 from three chunks. The same
+    symbols are printed below as the file's outline, so the wall was redundant
+    as well as unreadable.
+    """
+    seen: dict[str, None] = {}
+    for meta in hits:
+        for name in (meta.name or "").split(","):
+            if (name := name.strip()):
+                seen.setdefault(name, None)
+    return list(seen)[:params.matched_names]
 
 
 def related_entry(state: SearchState, relpath: str, ranking: Ranking,
@@ -26,8 +49,7 @@ def related_entry(state: SearchState, relpath: str, ranking: Ranking,
         file=relpath,
         score=ranking.best_of.get(relpath, 0.0),
         via_graph=via_graph,
-        matched=[name for i in indexes[:params.matched_names]
-                 if (name := metas[i].name)],
+        matched=matched_names([metas[i] for i in indexes], params),
         doc=_first_doc(symbols),
         best_chunk=to_ref(metas[indexes[0]]) if indexes else None,
         symbols=[to_outline(s) for s in symbols
