@@ -1,0 +1,21 @@
+  /* ── brief: prose, relations, interface ─────────────────────────────────
+     The one panel in the studio whose payload is PROSE, so it is the one that
+     gets reading measures rather than the data density the rest is tuned for:
+     a max line length, real line height, and the interface set back in mono so
+     the eye separates "what this is" from "what it declares" without a rule. */
+  .brief-card{padding:16px;display:grid;gap:12px;margin-bottom:12px}
+  .brief-head{display:flex;align-items:center;gap:10px;min-width:0}
+  .brief-path{flex:1;text-align:left;min-width:0}
+  .brief-path:hover{color:var(--accent)}
+  .brief-score{font-size:10.5px;color:var(--muted);flex-shrink:0}
+  .brief-prose{font-size:13px;line-height:1.68;color:var(--text);max-width:78ch;
+               letter-spacing:-0.005em}
+  .brief-rel{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .brief-arrow{font-size:12px;color:var(--accent);flex-shrink:0}
+  .brief-rel-label{font-size:11px;font-weight:500;color:var(--muted);flex-shrink:0}
+  .brief-pills{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
+  .brief-rel-more{font-size:10.5px;color:var(--muted);align-self:center}
+  .brief-iface{display:grid;gap:3px;padding:10px 12px;background:var(--panel2);
+               border:1px solid var(--border);border-radius:6px}
+  .brief-sig{font-size:11px;line-height:1.6;color:var(--muted);overflow-x:auto;
+             white-space:pre}

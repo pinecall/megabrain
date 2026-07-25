@@ -7,7 +7,9 @@
 @import "./tokens.css";
 @import "./shell.css";
 @import "./search.css";
+@import "./brief.css";
 @import "./ask.css";
+@import "./graph.css";
 @import "./overlays.css";
 @import "./navigator.css";
 @import "./addrepo.css";

@@ -9,12 +9,15 @@ import { el, fill } from "./dom.js";
 import { icon } from "./icons.js";
 import { currentTheme, toggleTheme } from "./theme.js";
 
-export type TabName = "ask" | "search" | "graph";
+export type TabName = "ask" | "brief" | "search" | "graph";
 
 /* ASK first, and that ordering is the product's: it is the feature people come
- * for. Search sits beside it because ask is built ON it — every walkthrough is
- * a retrieval the model then explains. */
-export const TABS: TabName[] = ["ask", "search", "graph"];
+ * for. Then the three in the order a reader actually needs them: BRIEF to
+ * orient (what these files are and how they connect), SEARCH for the code
+ * itself, GRAPH for the structure. Ask is built ON search — every walkthrough
+ * is a retrieval the model then explains — and brief is that same retrieval
+ * with the cards instead of the bodies. */
+export const TABS: TabName[] = ["ask", "brief", "search", "graph"];
 
 export interface Shell {
   viewport: HTMLElement;

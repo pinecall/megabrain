@@ -23,8 +23,8 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
     parser.add_argument("--from", dest="source", metavar="FILE",
                         help="with --to: how two files are connected")
     parser.add_argument("--to", dest="target", metavar="FILE")
-    parser.add_argument("--label", action="store_true",
-                        help="name the clusters with a model (cached per graph)")
+    parser.add_argument("--no-labels", dest="label", action="store_false",
+                        help="skip the cached model call that names the clusters")
     parser.add_argument("--code", action="store_true",
                         help="with --from/--to: show the code at each hop")
     parser.add_argument("--json", action="store_true")

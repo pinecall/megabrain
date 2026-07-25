@@ -5,8 +5,8 @@
  * handle a 401 differently from its neighbours.
  */
 import type {
-  Bundle, Config, FileView, GraphMap, Health, Neighbourhood, Project, RepoEntry,
-  ScanReport,
+  Brief, Bundle, Config, FileView, GraphMap, GraphPath, Health, Neighbourhood,
+  NodeView, Project, RepoEntry, ScanReport,
 } from "./contracts.js";
 
 /* Same-origin and PREFIX-AWARE: the studio may be mounted under a sub-path
@@ -75,13 +75,32 @@ export const api = {
       body: JSON.stringify({ query: q, repo, content }),
     }),
 
+  /* The mental map for a question: prose written at study time, relations read
+   * live from the graph. No model runs here — a 404 `study_not_found` means the
+   * repo was never studied, which the view reports as an action, not an error. */
+  brief: (q: string, repo?: string, limit?: number) =>
+    request<Brief>("/brief", {
+      method: "POST",
+      body: JSON.stringify({ query: q, repo, limit }),
+    }),
+
   file: (file: string, repo?: string, symbol?: string) =>
     request<FileView>(`/get${query({ file, repo, symbol })}`),
 
   graph: (repo?: string) => request<GraphMap>(`/graph${query({ mode: "map", repo })}`),
 
   node: (node: string, repo?: string) =>
-    request<Neighbourhood>(`/graph${query({ mode: "node", node, repo })}`),
+    request<Neighbourhood>(`/graph${query({ mode: "node", node, repo, label: "0" })}`),
+
+  /* The full node view: both edge directions kept per kind, the semantic
+   * twins, the symbols. `node` accepts a TERM, not only a path. */
+  graphNode: (node: string, repo?: string) =>
+    request<NodeView>(`/graph${query({ mode: "node", node, repo })}`),
+
+  /* How two files are connected — with the carrier symbols and the real code
+   * at both ends of every hop. */
+  graphPath: (source: string, target: string, repo?: string) =>
+    request<GraphPath>(`/graph${query({ mode: "path", source, target, repo })}`),
 
   /* Both streams are POST + SSE, so EventSource (GET-only) cannot be used:
    * the body stream is read and the `event:`/`data:` frames parsed here. */
@@ -93,10 +112,13 @@ export const api = {
     return stream("/ask/stream", { question, repo, content }, onEvent);
   },
 
-  index(repo: string, onEvent: (event: string, data: unknown) => void): {
+  /* `llm` also writes the mental map — a model call per changed file, which is
+   * why it is a parameter the caller has to pass rather than a default. */
+  index(repo: string, llm: boolean,
+        onEvent: (event: string, data: unknown) => void): {
     done: Promise<void>; abort: () => void;
   } {
-    return stream("/index/stream", { path: repo }, onEvent);
+    return stream("/index/stream", { path: repo, llm }, onEvent);
   },
 };
 

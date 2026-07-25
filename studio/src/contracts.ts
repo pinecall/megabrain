@@ -65,6 +65,31 @@ export interface Bundle {
   ms: number;
 }
 
+export interface BriefSymbol {
+  name: string;
+  kind: string;
+  line: number;
+  signature: string;
+}
+
+export interface BriefFile {
+  file: string;
+  card: string;
+  degraded: boolean;
+  score: number;
+  imports: string[];
+  imported_by: string[];
+  symbols: BriefSymbol[];
+}
+
+export interface Brief {
+  repo: string;
+  query: string;
+  files: BriefFile[];
+  considered: number;
+  ms: number;
+}
+
 export interface FileView extends Span {
   text: string;
   symbols: SymbolRef[];
@@ -90,12 +115,29 @@ export interface GraphLink {
   source: string;
   target: string;
   kind: string;
+  /* Semantic links only — how close, which is the line's opacity. */
+  score?: number;
 }
 
 export interface Community {
   id: number;
+  label: string;
   size: number;
   files: string[];
+}
+
+export interface GodNode {
+  file: string;
+  degree: number;
+  in_degree: number;
+  out_degree: number;
+  community: number;
+}
+
+export interface Surprise {
+  a: string;
+  b: string;
+  score: number;
 }
 
 export interface GraphMap {
@@ -105,6 +147,8 @@ export interface GraphMap {
   links: GraphLink[];
   communities: Community[];
   hubs: GraphNode[];
+  god_nodes: GodNode[];
+  surprises: Surprise[];
   ms: number;
 }
 
@@ -113,6 +157,65 @@ export interface Neighbourhood {
   community: number;
   imports: string[];
   imported_by: string[];
+  ms: number;
+}
+
+export interface NodeEdge {
+  file: string;
+  kind: string;
+}
+
+export interface SemanticTie {
+  file: string;
+  score: number;
+}
+
+export interface NodeView {
+  repo: string;
+  file: string;
+  resolved_from: string;
+  community: number;
+  community_label: string;
+  degree: number;
+  imports: NodeEdge[];
+  imported_by: NodeEdge[];
+  semantic: SemanticTie[];
+  symbols: SymbolRef[];
+  ms: number;
+}
+
+export interface CodeSnip {
+  file: string;
+  start_line: number;
+  text: string;
+  highlight: string;
+  hi_rows: number[];
+  in_symbol?: string | null;
+}
+
+export interface HopCode {
+  symbol: string;
+  verified: boolean;
+  use: CodeSnip | null;
+  definition: CodeSnip | null;
+}
+
+export interface Hop {
+  file: string;
+  via: string;
+  symbols?: string[];
+  code?: HopCode | null;
+}
+
+export interface GraphPath {
+  source: string;
+  target: string;
+  hops: Hop[];
+  found: boolean;
+  flipped: boolean;
+  chain: boolean;
+  meet: string | null;
+  meet_kind: string | null;
   ms: number;
 }
 
@@ -148,7 +251,7 @@ export interface Project {
   repo: string;
   config_file: string;
   queries: string[];
-  models: { narrator: string; rerank: string };
+  models: { narrator: string; rerank: string; study: string };
   malformed: boolean;
 }
 

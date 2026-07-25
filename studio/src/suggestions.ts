@@ -1,6 +1,6 @@
 /* The questions a repository authored about ITSELF.
  *
- * From `.megabrain.json`, and worth surfacing because the hardest part of using
+ * From `megabrain.json`, and worth surfacing because the hardest part of using
  * this engine is knowing what to ask a codebase you have never read. A repo
  * that ships its own starter questions answers that for the newcomer.
  */

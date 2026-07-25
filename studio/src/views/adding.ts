@@ -9,6 +9,7 @@
 import { api } from "../api.js";
 import type { ScanReport } from "../contracts.js";
 import { el, fill, need } from "../dom.js";
+import { icon } from "../icons.js";
 
 /* One door for both jobs. A path that is ALREADY indexed is not a different
  * feature — the census says so and the button says "Re-index", which is also
@@ -24,6 +25,10 @@ export function addRepoOverlay(current: string | undefined, onIndexed: () => voi
   const start = el("button", { class: "btn-primary" }, "Index it");
   const preview = el("button", { class: "chip" }, "Scan");
   start.setAttribute("disabled", "true");
+  /* OFF by default, and it has to be: indexing is free after the embeddings,
+   * the mental map is a model call per file. An expensive box that arrives
+   * ticked is a bill nobody agreed to. */
+  const withBrief = briefOption();
 
   const close = (): void => fill(host);
   const closer = el("button", { class: "close-btn" }, "✕");
@@ -49,18 +54,13 @@ export function addRepoOverlay(current: string | undefined, onIndexed: () => voi
     const label = el("div", { class: "card-sub" }, "starting…");
     fill(census, el("div", { class: "progress-track" }, bar), label);
     start.setAttribute("disabled", "true");
-    const running = api.index(input.value.trim(), (name, data) => {
+    const running = api.index(input.value.trim(), withBrief.on(), (name, data) => {
       const event = data as Record<string, unknown>;
-      if (name === "progress" && event["type"] === "file") {
-        const done = Number(event["i"] ?? 0);
-        const total = Number(event["n"] ?? 1);
-        bar.classList.remove("indet");
-        bar.style.width = `${Math.round((done / total) * 100)}%`;
-        label.textContent = `${done}/${total} · ${String(event["file"] ?? "")}`;
+      if (name === "progress") {
+        progress(event, bar, label);
       } else if (name === "done") {
         bar.style.width = "100%";
-        label.textContent = `${String(event["chunks"])} chunks · `
-          + `${String(event["edges"])} edges · ${String(event["seconds"])}s`;
+        label.textContent = summary(event);
         onIndexed();
       } else if (name === "error") {
         onError(String(event["error"] ?? "indexing failed"));
@@ -84,10 +84,59 @@ export function addRepoOverlay(current: string | undefined, onIndexed: () => voi
         closer),
       el("div", { style: "padding:0 24px 22px;display:grid;gap:14px;overflow:auto" },
         el("div", { style: "display:flex;gap:8px" }, input, preview),
-        census,
+        census, withBrief.root,
         el("div", { style: "display:flex;justify-content:flex-end" }, start)))));
   input.focus();
   if (input.value) void look();     // the selected repo, already censused
+}
+
+interface Option {
+  root: HTMLElement;
+  on(): boolean;
+}
+
+/* A real checkbox, not a styled div: it is focusable, it toggles on Space, and
+ * a screen reader already knows what it is. */
+function briefOption(): Option {
+  const box = el("input", { type: "checkbox", class: "opt-box" }) as HTMLInputElement;
+  const root = el("label", { class: "opt-row" }, box,
+    el("div", {},
+      el("div", { class: "opt-title" }, icon("brain", 13),
+         "Also build the mental map"),
+      el("div", { class: "opt-note" },
+         "One model call per file writes what each one IS, so the Brief tab can "
+         + "answer instantly afterwards. Costs money and minutes; the index "
+         + "itself does not need it.")));
+  return { root, on: () => box.checked };
+}
+
+function progress(event: Record<string, unknown>, bar: HTMLElement,
+                  label: HTMLElement): void {
+  /* Two phases share one bar, distinguished by the event's own type. A second
+   * bar for the cards would imply they run in parallel; they do not — the map
+   * is written from the index that just finished. */
+  const kind = String(event["type"] ?? "");
+  if (kind !== "file" && kind !== "card") return;
+  const done = Number(event["i"] ?? 0);
+  const total = Number(event["n"] ?? 1);
+  bar.classList.remove("indet");
+  bar.style.width = `${Math.round((done / total) * 100)}%`;
+  label.textContent = (kind === "card" ? "card " : "")
+    + `${done}/${total} · ${String(event["file"] ?? "")}`;
+}
+
+function summary(event: Record<string, unknown>): string {
+  const base = `${String(event["chunks"])} chunks · ${String(event["edges"])} edges`
+    + ` · ${String(event["seconds"])}s`;
+  /* The card pass reports separately BECAUSE it can fail on its own: the index
+   * is written and committed by then, so a dead provider is a missing map, not
+   * a failed index — and saying nothing would leave the next Brief a mystery. */
+  const failure = event["study_error"];
+  if (typeof failure === "string") return `${base} · no mental map: ${failure}`;
+  const cards = event["study"] as Record<string, unknown> | undefined;
+  if (!cards) return base;
+  return `${base} · ${String(cards["written"])} cards written`
+    + ` · ${String(cards["degraded"])} degraded`;
 }
 
 function render(report: ScanReport): HTMLElement[] {
