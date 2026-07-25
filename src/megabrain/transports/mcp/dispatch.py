@@ -41,7 +41,8 @@ def _code(args: dict[str, Any]) -> str:
     sentence, so "how do I add a cache header" cannot be read as a change.
     """
     return ask(arg.repo(args), arg.first_of(args, "task", "query"),
-               path_filter=arg.scope(args), content="code", task=True)
+               path_filter=arg.scope(args), content="code", task=True,
+               full=arg.flag(args, "full", default=False))
 
 
 def _replace(args: dict[str, Any]) -> str:

@@ -63,9 +63,13 @@ REUSE what the task told you to reuse. If an existing helper does part of the \
 job, call it by name; re-deriving what it already returns is the change being \
 done wrong, however well it reads.
 
-Then one short section "## Pattern to follow" citing the nearest existing \
-example — the neighbouring test, or the sibling helper — so the new code \
-matches what is already there.
+Then ONE section "## Pattern to follow" with exactly ONE citation: the single \
+nearest existing example — one test, or one method — spanning it COMPLETELY, \
+from its own first line to its own `end`. Not the class, describe or module \
+that contains it: a container is the whole suite, and quoting it costs more \
+than the reader was going to spend opening the file. One complete sibling is \
+what they cannot reconstruct from anywhere else. Never cite the same range \
+twice anywhere in your answer.
 
 Rules:
 - EXISTING code is never retyped. Every line that is already in the repository \

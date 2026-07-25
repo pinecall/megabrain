@@ -15,7 +15,20 @@ import re
 
 from ..storage import Store
 
-__all__ = ["quote_citations", "lines_of", "CITATION"]
+__all__ = ["quote_citations", "lines_of", "CITATION", "MAX_QUOTE_LINES"]
+
+MAX_QUOTE_LINES = 40
+"""Lines any single citation may print before it is cut, LOUDLY.
+
+Enforced here because asking did not work. Told to cite "one test, or one
+method — not the class or describe that contains it", the model cited a
+117-line `describe` block holding fifteen tests: 3 518 characters, 55% of the
+whole answer, to show what one of them looks like. Forty lines is two or three
+complete examples, which is what imitating a style actually needs.
+
+Display only. The APPLY markers are read from the raw text before any quoting,
+so a cut here can never shorten the anchor an edit is built from.
+"""
 
 CITATION = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]")
 
@@ -36,9 +49,11 @@ def _block(store: Store, path: str, lo: int, hi: int) -> str:
     if not lines:
         return f"_(no file `{path}` in the index)_"
     lo, hi = max(1, lo), min(len(lines), max(lo, hi))
-    body = "\n".join(lines[lo - 1:hi])
+    shown = min(hi, lo + MAX_QUOTE_LINES - 1)
+    body = "\n".join(lines[lo - 1:shown])
+    cut = (f"\n… cut at L{shown} of L{lo}-{hi}" if shown < hi else "")
     lang = _LANG.get(path.rsplit(".", 1)[-1].lower(), "")
-    return f"**`{path}` L{lo}-{hi}**\n```{lang}\n{body}\n```"
+    return f"**`{path}` L{lo}-{hi}**\n```{lang}\n{body}\n```{cut}"
 
 
 def lines_of(store: Store, path: str) -> list[str]:

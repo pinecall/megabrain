@@ -32,7 +32,8 @@ __all__ = ["ask"]
 
 def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         content: Content | None = "code", cache: bool = True,
-        task: bool | None = None, emit: Emit = emit_nothing) -> str:
+        task: bool | None = None, full: bool = False,
+        emit: Emit = emit_nothing) -> str:
     """A narrated walkthrough of the code that answers `question`.
 
     `content` defaults to CODE, unlike search: a code walkthrough diluted with
@@ -66,7 +67,7 @@ def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         # Not cached: a walkthrough stays true until the code moves, an edit
         # surface is consumed once by the change that invalidates it.
         from ..ask.task import walk_task
-        return walk_task(provider, question, bundle, root, emit=emit)
+        return walk_task(provider, question, bundle, root, full=full, emit=emit)
     answer = narrate(provider, question, _with_flows(bundle, flows), emit=emit)
     if cache:
         remember_answer(root, question, answer, bundle, emit)

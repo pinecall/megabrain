@@ -16,7 +16,6 @@ backend with no tool support still returns its text.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +24,7 @@ from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
 from ._operations import operations_from
 from ._quote import quote_citations
+from ._surface import apply_block, full_files
 from ._taskprompt import build_task_prompt
 from ._toolcall import assistant_turn, tool_result
 from .events import Emit, emit_nothing
@@ -44,7 +44,7 @@ MAX_TOKENS = 3000
 
 
 def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
-              emit: Emit = emit_nothing) -> str:
+              full: bool = False, emit: Emit = emit_nothing) -> str:
     """The edit surface for `task`, with every cited line spliced verbatim.
 
     Opens the index itself and holds it for the whole loop: the tool reads
@@ -66,28 +66,13 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
         # here, and quoting turns them into code blocks that no longer say
         # which lines they were.
         operations = operations_from(answer.text, store)
-        surface = quote_citations(answer.text, store) + _apply_block(operations)
+        surface = (quote_citations(answer.text, store) + apply_block(operations)
+                   + (full_files(store, operations) if full else ""))
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a
     # path that only returns its text arrives as a blank answer everywhere.
     emit({"type": "delta", "text": surface})
     return surface
-
-
-def _apply_block(operations: list[dict[str, str]]) -> str:
-    """The whole change as ONE `megabrain_replace` batch.
-
-    MEASURED: handed the surface as prose, an agent spent two `replace` calls
-    and a `Read` applying a two-file change it had already been given — it
-    rebuilt the exact-string operations itself, one file at a time. They are
-    built here instead, from the index, so applying the change is one call and
-    the `find` strings cannot be mistyped.
-    """
-    if not operations:
-        return ""
-    return ("\n\n## Apply — ONE call, all files at once\n"
-            "```json\n" + json.dumps({"operations": operations}, indent=2)
-            + "\n```\n")
 
 
 def _body(provider: ChatProvider, messages: list[dict[str, Any]]) -> dict[str, Any]:
