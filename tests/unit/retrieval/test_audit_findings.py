@@ -56,7 +56,8 @@ def test_scoring_returns_the_query_vector_it_computed() -> None:
     """
     from megabrain.retrieval.scoring.pipeline import Scored
 
-    assert set(Scored.__dataclass_fields__) == {"metas", "fused", "query_vector"}
+    assert set(Scored.__dataclass_fields__) == {"metas", "fused", "query_vector",
+                                            "top_cosine"}
 
 
 def test_an_index_with_no_file_skeletons_still_answers(tmp_path: Path) -> None:

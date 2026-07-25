@@ -64,6 +64,27 @@ export function searchView(repo: () => string | undefined,
   };
 }
 
+/* The honesty banner. Silent on "strong": a banner on every answer is a
+ * banner on none. On "none" it names what the list below actually is —
+ * nearest vocabulary, not an answer — because the cards underneath will still
+ * render fluent summaries of each file, and without this line those summaries
+ * read as an endorsement. */
+function evidenceBanner(bundle: Bundle): HTMLElement[] {
+  if (bundle.evidence === "weak") {
+    return [el("div", { class: "info-bar warn" },
+      el("b", {}, "thin evidence"),
+      ` — the closest match is weak (top cosine ${bundle.top_cosine.toFixed(2)}). `
+      + "Verify before relying on it.")];
+  }
+  if (bundle.evidence === "none") {
+    return [el("div", { class: "warn-bar" },
+      el("b", {}, "nothing in this repo clearly answers this"),
+      ` (top cosine ${bundle.top_cosine.toFixed(2)}). The files below merely `
+      + "share vocabulary with the question.")];
+  }
+  return [];
+}
+
 function render(bundle: Bundle, results: HTMLElement, stats: HTMLElement,
                 onOpen: (file: string) => void): void {
   fill(stats, el("b", {}, String(bundle.tier1.length)), " core files",
@@ -71,6 +92,7 @@ function render(bundle: Bundle, results: HTMLElement, stats: HTMLElement,
        " related", el("div", { class: "sdot" }), el("b", {}, `${bundle.ms}ms`),
        el("div", { class: "sdot" }), bundle.repo);
   fill(results,
+    ...evidenceBanner(bundle),
     sectionHead("CORE", "full code"),
     ...bundle.tier1.map((file) => coreCard(file, onOpen)),
     ...(bundle.tier2.length

@@ -84,4 +84,12 @@ class Bundle(TypedDict):
     tier2: list[Tier2File]
     flows: list[FlowHit]
     anchors: list[AnchorHit]
+    evidence: str
+    """"strong" | "weak" | "none" — how much the index actually offered.
+
+    The fused scores cannot say this: their scale is offset so a zero cosine
+    displays as 0.75, and an off-topic query's CORE looks like a hit. The band
+    comes from the RAW top cosine, calibrated in `scoring/evidence.py`, and it
+    is what lets a surface stop writing confident prose over nothing."""
+    top_cosine: float
     ms: int

@@ -14,6 +14,7 @@ inline bodies for a caller who wants them.
 from __future__ import annotations
 
 from ...contracts import Bundle, Tier1File, Tier2File
+from ._evidence import evidence_banner
 from ._lang import lang_of
 
 __all__ = ["render"]
@@ -28,8 +29,9 @@ def render(bundle: Bundle, *, compact: bool = False,
     core, related = bundle["tier1"], bundle["tier2"]
     out = [f'# megabrain — "{bundle["query"]}"',
            f'repo `{bundle["repo"]}` · {len(core)} core files (full code) · '
-           f'{len(related)} related (mapped) · {bundle["ms"]}ms\n',
-           "## CORE\n"]
+           f'{len(related)} related (mapped) · {bundle["ms"]}ms\n']
+    out += evidence_banner(bundle)
+    out.append("## CORE\n")
     for rank, core_file in enumerate(core, 1):
         out += _core(rank, core_file, compact=compact)
     if related:

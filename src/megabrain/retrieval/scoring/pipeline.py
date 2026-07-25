@@ -39,6 +39,10 @@ class Scored:
     metas: list[ChunkMeta]
     fused: Matrix               # score i belongs to metas[i]
     query_vector: Vector
+    top_cosine: float
+    """The best RAW chunk cosine — the un-remapped number the evidence bands
+    read. Kept beside the fused scores because the fusion's `(cos + 1) / 2`
+    offset destroys exactly the absolute level this preserves."""
 
 
 def score_chunks(state: SearchState, query: str, *,
@@ -62,7 +66,8 @@ def score_chunks(state: SearchState, query: str, *,
     for lane in LANES:
         if lane.applies(ctx):
             fused = lane.apply(ctx, fused)
-    return Scored(metas=metas, fused=fused, query_vector=vector)
+    return Scored(metas=metas, fused=fused, query_vector=vector,
+                  top_cosine=float((chunks @ vector).max()))
 
 
 def _candidates(state: SearchState, path_filter: str | None,

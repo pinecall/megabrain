@@ -61,3 +61,7 @@
   .t2-card{padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:8px;
            transition:border-color 150ms;cursor:pointer}
   .t2-card:hover{border-color:var(--border2)}
+
+  /* The thin-evidence banner shares .warn-bar (graph.css) for "none"; "weak"
+     is quieter — an info bar with the warning accent, not the alarm one. */
+  .info-bar.warn{border-color:var(--amber-bd,var(--bad-bd));color:var(--amber,var(--bad))}

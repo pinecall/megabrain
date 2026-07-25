@@ -63,6 +63,10 @@ export interface Bundle {
   flows: unknown[];
   anchors: unknown[];
   ms: number;
+  /* "strong" | "weak" | "none" — how much the index actually offered. From the
+   * RAW top cosine: the fused scores' scale is offset, so they cannot say it. */
+  evidence: string;
+  top_cosine: number;
 }
 
 export interface BriefSymbol {

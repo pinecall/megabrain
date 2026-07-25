@@ -13,6 +13,7 @@ from ..._arrays import Matrix
 from ..._types import Content
 from ...contracts import Bundle, Tier1File
 from ...storage.model import ChunkMeta
+from ..scoring.evidence import evidence_of
 from ..scoring.pipeline import Scored, score_chunks
 from ..state import SearchState
 from ._anchors import render_anchors
@@ -53,6 +54,8 @@ def search_with_state(state: SearchState, query: str, *,
     return Bundle(
         query=query,
         repo=state.repo,
+        evidence=evidence_of(scored.top_cosine),
+        top_cosine=round(scored.top_cosine, 3),
         tier1=[_core(state, f, ranking, metas, fused, candidates + neighbours)
                for f in core],
         tier2=[related_entry(state, f, ranking, metas,
