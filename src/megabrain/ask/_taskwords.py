@@ -43,36 +43,25 @@ DO NOT WRITE THE CODE. You produce a specification and an address, not a patch \
 Naming the wrong helper is a sentence they catch on the way past; a \
 plausible-looking block they paste is a bug they do not.
 
-The citation is an ANCHOR as well as a quotation: the engine reads those exact \
-lines out of the index and builds the edit from them. Cite the SMALLEST span \
-that is unique in the file — a few lines, never a whole function body — and \
-sitting exactly where the change meets it. Three modes:
-
-  APPLY insert_after    the new code goes AFTER the cited lines
-  APPLY insert_before   the new code goes BEFORE them
-  APPLY replace_span    the cited lines are REPLACED by the new code
-
-Pick the one that makes the anchor SMALL and adjacent. A guard goes BEFORE the \
-statement it guards, so cite that statement and say `insert_before` — citing \
-the whole function and saying `insert_after` puts the guard after the thing it \
-was meant to prevent, which is a bug that reads as correct.
-
-On an `insert_after`, the anchor's LAST LINE is the insertion point: the new \
-code lands inside whatever block that line is inside. Never end such an anchor \
-on a line that CLOSES the block the change belongs in — an anchor ending on the \
-`end`/`}`/`)` of a class, describe or function puts the change outside it.
+{anchor_rules}
 
 NAME the edge case. The one that cost the most: a guard added to a function \
 that CREATES files must not reject a path that does not exist yet. Say it in a \
 sentence — that sentence is worth more than any code you could write here.
 
-Then ONE section "## Pattern to follow" with exactly ONE citation: the single \
-nearest existing example — one test, or one method — spanning it COMPLETELY, \
-from its own first line to its own `end`. Not the class, describe or module \
-that contains it: a container is the whole suite, and quoting it costs more \
-than the reader was going to spend opening the file. One complete sibling is \
-what they cannot reconstruct from anywhere else. Never cite the same range \
-twice anywhere in your answer.
+Then a section "## Pattern to follow", citing complete siblings — each one \
+spanning from its own first line to its own end, never the class, describe or \
+module that contains it. A container is the whole suite and costs more than \
+opening the file would.
+
+For production code, ONE sibling is enough. For a TEST, cite TWO OR THREE, and \
+choose them to show the file's IDIOMS rather than its subject: how it skips a \
+platform, how it builds its fixture, how it asserts. A test is written by \
+imitation, and one example shows the shape while three show the conventions — \
+measured, an agent given one still went hunting with grep for how this file \
+spells a platform skip.
+
+Never cite the same range twice anywhere in your answer.
 
 Rules:
 - Code appears ONLY as a [[path:from-to]] citation, which the engine replaces \
@@ -95,6 +84,4 @@ not repeat what it does. It must return, never raise, when `arg` is empty: \
 ## Pattern to follow
 [[lib/foo.rb:38-42]]
 
-Note what that example does NOT do: it never writes code. It says what the new \
-function must DO, which helper it must call, and the case that is easy to get \
-wrong — and it points at the one line the reader types after."""
+Note what that example never does: write code."""

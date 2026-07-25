@@ -14,6 +14,7 @@ everything in ONE turn — a file per turn is a round trip per file, measured at
 from __future__ import annotations
 
 from ..contracts import Bundle
+from ._anchorrules import ANCHOR_RULES
 from ._taskwords import PROMPT
 
 __all__ = ["build_task_prompt", "MAX_MAP_FILES"]
@@ -34,7 +35,8 @@ def build_task_prompt(task: str, bundle: Bundle) -> str:
     # and grows with every lesson; the first brace someone writes into it —
     # `end`/`}`/`)` in a rule about closing delimiters — turns every task call
     # into "Single '}' encountered in format string".
-    return (PROMPT.replace("{task}", task)
+    return (PROMPT.replace("{anchor_rules}", ANCHOR_RULES)
+                  .replace("{task}", task)
                   .replace("{map}", "\n".join(lines) or "- (nothing found)"))
 
 
