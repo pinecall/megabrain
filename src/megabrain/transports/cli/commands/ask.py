@@ -62,6 +62,8 @@ def _trace(event: Event) -> str:
                 + ", ".join(core))
     if kind == "narrating":
         return f'· narrating over {event.get("candidates")} chunks…'
+    if kind == "opened":
+        return f'· opened {event.get("file")} ({event.get("chars")} chars)'
     if kind == "narrated":
         return f'\n· done in {event.get("ms")}ms'
     return f'· {kind}'

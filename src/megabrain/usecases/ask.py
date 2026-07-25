@@ -22,6 +22,7 @@ from ..ask.narrator import narrate
 from ..contracts import Bundle, FlowHit
 from ..project import load_project
 from ..providers.chat import ChatProvider, OpenAICompatible
+from ..retrieval.intent import is_task
 from ..storage.locate import resolve_root
 from ._flows import matched_flows, remember_answer, served
 from .search import search
@@ -56,10 +57,27 @@ def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         # Named, not a generic failure: retrieval already worked, and the only
         # thing missing is a credential the message can point at.
         raise MissingCredential.named("MEGABRAIN_CHAT_API_KEY")
+    if is_task(question):
+        # Measured: answering a task the question-shaped way cost a second
+        # round trip — the first answer said HOW, and the agent still had to
+        # ask WHERE to type.
+        return _task_surface(root, question, bundle, provider, emit)
     answer = narrate(provider, question, _with_flows(bundle, flows), emit=emit)
     if cache:
         remember_answer(root, question, answer, bundle, emit)
     return answer
+
+
+def _task_surface(root: Path, task: str, bundle: Bundle,
+                  provider: ChatProvider, emit: Emit) -> str:
+    """The edit surface, store open for the whole tool loop. Not cached: a
+    walkthrough stays true until the code moves, an edit surface is consumed
+    once by the change that invalidates it."""
+    from ..ask.task import walk_task
+    from ..storage import Store
+
+    with Store(root) as store:
+        return walk_task(provider, task, bundle, store, emit=emit)
 
 
 def _with_flows(bundle: Bundle, flows: list[FlowHit]) -> Bundle:

@@ -16,7 +16,26 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["wants_tests"]
+__all__ = ["wants_tests", "is_task"]
+
+# What the sentence is FOR. An interrogative opening decides it outright:
+# "how do I add a cache header" says "add" and is still a question, and that
+# phrasing is the one most likely to fool a verb list.
+_ASKING = re.compile(r"^\s*(how|where|what|why|which|who|when|does|do|is|are|"
+                     r"can|should|explain|describe|show)\b", re.IGNORECASE)
+
+# The verbs that name a CHANGE to the repository. Anchored to the start of a
+# clause so "where does the indexer add chunks" — a description of code that
+# adds — is not read as a request to add anything.
+_CHANGING = re.compile(
+    r"(^|[.;]\s*|\band\s+)(add|implement|create|build|write|introduce|support|"
+    r"fix|change|update|modify|rename|remove|delete|drop|refactor|migrate|"
+    r"wire|hook|extend|replace|make)\b",
+    re.IGNORECASE)
+
+# The other way people phrase a change: "we need a way to…", "it should…".
+_WANTING = re.compile(r"\b(we|i)\s+(need|want)\b|\bshould\s+be\s+able\b",
+                      re.IGNORECASE)
 
 # The noun, not the verb: "tests", "spec", "test coverage". `tested` is here
 # because "where is this behaviour tested" is the same request phrased as a
@@ -34,6 +53,20 @@ _ABOUT_THE_MACHINERY = re.compile(
     r"|\b(?:runs?|running|discover(?:s|ing)?|load(?:s|ing)?|collect(?:s|ing)?)"
     r"\s+(?:the\s+)?tests?\b",
     re.IGNORECASE)
+
+
+def is_task(query: str) -> bool:
+    """Whether this asks for a CHANGE rather than an explanation.
+
+    The two want opposite deliverables. A question wants the flow narrated; a
+    task wants the edit surface — the files that must change, opened, with the
+    place the change goes. Measured: answering a task as a question cost a
+    second round trip, because the first answer said HOW it works and the agent
+    still had to ask WHERE to type.
+    """
+    if _ASKING.match(query):
+        return False
+    return bool(_CHANGING.search(query) or _WANTING.search(query))
 
 
 def wants_tests(query: str) -> bool:
