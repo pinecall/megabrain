@@ -20,7 +20,14 @@ await build({
   outfile: new URL("app.js", OUT).pathname,
   logLevel: "info",
 });
-for (const asset of ["index.html", "style.css"]) {
-  await copyFile(new URL(asset, import.meta.url), new URL(asset, OUT));
-}
+// The stylesheet is bundled too: it is split by the design's own section
+// banners, and @import at runtime would be eight blocking requests.
+await build({
+  entryPoints: ["styles/index.css"],
+  bundle: true,
+  minify: true,
+  outfile: new URL("style.css", OUT).pathname,
+  logLevel: "info",
+});
+await copyFile(new URL("index.html", import.meta.url), new URL("index.html", OUT));
 console.log("studio built ->", OUT.pathname);

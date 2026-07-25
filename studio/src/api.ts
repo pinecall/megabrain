@@ -72,25 +72,43 @@ export const api = {
   node: (node: string, repo?: string) =>
     request<Neighbourhood>(`/graph${query({ mode: "node", node, repo })}`),
 
-  /* POST + SSE, so EventSource (GET-only) cannot be used: the body stream is
-   * read and the `event:`/`data:` frames parsed here. */
+  /* Both streams are POST + SSE, so EventSource (GET-only) cannot be used:
+   * the body stream is read and the `event:`/`data:` frames parsed here. */
+  ask(question: string, repo: string | undefined,
+      onEvent: (event: string, data: unknown) => void): {
+    done: Promise<void>; abort: () => void;
+  } {
+    return stream("/ask/stream", { question, repo }, onEvent);
+  },
+
   index(repo: string, onEvent: (event: string, data: unknown) => void): {
     done: Promise<void>; abort: () => void;
   } {
-    const controller = new AbortController();
-    const done = (async () => {
-      const response = await fetch(BASE + "/index/stream", {
-        method: "POST",
-        headers: headers({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ path: repo }),
-        signal: controller.signal,
-      });
-      if (!response.ok || !response.body) throw new ApiFailure("index failed", "error", response.status);
-      await readFrames(response.body, onEvent);
-    })();
-    return { done, abort: () => controller.abort() };
+    return stream("/index/stream", { path: repo }, onEvent);
   },
 };
+
+function stream(path: string, body: object,
+                onEvent: (event: string, data: unknown) => void): {
+  done: Promise<void>; abort: () => void;
+} {
+  const controller = new AbortController();
+  const done = (async () => {
+    const response = await fetch(BASE + path, {
+      method: "POST",
+      headers: headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) {
+      const failed = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
+      throw new ApiFailure(failed?.error ?? "stream failed", failed?.code ?? "error",
+                           response.status);
+    }
+    await readFrames(response.body, onEvent);
+  })();
+  return { done, abort: () => controller.abort() };
+}
 
 async function readFrames(body: ReadableStream<Uint8Array>,
                           onEvent: (event: string, data: unknown) => void): Promise<void> {

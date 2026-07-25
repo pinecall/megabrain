@@ -24,6 +24,11 @@ OPEN_PATHS = frozenset({"/", "/health", "/config"})
 # on every future route being labelled correctly is not one.
 WRITING_PATHS = frozenset({"/index", "/index/stream", "/repos/add"})
 
+# Routes that cost MONEY per call. Metered separately from writes: a read-only
+# public box still serves search for free, and still must not let one caller
+# spend the deployment's budget on walkthroughs.
+BILLED_PATHS = frozenset({"/ask", "/ask/stream"})
+
 
 def _no_hits() -> "deque[float]":
     return deque()

@@ -1,78 +1,68 @@
-/* Boot: pick a repo, wire the panels, keep one error path.
+/* Boot: the shell, three views, one error path.
  *
- * The whole studio is three panels over one API. State is the selected repo and
- * nothing else — a UI whose state is a question already asked does not need a
- * store, and one that grows a store grows two sources of truth for what is on
- * screen.
+ * State is the selected repo and the active tab. A UI whose state is a
+ * question already asked does not need a store, and one that grows a store
+ * grows a second source of truth for what is on screen.
  */
 import { ApiFailure, api } from "./api.js";
 import type { RepoEntry } from "./contracts.js";
 import { el, fill, need } from "./dom.js";
-import { filePanel } from "./files.js";
-import { graphPanel } from "./graph.js";
-import { searchPanel } from "./search.js";
+import { mountShell, type Shell, type TabName } from "./shell.js";
+import { askView } from "./views/ask.js";
+import { graphView } from "./views/graph.js";
+import { openFile } from "./views/files.js";
+import { indexOverlay } from "./views/indexing.js";
+import { searchView } from "./views/search.js";
 
 let selected: string | undefined;
-
 const repo = (): string | undefined => selected;
-const view = need("view");
-const status = need("status");
-const repoList = need("repos");
-const input = need<HTMLInputElement>("q");
 
-const files = filePanel(view, repo, (file) => guard(() => graph.node(file)));
-const graph = graphPanel(view, repo, (file) => guard(() => files.open(file)));
-const search = searchPanel(view, repo,
-  (file, symbol) => guard(() => files.open(file, symbol)));
-
-/** One error path for every action: a panel that renders its own failure
- *  renders it differently from its neighbours. */
-async function guard(action: () => Promise<void>): Promise<void> {
-  try {
-    await action();
-  } catch (failure) {
-    const message = failure instanceof ApiFailure
-      ? `${failure.message} (${failure.code})`
-      : String(failure);
-    fill(view, el("p", { class: "warn" }, message));
-  }
+function toast(failure: unknown): void {
+  const message = failure instanceof ApiFailure
+    ? `${failure.message} (${failure.code})` : String(failure);
+  const node = el("div", { class: "toast" }, message);
+  need("toasts").append(node);
+  setTimeout(() => node.remove(), 8000);
 }
 
-function selectRepo(entry: RepoEntry, button: HTMLElement): void {
-  selected = entry.path;
-  repoList.querySelectorAll(".on").forEach((other) => other.classList.remove("on"));
-  button.classList.add("on");
-  status.textContent = `${entry.name} · ${entry.files} files · ${entry.chunks} chunks`;
+const show = (file: string): void => { void openFile(file, repo(), toast); };
+
+const views = {
+  search: searchView(repo, show, toast),
+  ask: askView(repo, toast),
+  graph: graphView(repo, show, toast),
+};
+
+function select(shell: Shell, tab: TabName): void {
+  shell.select(tab);
+  fill(shell.viewport, views[tab].root);
+  views[tab].focus?.();
+  if (tab === "graph") void views.graph.load();
 }
 
 async function boot(): Promise<void> {
-  const [config, listed] = await Promise.all([api.config(), api.repos()]);
-  status.textContent = `megabrain ${config.version}`;
-  if (!listed.repos.length) {
-    fill(view, el("p", { class: "dim" },
-      "No indexed repository on this machine yet. Run `megabrain index <path>` "
-      + "and reload."));
+  const host = need("app");
+  const config = await api.config();
+  const shell = mountShell(host, config,
+    () => indexOverlay(repo(), toast), () => toast("settings: coming with phase 16"));
+  shell.onTab((tab) => select(shell, tab));
+
+  const { repos } = await api.repos();
+  if (!repos.length) {
+    fill(shell.viewport, el("div", { class: "empty" },
+      el("div", {}, "No indexed repository on this machine."),
+      el("div", { class: "mono", style: "font-size:11.5px" },
+         "megabrain index <path>")));
     return;
   }
-  fill(repoList, ...listed.repos.map((entry) => {
-    const button = el("button", { class: "repo" }, entry.name);
-    button.addEventListener("click", () => selectRepo(entry, button));
-    return button;
-  }));
-  const first = listed.repos[0];
-  const firstButton = repoList.firstElementChild;
-  if (first && firstButton instanceof HTMLElement) selectRepo(first, firstButton);
-  fill(view, el("p", { class: "dim" }, "Ask something about this repository."));
+  const pick = (entry: RepoEntry): void => {
+    selected = entry.path;
+    shell.markRepo(entry.path);
+    shell.setCrumb(entry.name, `${entry.files} files · ${entry.chunks} chunks`);
+  };
+  shell.setRepos(repos, pick);
+  pick(repos[0]!);
+  select(shell, "search");
 }
 
-need("go").addEventListener("click", () => {
-  if (input.value.trim()) void guard(() => search.run(input.value.trim()));
-});
-input.addEventListener("keydown", (event) => {
-  if ((event as KeyboardEvent).key === "Enter" && input.value.trim()) {
-    void guard(() => search.run(input.value.trim()));
-  }
-});
-need("graph").addEventListener("click", () => void guard(() => graph.overview()));
-
-void guard(boot);
+boot().catch(toast);

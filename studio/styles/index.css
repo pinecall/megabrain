@@ -1,0 +1,14 @@
+/* The studio's stylesheet, in the order the cascade needs it.
+ *
+ * Ported unchanged from the design that shipped: the tokens, the two
+ * themes, and every field note in the comments. Split by the section
+ * banners its author already wrote, so the seams are the design's own.
+ */
+@import "./tokens.css";
+@import "./shell.css";
+@import "./search.css";
+@import "./ask.css";
+@import "./overlays.css";
+@import "./navigator.css";
+@import "./addrepo.css";
+@import "./responsive.css";

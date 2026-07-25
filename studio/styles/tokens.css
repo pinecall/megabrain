@@ -1,0 +1,59 @@
+  /* ── design tokens ────────────────────────────────────────────────────
+     Ported from the Claude Design bundle. Dark-first, terminal-adjacent.
+     Self-contained: system font stacks (no CDN fonts at runtime). */
+  :root, :root[data-theme="dark"] {
+    --bg:#0a0a0c; --panel:#111114; --panel2:#16161a; --code:#0c0c0f;
+    --border:#232329; --border2:#2b2b32;
+    --text:#e9e9ec; --muted:#7a7a84;
+    /* dark theme lifts the brand blue: the light-theme accent (L .48) is too
+       dark to read on #0a0a0c, so lightness/chroma rise while the hues hold. */
+    --accent:oklch(0.72 0.17 267); --accent2:oklch(0.66 0.15 258);
+    --accent-dim:rgba(117,158,255,0.16); --accent-bd:rgba(117,158,255,0.34);
+    --chunk-dim:rgba(255,255,255,0.06);
+    --ok:#8ac89a; --ok-bg:rgba(100,180,120,0.12); --ok-bd:rgba(100,180,120,0.25);
+    --bad:#d68a8a; --bad-bg:rgba(180,80,80,0.12); --bad-bd:rgba(180,80,80,0.25);
+    --blue:#a8c1ff;
+    --syn-kw:#c396f0; --syn-fn:#7ec8ff; --syn-str:#a4d38a; --syn-num:#f0a878; --syn-cm:#7a7a84;
+    --shadow:0 8px 24px rgba(0,0,0,0.3);
+  }
+  :root[data-theme="light"] {
+    --bg:#f8f7f4; --panel:#ffffff; --panel2:#f2f1ec; --code:#faf9f5;
+    --border:#e5e3dc; --border2:#d8d5cc;
+    --text:#171718; --muted:#7a7770;
+    --accent:oklch(0.48 0.23 277.46); --accent2:oklch(0.52 0.16 257.92);
+    --accent-dim:rgba(73,58,218,0.11); --accent-bd:rgba(73,58,218,0.26);
+    --chunk-dim:rgba(0,0,0,0.06);
+    --ok:#3f7f4f; --ok-bg:rgba(70,140,80,0.10); --ok-bd:rgba(70,140,80,0.2);
+    --bad:#a04040; --bad-bg:rgba(180,80,80,0.08); --bad-bd:rgba(180,80,80,0.2);
+    --blue:#3f5fb0;
+    --syn-kw:#7a3fb0; --syn-fn:#0b5fb0; --syn-str:#4a7a2a; --syn-num:#b0621a; --syn-cm:#7a7770;
+    --shadow:0 8px 24px rgba(0,0,0,0.04);
+  }
+
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{
+    font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased;background:var(--bg);color:var(--text);
+  }
+  .mono{font-family:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace}
+  ::selection{background:rgba(117,158,255,0.30)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(140,140,150,0.18);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(140,140,150,0.32);background-clip:padding-box}
+  a{color:inherit}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;padding:0}
+  input,textarea{font-family:inherit;color:inherit}
+  input:focus,textarea:focus{outline:none}
+  pre{margin:0}
+
+  @keyframes mb-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+  @keyframes mb-pulse{0%,100%{opacity:0.35}50%{opacity:1}}
+  @keyframes mb-slide-in{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  @keyframes mb-fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes mb-slide-up{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
+  .mb-slide{animation:mb-slide-up 340ms cubic-bezier(.2,.7,.2,1) both}
+  @keyframes mb-spin{to{transform:rotate(360deg)}}
+  @keyframes mb-stripe{to{background-position:28px 0}}
+  .mb-fade{animation:mb-fade 240ms cubic-bezier(.2,.7,.2,1) both}
