@@ -9,7 +9,6 @@ import type { RepoEntry } from "./contracts.js";
 import { el, fill, need } from "./dom.js";
 import { mountShell, type Shell, type TabName } from "./shell.js";
 import { askView } from "./views/ask.js";
-import { briefView } from "./views/brief.js";
 import { graphView } from "./views/graph.js";
 import { openFile } from "./views/files.js";
 import { addRepoOverlay } from "./views/adding.js";
@@ -35,7 +34,6 @@ const show = (file: string, line?: number): void => {
 
 const views = {
   search: searchView(repo, show, toast),
-  brief: briefView(repo, show, toast),
   ask: askView(repo, toast),
   graph: graphView(repo, show, toast),
 };

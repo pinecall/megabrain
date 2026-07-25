@@ -8,8 +8,7 @@ of it, and which models narrate and judge.
       "ignore":  ["dist", "vendor/**"],
       "queries": ["how does the retry policy work?"],
       "models":  {"narrator": "google/gemini-3.1-flash-lite",
-                  "rerank":   "google/gemini-3.5-flash-lite",
-                  "study":    "google/gemini-3.1-flash-lite"}
+                  "rerank":   "google/gemini-3.5-flash-lite"}
     }
 
 The precedence is deliberate: an explicit argument beats the file, the file
@@ -34,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ._config_file import lines_of, read_object, string_map, string_tuple
-from ._models import NARRATOR_MODEL, RERANK_MODEL, STUDY_MODEL
+from ._models import NARRATOR_MODEL, RERANK_MODEL
 
 CONFIG_FILE = "megabrain.json"
 LEGACY_IGNORE = ".megabrainignore"
@@ -52,7 +51,6 @@ class Project:
     queries: tuple[str, ...] = ()
     narrator_model: str = NARRATOR_MODEL
     rerank_model: str = RERANK_MODEL
-    study_model: str = STUDY_MODEL
     malformed: bool = False
     """True when a config file exists but could not be read.
 
@@ -74,6 +72,4 @@ def load_project(root: Path | str) -> Project:
         or os.environ.get("MEGABRAIN_ASK_MODEL") or NARRATOR_MODEL,
         rerank_model=models.get("rerank")
         or os.environ.get("MEGABRAIN_RERANK_MODEL") or RERANK_MODEL,
-        study_model=models.get("study")
-        or os.environ.get("MEGABRAIN_STUDY_MODEL") or STUDY_MODEL,
         malformed=malformed)

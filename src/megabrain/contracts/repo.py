@@ -19,9 +19,3 @@ class RepoEntry(TypedDict):
     name: str
     files: int
     chunks: int
-    cards: int
-    """How many files have a mental-map card — 0 means `brief` cannot answer yet.
-
-    Surfaced because the Brief tab silently needs `megabrain study` to have run,
-    and a rail that showed every repository identically made that impossible to
-    know before clicking. One SQL count; the confusion was free to remove."""

@@ -4,12 +4,24 @@
 > explained like a senior engineer with the real code spliced in. Built to replace
 > minutes of agent file-crawling with one grounded answer.
 
+> ⚠️ **This document is being rewritten for v3 and is partly stale.** Accurate as of
+> the v3 branch: the hard rules, §1's shape, §4.5 (the atlas) and §7's layout. Still
+> describing **v2**, with names and modules that have moved or do not exist yet: the
+> `forge` sections (§2.5), the flow-cache narrative (§3.4), `--prune`/`prune_search`
+> (§3.3), and the HTTP entry-point bullet in §5. The MCP surface is v3-accurate as of
+> phase 13 — three tools, §5.1. Verify against `src/megabrain/` before trusting a name
+> in those sections.
+
 Every load-bearing choice below is locked by experimental data (golden-set gates,
 model bakeoffs — see §8). The five hard rules:
 
 1. **No LLM in the retrieval path** — LLM pruning was tested four ways and every
-   variant cost completeness or added 1–2 s for no recall gain. The only LLM calls
-   is `ask` (the post-retrieval narrator) — fail-open.
+   variant cost completeness or added 1–2 s for no recall gain. Query-time LLM calls
+   live *above* retrieval and all fail open: `ask` (the post-retrieval narrator) and
+   the optional judge lane (`enrich/rerank.py`). Two passes run an LLM at **index**
+   time instead, each gated by a deterministic oracle that decides whether the output
+   may be stored at all — `forge` (§2.5, the partition oracle) and `study` (§4.5, the
+   card oracle). Neither can reach a query.
 2. **Completeness beats ordering** — the bundle is tuned so golden `bundle_full`
    recall is **1.00**. A change that lowers it is not merged. Noise is handled by
    *render structure* (§4.3), never by dropping files.
@@ -25,29 +37,39 @@ model bakeoffs — see §8). The five hard rules:
 ## 1. The pipeline at a glance
 
 ```
-                 INDEX TIME (once per repo, incremental after; auto-refresh 60s TTL)
+                 INDEX TIME (once per repo, incremental after)
   repo files ──► chunkers (cAST) ──► embed (OpenRouter/local) ──► SQLite (.megabrain/db.sqlite)
                      │                                        chunks · vectors · symbols
                      ├─ symbols (defs/classes/consts)         file skeletons · edges
-                     ├─ file skeleton (signatures)
-                     └─ import/call graph edges (py · ts/js · php)
+                     ├─ file skeleton (signatures)            cards (study)
+                     └─ import/call graph edges (py)
 
-                 QUERY TIME (per question)
-  question ──► retrieve (no LLM, ~10–200 ms) ──► bundle ──► [ask] narrate (1 chat call)
-               dense + file-fusion + graph            splice verbatim code into [[k]] cites
-               (+ issue-mode lanes for long queries)
+                 STUDY TIME (opt-in: `index --llm` / `study`; ONE chat call per file)
+  file skeleton ──► model writes 3-5 sentences ──► ORACLE (no LLM) ──► cards table
+                    "what IS this file"           reject → retry → degrade to skeleton
+
+                 QUERY TIME (per question — retrieval itself never calls a model)
+  question ──► retrieve (no LLM, ~10–200 ms) ──► bundle ──┬─► [ask]   narrate (1 chat call)
+               dense + file-fusion + graph                │          splice verbatim code
+                                                          │          into [[k]] cites
+                                                          └─► [brief] the SAME file list,
+                                                                     re-presented: cards +
+                                                                     live graph relations +
+                                                                     interfaces (0 calls)
 ```
 
-Entry points share one retrieval core: CLI (`megabrain …`), MCP stdio server
-(`megabrain_ask/_search/_graph/_index/_forge/_flows`), HTTP (`serve-api`), and the Python
-API (`megabrain.search/ask/…`, lazy imports, `py.typed`).
+Entry points share one retrieval core: CLI (`megabrain …`), MCP stdio
+(`megabrain_ask` · `megabrain_search` · `megabrain_brief` — §5.1), HTTP
+(`megabrain studio`, which also serves the studio UI), and the Python API
+(`megabrain.search/…`, lazy imports, `py.typed`).
 
 | command | LLM? | latency | use |
 |---------|------|---------|-----|
 | `search` | no | ~10–200 ms | complete bundle: CORE full code + RELATED map (`--full` for RELATED bodies) |
-| `search --prune` | no | ~10–200 ms | flat, relevance-ranked **signal** chunks only (noise dropped) — the existing selection, projected flat |
+| `brief` | **no** — the prose was written at study time | ~3–5 ms warm | the repo's MENTAL MODEL for a question: cards + relations + interfaces, almost no code (§4.5) |
 | `ask`   | 1 chat call | ~6–25 s | narrated walkthrough, verbatim code spliced at each citation |
-| `get` / `chunks` | no | <10 ms | one file/symbol · per-chunk scores for one file |
+| `get` | no | <10 ms | one file or symbol |
+| `study` | 1 chat call **per file**, cached by interface | ~26 s / 24 files cold, 0 s unchanged | write the cards `brief` reads (§4.5) |
 
 ---
 
@@ -448,28 +470,112 @@ prints status lines, `/ask/stream` forwards them as SSE, buffered callers (MCP,
 `POST /ask`) just take the final dict. Fail-open chain end to end: fan-out error →
 single-agent ask → full bundle.
 
+### 4.5 `brief` — the mental model, and why it does not rank (`atlas/`)
+
+Full detail, with the numbers and the field notes: **[docs/BRIEF.md](docs/BRIEF.md)**.
+
+`search` returns code; `brief` returns the **model of the system** — what each relevant
+file *is*, how the files connect, what they declare — with almost no bodies. It exists
+because an agent handed 4 000 tokens of code has to *reconstruct* the mental model before
+it can act; the brief hands it over already built (~950 tokens at `--limit 3`).
+
+The design is one split, and everything follows from it:
+
+| part | produced | when | can it be stale or wrong? |
+|---|---|---|---|
+| the prose (**card**) | a chat model, oracle-gated | **index** time, cached | the only model-written text |
+| `→ uses` / `← used by` | the stored `edges` table | **query** time, live | no — it is the index |
+| the interface | the `symbols` table | query time | no — from the AST |
+
+**A card may never describe another file.** Not a style rule: a claim about another file
+goes stale when *that* file changes, and nothing would regenerate this card. Relations
+belong to the graph, and the graph is re-read on every query — so they cannot rot.
+
+**Selection is the bundle, not a second ranker.** `brief_repo` calls
+`search_with_state` — the same deterministic engine `search` and `ask` use — and only
+changes the *presentation* of the file list it returns. This was not the first design, and
+the first one was wrong in a way worth keeping: it ranked by cosine over one vector per
+card, and on a real repo (`pineward`, *"how does the VDF proof get validated?"*)
+`validate.py` — the file that calls `verify_vdf` — landed **5th**, below a file that
+merely shares the question's vocabulary. At `--limit 3` it disappeared.
+
+The cause is structural: **one vector per file averages everything the file does.**
+`validate.py` has seven responsibilities and VDF is one, so its card vector dilutes VDF to
+nothing. That is precisely why §3.1 fuses chunk cosine with the file skeleton
+(`file_fusion_w = 0.5`) and §3.3 adds two recall floors, rather than ranking on file
+vectors. Deleting the parallel ranker fixed it *by inheritance* — the brief now gets the
+fusion, the test penalty and both floors for free, so **rule 2 holds here by construction
+instead of by a second implementation that has to remember it.** It also removed the card
+embeddings entirely: cards never rank, so the `cards` table has no vector column and
+`study` costs no embedding calls.
+
+**Cached by INTERFACE, not by content.** The key is `sha256(CARD_SCHEMA, model, skeleton)`
+— not the file's sha. A card describes what a file *declares*, so editing a body leaves
+the skeleton, the key and the card untouched; changing a signature regenerates exactly the
+file whose interface moved. `CARD_SCHEMA` behaves like `EDGE_SCHEMA` (§2.3): a bump makes
+every card stale and the next `study` re-authors them with no `--force`.
+
+**The oracle (`atlas/oracle.py`, no LLM)** — the same stance as forge: the model proposes,
+a deterministic check disposes. Every `backticked` name must appear in the skeleton the
+prompt showed; no other file may be named; length is bounded and at least one real name
+must be cited. Reject → one retry with the problems listed → still reject → the card
+**degrades to the raw skeleton**, flagged `degraded`. Worse prose, zero lies.
+
+> **Field note.** The grounding set was first the file's top-level *symbol names*, and
+> that rejected 5 of 24 cards on a real repo — including the most relevant file. The
+> rejected prose was good; it backticked `x`, `y`, `t`, `pi`, the **parameters of
+> signatures the prompt itself contained**. Grounding on the skeleton (the model's actual
+> input) took degradation 5 → **0**. The grounding set must be the model's input, never a
+> narrower view of it.
+
+**Failure is a missing map, never a failed index.** `build_index(llm=True)` composes the
+two passes in the use-case layer — not chained by each transport, so no surface can
+disagree about what "index with the LLM" means — and the card pass runs *after* the index
+is committed. A dead provider therefore leaves the index intact, the exit code 0, and the
+shortfall **reported** (`study_error`, or the `degraded` count) rather than raised.
+
 ---
 
 ## 5. Serving surfaces
 
-- **MCP** (`mcp_server.py`, stdio, no deps): `megabrain_ask` (primary; `docs`,
-  `scope_path`, `agents` — omit for auto fan-out on broad
-  questions; MCP is request/response, so the fan-out runs buffered and the trace
-  lands as a footer), `megabrain_search` (`scope_path`, `compact` — ALWAYS the flat
-  signal-only chunk list with code; the file-grouped bundle is deliberately
-  not exposed, since its code-less RELATED map is a dead end without a get/chunks
-  tool, while pruning still keeps every bundle file; the **LLM rerank runs by default**
-  here — `rerank: true`, fail-open — `megabrain_query` stays as a deprecated dispatch
-  alias),
-  `megabrain_graph` (`mode=map|node|path`, `node`/`source`/`target`/`scope_path` — the
-  knowledge graph over §6, node mode splicing the file's real chunks),
-  `megabrain_index` (index a repo, or `list: true` / no `repo_path` → the machine-global
-  registry of every indexed repo), `megabrain_forge`, `megabrain_flows`. A tool costs the
-  caller context + a routing decision, so the MCP surface carries
-  only what megabrain alone can do (single-file/symbol fetches are the host's
-  Read/Grep job; `ask`'s sub-agents fetch files internally). `megabrain_search`
-  also takes `docs` (the docs-only lane, same switch as ask's). Auto-refreshes
-  stale indexes before answering.
+### 5.1 MCP — three tools, and the reason there are only three
+
+`transports/mcp/` (stdio, no deps): **`megabrain_ask`** (the walkthrough),
+**`megabrain_search`** (the edit surface, with bodies), **`megabrain_brief`** (the
+mental model, §4.5). Nothing else — no `get`, no `grep`, no `index`.
+
+That is a deliberate subtraction. Every tool costs the calling agent context and a
+routing decision, and the host it runs in already has Read, Grep and an editor. So the
+surface carries only what megabrain alone can do; a tool that fetches one span invites
+the agent to re-verify what the render already showed.
+
+Two properties worth knowing:
+
+- **The `inputSchema` is GENERATED from `contracts/tools.py`**, not written beside the
+  dispatch. A parameter therefore cannot exist on the wire without existing in the
+  dispatch, or the reverse — which is how a tool ends up advertising a flag nobody
+  reads. The `Annotated[...]` descriptions are part of the contract: they are the only
+  thing a calling agent reads before choosing arguments.
+- **`dispatch.py` is a table of three-line handlers.** The behaviour lives in
+  `usecases/`, so this layer only maps a name to a use case and picks a renderer —
+  which is the whole reason the CLI, MCP and HTTP surfaces cannot drift apart.
+
+`megabrain_brief` takes `repo_path` · `question` · `limit` (default 10, capped at 30) and
+renders through the same `atlas.render_brief` the CLI prints. A repo that was never
+studied comes back as a typed failure naming `megabrain study`, not as an empty answer.
+
+- **MCP** (`transports/mcp/`, stdio, no deps): `megabrain_ask` (`question`,
+  `scope_path`, `content=code|docs` — MCP is request/response, so it runs buffered:
+  the consuming agent reads the final text only, and events would be written to
+  nobody), `megabrain_search` (`task`, `scope_path`, `content`, `bodies` default
+  true, `rerank` default **false** — the deterministic answer is complete on its
+  own, and a caller that wants the judge lane asks for it and accepts the call),
+  `megabrain_brief` (§5.1). Nothing else: single-file and single-symbol fetches are
+  the host's own Read/Grep job. Registered by `megabrain install`
+  (`transports/install/`: a table of six assistants, one module per config format,
+  only ever writing the `megabrain` key and pinning `sys.executable`) or by hand with
+  `claude mcp add megabrain -- python3 -m megabrain.transports.mcp`; a stale index is
+  not auto-refreshed at query time, unlike v2.
 - **HTTP** (`frontends/http.py`, stdlib `http.server`, warm state, db-mtime auto-reload):
   `/search` `/docsearch` `/chunks` `/ask` `/ask/stream` (SSE: the ask v2 event
   stream — plan, per-agent deltas/tools, spliced synthesis) `/prune` (`?rerank=1` runs
@@ -539,72 +645,106 @@ The tree mirrors the pipeline — content → index → retrieval → narration 
 surfaces — one subpackage per layer (src/ layout, PyPA standard). Loose files
 at the package root are only the cross-cutting spine:
 
+Layers are numbered L0–L5 and the dependency arrow only ever points **down**. Two of
+them are enforced by executable tests rather than documented: `retrieval/` may not import
+`providers.chat` or `enrich/` (rule 1), and only `storage/` may write SQL.
+
 ```
 src/megabrain/
-  __init__.py        public API (lazy, typed)
-  __main__.py        python -m megabrain == the megabrain script
-  errors.py          structured error taxonomy (MegabrainError → code + http_status)
-  model.py           ChunkMeta — the frozen read-side chunk record
-  app.py             application-service layer: one use-case per verb + the
-                     shared pre-steps (resolve_scope · rel_join · normalize_agents
-                     · reindex policy) every surface calls
-  graph.py           KNOWLEDGE GRAPH (§6): structural (AST edges) + semantic
-                     (skeleton cosine) lanes · label-prop communities · god
-                     nodes · surprises · embedding-resolved BFS paths · one
-                     cached LLM community-label call (numpy only, no networkx)
-  mcp_server.py      launcher shim — keeps `python3 -m megabrain.mcp_server` registrations working
+  L0  _types.py        NotGiven / Omit sentinels — the three-state vocabulary
+      _arrays.py       Vector / Matrix / IndexArray (numpy dtypes, kept apart from
+                       _types so importing a sentinel never drags numpy in)
+      _errors.py       the taxonomy: MegabrainError → code + http_status, dual
+                       inheritance for back-compat (IndexNotFound is a ValueError)
+      _version.py · _home.py · _models.py (the three default models, one per JOB)
+      _config_file.py  reading a JSON file a person edits by hand
+      project.py       megabrain.json — what a REPOSITORY decides about itself
+                       (ignore · queries · models.{narrator,rerank,study})
+      __init__.py      public API: lazy __getattr__ + a TYPE_CHECKING block, so
+                       `import megabrain` costs no numpy (pinned by a test)
 
-  chunkers/          CONTENT → CHUNKS: base (contract) · cast (the ONE cAST
-                     engine) · python · treesitter+LangSpec (TreeChunkerOps) · php · markdown
-  indexing/          BUILD the index
-    indexer.py         registry-driven incremental walk + maybe_reindex (60s TTL);
-                       returns stats (never prints)
-    strategies.py      ext → strategy registry + ChunkStrategy protocol (custom via
-                       index_repo) + trust-gated repo-local loading (.megabrain/strategies)
-    graph.py           import/call edges (py · ts/js · php)
-  storage/           PERSISTENCE
-    store.py           SQLite schema + loads + row packing + flow integrity
-                       (+ all_edges / file_chunks — the graph's structural read)
-    registry.py        machine-global repo registry (~/.megabrain/registry.json,
-                       env MEGABRAIN_REGISTRY): every index registers here so any
-                       frontend lists EVERY indexed repo · fail-open · self-heals
-                       (drops entries whose db.sqlite is gone)
-    flows.py           flow-cache MECHANICS (write/dedupe · cosine read · verbatim
-                       serve · sha invalidation — no LLM; retrieval may import this)
-  retrieval/         ANSWER queries (no LLM in this package — rule 1)
-    params.py          RetrievalParams — every tuning knob, frozen + injectable
-    state.py           SearchState + load_state (warm state, lifecycle)
-    scoring.py         score_chunks — self-gating lane pipeline (dense+fusion ·
-                       test-penalty · issue · lexical); add a signal = 1 lane + 1 entry
-    bundle.py          rank + tier (CORE/RELATED) · selection · prune · chunks_for_file · multi
-    render.py          bundle → markdown (pure view)
-    files.py           get_code — the file-serving containment boundary
-    docsearch.py       docs-site search projection
-    issue.py           deterministic issue parsing (py + js/ts frames, variants)
-    bm25.py            sparse entity-ID lane (postings)
-    rerank.py          OPTIONAL post-prune LLM rerank (§3.3): one buffered call
-                       over a compact candidate view drops vocabulary-only hits +
-                       reorders verbatim chunks · fail-open · MCP default-on
-  ask/               NARRATE (the only layer that talks to an LLM at query time)
-    narrator.py        walkthrough with verbatim splice (code/docs/code+docs modes)
-    agents.py          ask v2: classifier · planner · parallel tool-enabled
-                       sub-agents · synthesizer · the stream_events event driver
-    warmup.py          flow-cache warm/refresh orchestration (the LLM half cut
-                       out of flows so storage never imports upward)
-  forge/             STRATEGY GENERATION & MEASUREMENT
-    coverage.py        uncovered-ext census · LLM generate · partition-oracle
-                       validate (repair loop) · trust install
-    ab_gate.py         the empirical gate: neutral probes · rank-aware
-                       span-IoU/hit@k · champion-vs-challenger win/lose
-    specialize.py      hand-written specialization, installed only on a measured win
-  providers/         everything that talks to a model API
-    base.py            ChatProvider Protocol (available/chat_text/stream_chat/agent_stream)
-    __init__.py        provider registry + resolve() (auto claude/openrouter) + OpenAI-compat clients + keys
-    claude.py          Claude Agent SDK transport (subscription credits / ANTHROPIC_API_KEY)
-    embeddings.py      embed client (construction-time config; int8 decode, L2 norm, atomic disk cache)
-  server/            SURFACES — thin adapters over app.py (map args → use-case → render)
-    cli.py · mcp.py · http.py · session.py (RepoSession warm state, shared)
+  L1  contracts/       EVERY cross-boundary payload, TypedDict only, zero logic
+                       chunk · bundle · brief · file · graph · repo · scan · prune
+
+  L2  storage/         PERSISTENCE — the ONLY package allowed to write SQL
+        store.py         connection + schema; one table per object
+        schema.py        DDL + versioned migrations (chunks · files · symbols ·
+                         edges · meta · flows · cards)
+        _chunks · _files · _symbols · _graph · _flows · _cards (the study cards,
+                         no vector column: cards never rank)
+        _blobs.py        the untyped sqlite↔numpy boundary
+        locate.py        resolve_root + INDEX_FILE — the layout lives in ONE line
+      providers/       model APIs
+        embeddings.py    OpenAI-compatible /embeddings; batch width detection,
+                         index-set validation, content-addressed disk cache
+        http · _retry · _urllib · _wire · _width · _config · cache
+        chat/            L4 — nothing under retrieval/ may import this
+          base.py          ChatProvider Protocol · openai_compat.py · router.py
+
+  L3  chunkers/        CONTENT → CHUNKS behind one partition-guaranteed contract
+        cast.py          the ONE split-then-merge engine · units.py the language seam
+        _spans · _split · _merge · _balance · _breadcrumb · _signature · _pysymbols
+        python.py        stdlib ast · model.py Chunk/Symbol/FileResult + validate_partition
+      indexing/        BUILD the index — 3 phases = 3 functions
+        indexer.py       orchestration · discover.py the walk · _plan.py what to do
+        _embed.py        the GLOBAL batch embed (one network call per pass)
+        _write.py        rows + prune_orphans (GONE vs SKIPPED) · _graph.py edges
+        edges · _imports · _calls   import/call resolution (python)
+        strategies.py    ext → Strategy registry (OCP) · builtin.py the shipped one
+        _exclude.py      megabrain.json ignores + the legacy dotfiles
+      retrieval/       ANSWER queries — NO LLM IN HERE (rule 1, enforced by a test)
+        search.py        the neutral primitive · params.py every knob, frozen
+        state.py         SearchState + load_state (warm matrices)
+        paths.py         is_test / is_demo / ident_tokens — path vocabulary
+        scoring/         pipeline · lane · lanes (TestPenalty, LexicalBoost) ·
+                         _fusion (the BASE: dense + 0.5·file) · _space · context
+        bundle/          assemble · _rank · _related · _anchors · floors (the two
+                         recall floors) · _convert
+        render/          markdown · _lang
+      knowledge/       THE GRAPH (§6) — candidates + annotations, never ranking
+        build.py         RepoGraph + load_graph (near/out/into adjacency)
+        communities · gods · surprises · paths (BFS) · labels · views
+        uses · usesites · carriers · tolls · aliases · source · snips
+
+  L4  atlas/           THE MENTAL MAP (§4.5) — an LLM at INDEX time, never at query
+        author.py        writes one card per file  ← the only module here with an LLM
+        oracle.py        accepts/rejects a card against the skeleton it was shown
+        _plan.py         CARD_SCHEMA + the cache key (schema, model, skeleton)
+        _prompt.py       the prompt and its one retry
+        brief.py         QUERY time, 0 LLM: takes the bundle's file list as-is
+        _assemble.py     narrative order (graph BFS) + one entry's relations/interface
+        render.py        Brief → terminal markdown
+      enrich/          Bundle → Bundle, opt-in, fail-open to the input
+        rerank.py        the judge lane: the model returns IDS, never code
+        _batches · _cards · _prompt · _verdict
+      ask/             NARRATE — the only layer that talks to an LLM at query time
+        narrator.py · splice.py (rule 5) · agents.py · _subagent · _pool ·
+        _candidates · citations · events · prompt · stream · _rules · _block ·
+        repair.py + _broken.py  (a citation that resolved to nothing, re-asked)
+      flows/           the cached-walkthrough lane (cache · serve · match · covers ·
+                       freshness · chrome)
+
+  L5  usecases/        ONE FILE PER VERB — every transport calls THESE
+        build.py         index (+ llm=True composes study — one meaning, N surfaces)
+        study.py         write the cards · brief.py the mental model
+        search · ask · get · scan · repos · freshness · _flows · _registry
+      transports/      SURFACES — thin adapters: args → use-case → render
+        cli/            main.py + commands/{index,study,scan,search,brief,ask,get,
+                        graph,studio}.py — one module per verb, no branch in main
+        mcp/            server · protocol · dispatch (a TABLE of 3-line handlers) ·
+                        tools (the three) · schema (inputSchema GENERATED from
+                        contracts/tools.py) · arguments · answers · __main__
+        http/           app · router (a TABLE, never a chain of ifs) · messages
+                        (the two records) · replies (the Reply factories) · _target
+                        (wire parsing) · _handler · _writer · sse · security
+          routes/         query (search · brief · get · symbols) · asking · indexing ·
+                          graph · project · meta · scanning · static
+studio/                the studio's TypeScript workspace (esbuild → transports/http/ui/)
+  src/views/           ask · brief · search · graph · files · adding
 ```
+
+Not yet ported (deliberate, tracked): `forge/` (phase 16) · the `treesitter` / `php` /
+`markdown` chunkers and the languages they carry · the issue-mode lane.
 
 Runnable examples (programmatic API · custom .sql chunker · chunk heatmap ·
 web demo) live in their own repo, `~/megabrain-examples` — they need the engine

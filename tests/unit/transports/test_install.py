@@ -178,7 +178,7 @@ def test_the_report_counts_what_it_did_and_names_the_three_tools(home: Path) -> 
     (home / ".codex").mkdir()
     text = install.render(install.apply())
     assert "Registered megabrain in 1 platform(s)" in text
-    assert "megabrain_ask" in text and "megabrain_brief" in text
+    assert "megabrain_ask" in text and "megabrain_search" in text
     assert "Restart your assistant" in text
 
 

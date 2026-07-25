@@ -11,9 +11,8 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ..._errors import MegabrainError
-from ...atlas import render_brief
 from ...retrieval.render import render
-from ...usecases import ask, brief, search
+from ...usecases import ask, search
 from . import arguments as arg
 from .answers import Answer, answer, failure, from_engine
 
@@ -36,20 +35,13 @@ def _search(args: dict[str, Any]) -> str:
     bundle = search(arg.repo(args), arg.text(args, "task"),
                     path_filter=arg.scope(args), content=arg.content(args),
                     rerank=arg.flag(args, "rerank", default=False))
-    bodies = arg.flag(args, "bodies", default=True)
+    bodies = arg.flag(args, "bodies", default=False)
     return render(bundle, compact=not bodies, related_code=bodies)
-
-
-def _brief(args: dict[str, Any]) -> str:
-    return render_brief(brief(arg.repo(args), arg.text(args, "question"),
-                              limit=arg.limit(args),
-                              rerank=arg.flag(args, "rerank", default=False)))
 
 
 HANDLERS: dict[str, Handler] = {
     "megabrain_ask": _ask,
     "megabrain_search": _search,
-    "megabrain_brief": _brief,
 }
 
 

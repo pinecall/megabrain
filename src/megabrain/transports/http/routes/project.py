@@ -31,8 +31,7 @@ def project_route(request: Request) -> Reply:
         "queries": starters["queries"],
         "queries_source": starters["source"],
         "models": {"narrator": project.narrator_model,
-                   "rerank": project.rerank_model,
-                   "study": project.study_model},
+                   "rerank": project.rerank_model},
         # Said out loud: a fallback that looks like "no config" is how somebody
         # edits a file for an hour and never learns it was never parsed.
         "malformed": project.malformed,

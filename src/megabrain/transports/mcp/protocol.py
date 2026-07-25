@@ -25,9 +25,8 @@ PROTOCOL = "2024-11-05"
 # context in every session that loads this server.
 INSTRUCTIONS = """megabrain answers questions about a repository's CODE from a pre-built index. Retrieval is deterministic — verbatim chunks, true line numbers, no model — and a model only ever narrates what retrieval already chose.
 
-Three tools, three jobs:
-- megabrain_brief — the mental model first: what each file is for, how they connect, no code. The cheap opening move on an unfamiliar repo.
-- megabrain_search — ONE call returns a task's whole edit surface WITH the code. The render IS your read: implement from it rather than re-fetching spans it already showed.
+Two tools, two jobs:
+- megabrain_search — ONE call MAPS a task's whole edit surface: the files that answer it, each with its best span and the symbols it declares. No code by default (the map is a third of the tokens and the span says which lines to open); pass `bodies: true` to read the code inline.
 - megabrain_ask — the flow narrated across subsystems, real code spliced in. The CODE is verbatim; the PROSE is narration, so verify its claims against that code.
 
 One call per TASK, not per facet. If something seems missing, re-read the render first — the key finding is usually in the first files.

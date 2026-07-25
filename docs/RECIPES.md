@@ -33,101 +33,15 @@ whatever your assistant reads):
 That one instruction is the difference between an agent that burns 15 turns reconstructing
 a flow and one that gets it in a single grounded call.
 
-**Which tool for which agent?** Both are grounded — pick by who does the reasoning:
+**Which tool for which agent?** All three are grounded — pick by who does the reasoning:
 
-- **`megabrain_search`** (rerank on by default over MCP) — for a strong agent that wants to
-  reason over raw code itself. ~200 ms of no-LLM retrieval returns the exact chunks worth
-  reading; the rerank then drops the vocabulary-only matches embeddings can't distinguish.
+- **`megabrain_search`** — for a strong agent that wants to reason over raw code itself.
+  ~200 ms of no-LLM retrieval returns the exact spans worth reading, bodies included;
+  `rerank: true` adds a judge call that drops the vocabulary-only matches embeddings
+  can't distinguish (off by default — the deterministic answer is complete on its own).
 - **`megabrain_ask`** — the repo *explained*. This is relevance curation for whatever model
   reads it: an agent on a smaller, cheaper LLM that could never navigate the repo alone
   gets handed the connected story, already assembled and grounded.
-
-Doing it by hand instead of `megabrain install`:
-
-```bash
-claude mcp add megabrain -- python3 -m megabrain.mcp_server
-```
-
-```json
-{ "mcpServers": { "megabrain": { "command": "python3",
-                                 "args": ["-m", "megabrain.mcp_server"] } } }
-```
-
----
-
-## Run fully local — no keys, no cloud
-
-Your code never leaves the machine. Two knobs here are **not obvious** and megabrain will
-look broken without them.
-
-```bash
-ollama serve
-
-# 1. embeddings — pick one, see the table below
-ollama pull bge-m3
-export MEGABRAIN_EMBED_BASE_URL=http://localhost:11434/v1
-export MEGABRAIN_EMBED_MODEL=bge-m3
-
-# 2. the narrator
-export MEGABRAIN_CHAT_BASE_URL=http://localhost:11434/v1
-export MEGABRAIN_ASK_MODEL=qwen3-coder:30b
-export MEGABRAIN_CHAT_EXTRA='{"reasoning_effort": "none"}'   # ← knob 1
-export MEGABRAIN_ASK_CTX_CHARS=105000                        # ← knob 2
-export OLLAMA_CONTEXT_LENGTH=40960
-
-megabrain index ~/repo --force        # --force re-embeds with the new model
-megabrain ask   ~/repo "how does X work"
-```
-
-### Which local embedder
-
-Measured the same day, same corpus, same 22 golden queries, each force-reindexed — because
-the corpus drifts, and comparing a fresh local number against a stale table row hides the
-real gap:
-
-| model | R@1 | bundle_full | size | dims |
-|---|---|---|---|---|
-| `perplexity/pplx-embed-v1-0.6b` *(cloud control)* | **0.864** | **0.955** | — | 1024 |
-| **`bge-m3`** — the local pick | **0.773** | 0.909 | 1.2 GB | 1024 |
-| `jina-embeddings-v2-base-code` Q8 GGUF | 0.682 | 0.909 | **172 MB** | **768** |
-
-**Take `bge-m3`.** It ranks the #1 slot meaningfully better than the code-tuned jina
-(0.773 vs 0.682) and they tie on `bundle_full` — the number that decides whether `ask` has
-the right code to splice. Reach for jina only when footprint matters more than ranking:
-it's 7× smaller and its 768 dims make a 25% smaller index and faster search.
-
-Both are 8K-context models. The 512-token BERT embedders (e5, gte, bge-large) **cannot**
-be used — megabrain's chunks overflow their context and the request fails outright.
-
-**Knob 1 — `MEGABRAIN_CHAT_EXTRA`.** Hybrid-thinking models (`qwen3:*`) burn hundreds of
-hidden reasoning tokens per answer through Ollama's OpenAI endpoint, which **ignores** the
-native `think:false`. `reasoning_effort:"none"` is the field it honors (Ollama ≥ 0.12).
-Non-thinking models (`qwen3-coder:*`) don't need it.
-
-**Knob 2 — `MEGABRAIN_ASK_CTX_CHARS`.** `ask`'s candidate budget is sized for cloud windows
-(200K chars ≈ 50K tokens). A 40K-token local model gets its prompt **silently truncated**
-by the runtime. Cap the budget below the model's window (~3 chars/token, leave ~3K tokens
-for the answer).
-
-### Which local narrator
-
-Same retrieval bundle, different chat model, over the golden queries. `cite_recall` = the
-share of a query's expected files the model actually cited; VRAM is a realistic 4-bit quant.
-
-| model | cite_recall | latency | ~VRAM (Q4) |
-|---|---|---|---|
-| **`qwen3-coder:30b`** *(MoE, ~3B active)* ⭐ | **0.583** | **15 s** | ~18–20 GB |
-| `qwen3:30b` — the same size, **not** code-specialized | 0.333 | 12 s | ~18–20 GB |
-| `qwen3:8b` | 0.417 | 41 s | ~5–6 GB |
-| `qwen3:14b` | 0.333 | 41 s | ~9–10 GB |
-| `gemma-3-12b` | 0.333 | 42 s | ~8–9 GB |
-| — *cloud baselines, for scale* — | | | |
-| `qwen/qwen3-coder` (480B MoE) | 0.750 | 21 s | ✗ |
-| `anthropic/claude-haiku-4.5` | 0.833 | 19 s | ✗ |
-
-**Take `qwen3-coder`, the current version.** Two findings worth internalizing before you
-pick something smaller to save VRAM:
-
 - **The lightweight dense models lose on both axes.** They cite fewer files *and* run ~2.7×
   slower (~41 s vs 15 s) — they think harder per token with no MoE speedup. Being frugal
   buys you a worse *and* slower narrator, not a trade.

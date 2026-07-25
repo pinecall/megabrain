@@ -17,10 +17,6 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
                         help="re-chunk and re-embed every file, ignoring hashes")
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
                         help="skip paths matching GLOB (repeatable)")
-    parser.add_argument("--llm", action="store_true",
-                        help="also write the mental map: one model-authored card "
-                             "per file, so `megabrain brief` can answer "
-                             "(costs a call per changed file)")
     parser.add_argument("--quiet", action="store_true", help="no progress output")
     parser.set_defaults(run=run)
 
@@ -33,7 +29,6 @@ def run(args: argparse.Namespace) -> str:
     long silence otherwise.
     """
     report = build_index(args.path, force=args.force, exclude=args.exclude,
-                         llm=args.llm,
                          on_progress=None if args.quiet else _progress)
     if not args.quiet:
         print(file=sys.stderr)
@@ -49,24 +44,7 @@ def _summary(report: dict[str, object]) -> str:
         # Silence here would mean chunks that do not cover their file — the one
         # invariant the chunker cannot be wrong about without losing code.
         parts.append(f'  ⚠ {report["partition_violations"]} partition violation(s)')
-    parts += _study_lines(report)
     return "\n".join(parts)
-
-
-def _study_lines(report: dict[str, object]) -> list[str]:
-    """What the card pass did, or why it did nothing.
-
-    The failure is printed, not swallowed: the index succeeded, so the exit
-    code is 0, and a `--llm` run that wrote no cards has to say so or the next
-    `brief` is a mystery.
-    """
-    if isinstance(failure := report.get("study_error"), str):
-        return [f'  ⚠ no mental map: {failure}']
-    if not isinstance(cards := report.get("study"), dict):
-        return []
-    return [f'  cards: {cards["written"]} written · {cards["unchanged"]} unchanged '
-            f'· {cards["degraded"]} degraded · {cards["seconds"]}s '
-            f'· model {cards["model"]}']
 
 
 def _progress(event: dict[str, object]) -> None:

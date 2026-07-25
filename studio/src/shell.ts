@@ -9,15 +9,12 @@ import { el, fill } from "./dom.js";
 import { icon } from "./icons.js";
 import { currentTheme, toggleTheme } from "./theme.js";
 
-export type TabName = "ask" | "brief" | "search" | "graph";
+export type TabName = "ask" | "search" | "graph";
 
 /* ASK first, and that ordering is the product's: it is the feature people come
- * for. Then the three in the order a reader actually needs them: BRIEF to
- * orient (what these files are and how they connect), SEARCH for the code
- * itself, GRAPH for the structure. Ask is built ON search — every walkthrough
- * is a retrieval the model then explains — and brief is that same retrieval
- * with the cards instead of the bodies. */
-export const TABS: TabName[] = ["ask", "brief", "search", "graph"];
+ * for. Then SEARCH for the code itself and GRAPH for the structure. Ask is
+ * built ON search — every walkthrough is a retrieval the model then explains. */
+export const TABS: TabName[] = ["ask", "search", "graph"];
 
 export interface Shell {
   viewport: HTMLElement;
@@ -110,12 +107,7 @@ function repoRow(entry: RepoEntry, onPick: (entry: RepoEntry) => void): HTMLElem
       el("div", { class: "repo-meta" },
          empty ? "empty index — nothing indexed yet"
            : `${entry.files} files · ${entry.chunks} chunks`)),
-    /* The Brief tab silently needs `megabrain study`. Without this badge every
-     * repository looked equally ready and only one of seventeen actually was. */
-    ...(!empty && entry.cards > 0
-      ? [el("span", { class: "index-tag chg", title:
-             `${entry.cards} mental-map cards — the Brief tab works here` }, "brief")]
-      : []));
+    );
   row.dataset["path"] = entry.path;
   row.addEventListener("click", () => onPick(entry));
   return row;

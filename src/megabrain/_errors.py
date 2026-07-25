@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 __all__ = ["MegabrainError", "IndexNotFound", "EmptyIndex", "ModelMismatch",
-           "StudyNotFound", "NothingToIndex"]
+           "NothingToIndex"]
 
 # The provider-side failures live in `_provider_errors` — same taxonomy, one
 # layer up, because they are about the environment rather than the index. The
@@ -71,13 +71,6 @@ class NothingToIndex(MegabrainError, ValueError):
         return cls(f"nothing to index in {path} — this build reads "
                    f"{', '.join(supported)}"
                    + (f", and found {seen}" if seen else ", and found no source files"))
-
-
-class StudyNotFound(MegabrainError, RuntimeError):
-    """The index has no cards yet — `brief` needs one `megabrain study` run."""
-
-    code = "study_not_found"
-    http_status = 404
 
 
 class ModelMismatch(MegabrainError, RuntimeError):

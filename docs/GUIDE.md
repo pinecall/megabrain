@@ -378,21 +378,29 @@ Registered megabrain in 3 platform(s):
 ```
 
 Supported: **Claude Code · Codex · Antigravity · Cursor · Windsurf · Gemini CLI**. It only
-ever writes the `megabrain` key — your other MCP servers are untouched — and it pins the
-entry to the interpreter megabrain is installed in, so re-running it repairs a config that
-drifted to an old checkout.
+ever writes the `megabrain` key — your other MCP servers, your unrelated settings and (in
+Codex's TOML) your comments are left alone — and it pins the entry to the interpreter
+megabrain is installed in, so re-running it repairs a config that drifted to an old
+checkout. `--platform NAME` writes just one, even if it was not detected.
 
-Your agent gets six tools, deliberately lean, because every tool costs it context and a
-routing decision — pulling a single file is the host's own Read/Grep job:
+By hand, if you would rather:
+
+```bash
+claude mcp add megabrain -- python3 -m megabrain.transports.mcp
+```
+
+```json
+{ "mcpServers": { "megabrain": { "command": "python3",
+                                 "args": ["-m", "megabrain.transports.mcp"] } } }
+```
+
+Your agent gets **three** tools, and the smallness is the point: every tool costs it
+context and a routing decision, and pulling a single file is the host's own Read/Grep job.
 
 | tool | when the agent reaches for it |
 |---|---|
 | **`megabrain_ask`** | **the default** — any "how/where/why does X work" |
 | `megabrain_search` | it wants the code to read and will reason over it itself |
-| `megabrain_graph` | repo topology, one file in depth, or the route between two |
-| `megabrain_index` | index a new repo, or `list: true` to see every repo on the machine |
-| `megabrain_forge` | make a file type the engine can't read yet searchable |
-| `megabrain_flows` | manage the cache: `warm`, `refresh`, `list`, `disable` |
 
 → **[Every parameter](REFERENCE.md#mcp-tools)** ·
 **[The one rule that makes it pay off](RECIPES.md#give-your-coding-agent-the-whole-repo)**

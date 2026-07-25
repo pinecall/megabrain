@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ...contracts.tools import AskParams, BriefParams, SearchParams
+from ...contracts.tools import AskParams, SearchParams
 from .schema import json_schema
 
 __all__ = ["Tool", "TOOLS", "listing"]
@@ -41,25 +41,16 @@ TOOLS: tuple[Tool, ...] = (
          "only the files you will edit.",
          AskParams),
     Tool("megabrain_search",
-         "ONE call that returns a task's whole edit surface, code included: "
-         "the files that answer it ranked, each with its best span and its "
-         "body under a true-line-number gutter, plus the anchors a change has "
-         "to touch and the tests that pin the behaviour. The render IS your "
-         "read — build your edits straight from it instead of re-fetching a "
-         "span it already showed, and search once per TASK, not once per "
-         "facet. One boundary worth knowing: it ranks what EXISTS, so when the "
-         "bug is a missing call or flag it shows you the site to inspect but "
-         "cannot report the absence.",
+         "ONE call that MAPS a task's whole edit surface: the files that answer "
+         "it ranked, each with its best span (true line numbers) and the "
+         "symbols it declares, plus the anchors a change has to touch and the "
+         "tests that pin the behaviour. No code bodies by default — the map is "
+         "~2 700 tokens against ~8 100 with them, and the span already tells "
+         "you which lines to open; pass `bodies: true` to read the code inline "
+         "instead. Search once per TASK, not once per facet. One boundary worth "
+         "knowing: it ranks what EXISTS, so when the bug is a missing call or "
+         "flag it shows you the site to inspect but cannot report the absence.",
          SearchParams),
-    Tool("megabrain_brief",
-         "The mental model for a question, before any code: one card per file "
-         "saying what it is for, the import relations rendered live from the "
-         "graph (never stale, never invented), and each file's interface — no "
-         "bodies at all. No model runs at query time, so it answers in "
-         "milliseconds. It is the cheap first call on an unfamiliar "
-         "repository; megabrain_search is the second, once you know which "
-         "files matter. Needs `megabrain study` to have run on the repo once.",
-         BriefParams),
 )
 
 

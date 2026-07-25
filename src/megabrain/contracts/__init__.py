@@ -10,7 +10,6 @@ is what lets every layer above depend on it freely.
 
 from __future__ import annotations
 
-from .brief import Brief, BriefFile, BriefSymbol
 from .bundle import AnchorHit, Bundle, FlowHit, Tier1File, Tier2File
 from .chunk import ChunkHit, ChunkRef, PrunedChunk, Span, SymbolRef
 from .file import FileView
@@ -36,8 +35,6 @@ __all__ = [
     "GraphMap", "GraphNode", "GraphLink", "Community", "Neighbourhood", "GraphPath",
     "GodNode", "Surprise", "Hop", "HopCode", "CodeSnip",
     "NodeView", "NodeEdge", "SemanticTie",
-    # the mental model
-    "Brief", "BriefFile", "BriefSymbol",
     # the flat projection
     "PruneResult", "NoiseSpan", "RelatedDoc", "RelatedTest",
 ]

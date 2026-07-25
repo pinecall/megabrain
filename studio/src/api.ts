@@ -5,7 +5,7 @@
  * handle a 401 differently from its neighbours.
  */
 import type {
-  Brief, Bundle, Config, FileView, GraphMap, GraphPath, Health, Neighbourhood,
+  Bundle, Config, FileView, GraphMap, GraphPath, Health, Neighbourhood,
   NodeView, Project, RepoEntry, ScanReport,
 } from "./contracts.js";
 
@@ -75,15 +75,6 @@ export const api = {
       body: JSON.stringify({ query: q, repo, content, rerank }),
     }),
 
-  /* The mental map for a question: prose written at study time, relations read
-   * live from the graph. No model runs here — a 404 `study_not_found` means the
-   * repo was never studied, which the view reports as an action, not an error. */
-  brief: (q: string, repo?: string, limit?: number, rerank?: boolean) =>
-    request<Brief>("/brief", {
-      method: "POST",
-      body: JSON.stringify({ query: q, repo, limit, rerank }),
-    }),
-
   file: (file: string, repo?: string, symbol?: string) =>
     request<FileView>(`/get${query({ file, repo, symbol })}`),
 
@@ -112,13 +103,11 @@ export const api = {
     return stream("/ask/stream", { question, repo, content }, onEvent);
   },
 
-  /* `llm` also writes the mental map — a model call per changed file, which is
-   * why it is a parameter the caller has to pass rather than a default. */
-  index(repo: string, llm: boolean,
+  index(repo: string,
         onEvent: (event: string, data: unknown) => void): {
     done: Promise<void>; abort: () => void;
   } {
-    return stream("/index/stream", { path: repo, llm }, onEvent);
+    return stream("/index/stream", { path: repo }, onEvent);
   },
 };
 

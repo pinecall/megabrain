@@ -170,9 +170,16 @@ the core "god node" files, and the real call-path between any two files — buil
 edges plus embedding similarity, numpy only, no networkx.
 [What it's actually good for →](docs/GUIDE.md#4-map-the-repo-with-the-graph)
 
+**The answer is a MAP, not a wall of code.** `search` returns the files that answer the
+task, each with its best-matching span (true line numbers) and the symbols it declares —
+**~2 700 tokens against ~8 100 with bodies**, measured on a real bundle. The span already
+says which lines to open, so the code is one `--full` away when you want it and never in
+the way when you do not.
+
 **A local studio.** `megabrain studio` opens the whole engine in your browser: search,
-ask, the flow cache and the graph on a live canvas, plus a read-only code navigator where
-every identifier is a go-to-definition link. [Take the tour →](docs/GUIDE.md#3-the-studio)
+ask, the flow cache and the graph on a live canvas, plus a read-only code navigator
+where every identifier is a go-to-definition link.
+[Take the tour →](docs/GUIDE.md#3-the-studio)
 
 **Everywhere you work.** A terminal CLI, an MCP server inside Claude Code / Codex / Cursor
 / Gemini CLI, a Python library, and the studio.
@@ -196,9 +203,17 @@ megabrain install    # detects Claude Code · Codex · Cursor · Windsurf · Gem
 | the cross-file story | reconstructed, unverified | **narrated, real code spliced in** |
 | asking it again later | the full re-exploration | **~0 ms, from the cache** |
 
-Your agent gets six tools, deliberately lean — it already has Read and Grep for single
-files: **`megabrain_ask`** (the default) · `megabrain_search` · `megabrain_graph` ·
-`megabrain_index` · `megabrain_forge` · `megabrain_flows`.
+Your agent gets **three** tools, and the smallness is the design — it already has Read,
+Grep and an editor, and a tool that fetches one span only invites it to re-verify what the
+render already showed:
+
+| tool | when |
+|---|---|
+| **`megabrain_ask`** | a how/where/why question — the narrated flow, real code spliced in |
+| **`megabrain_search`** | the task's whole edit surface as a map — files, spans, symbols; `bodies: true` for the code |
+
+Each tool's `inputSchema` is generated from `contracts/tools.py`, so a parameter cannot
+exist on the wire without existing in the dispatch.
 
 > **Put this in your agent's rules:** for any question about how the code works, call
 > `megabrain_ask` **first**, before grepping. One call returns the whole flow with the
@@ -213,11 +228,13 @@ files: **`megabrain_ask`** (the default) · `megabrain_search` · `megabrain_gra
 
 ```bash
 megabrain index  ~/repo                       # build / update the index (incremental)
-megabrain ask    ~/repo "how does X work"     # narrated walkthrough + real code
+megabrain scan   ~/repo                       # census only: what WOULD index, and skips
 megabrain search ~/repo "retry logic"         # the code map, no LLM (~200 ms)
+megabrain search ~/repo "retry logic" --full  #   …with the code bodies inline
+megabrain ask    ~/repo "how does X work"     # narrated walkthrough + real code
+megabrain get    ~/repo path/to/file.py       # one file, or one symbol
 megabrain graph  ~/repo                       # the repo as a knowledge graph
 megabrain studio                              # the web UI + JSON API
-megabrain install                             # register the MCP server
 ```
 
 [Every command and flag →](docs/REFERENCE.md#cli)

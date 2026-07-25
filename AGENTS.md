@@ -5,6 +5,7 @@ question, explained with the real code spliced in. It replaces minutes of
 grep + Read + explore-agent crawling with one grounded answer.
 
 - **What it does / how to use it** → [README.md](README.md) · [docs/GUIDE.md](docs/GUIDE.md)
+- **The mental-model lane (`study` / `brief`)** → [docs/BRIEF.md](docs/BRIEF.md)
 - **Every flag, tool, route and env var** → [docs/REFERENCE.md](docs/REFERENCE.md)
 - **Task-oriented how-tos** → [docs/RECIPES.md](docs/RECIPES.md)
 - **How it works, and why each choice is locked** → [ARCHITECTURE.md](ARCHITECTURE.md)
@@ -19,20 +20,24 @@ notes here.
 The engine answers questions about any indexed repo, including itself:
 
 ```bash
-megabrain index .                          # once; incremental after
-megabrain ask . "how does ask splice real code"
+megabrain index . --llm                    # once; incremental after (--llm adds the cards)
+megabrain brief . "how does the brief avoid ranking twice"
+megabrain ask   . "how does ask splice real code"
 ```
 
-Over MCP: `megabrain_ask` (primary) · `megabrain_search` (no-LLM ranked chunks,
-LLM rerank on by default) · `megabrain_graph` (`mode=map|node|path`) ·
-`megabrain_index` (`list=true` enumerates every repo on the machine) ·
-`megabrain_forge` · `megabrain_flows`. Prefer these over grep/Read chains.
+Over MCP, **three** tools — the surface carries only what megabrain alone can do, since
+the host already has Read, Grep and an editor: `megabrain_ask` (primary) ·
+`megabrain_search` (the task's edit surface, bodies included) · `megabrain_brief` (the
+mental model, no bodies, no model call). Prefer these over grep/Read chains.
 
 ## Hard rules — locked by experimental data, do not violate
 
-1. **No LLM in the retrieval path.** The only LLM calls are `ask` (post-retrieval
-   narrator), the optional `search --rerank` (post-prune reorder) and one cached
-   `graph` community-label call. All fail open.
+1. **No LLM in the retrieval path.** Query-time LLM calls sit *above* retrieval and
+   all fail open: `ask` (narrator), the optional `search --rerank` judge lane, one
+   cached `graph` community-label call. Two passes run a model at **index** time
+   instead, each gated by a deterministic oracle that decides whether the output may
+   be stored at all: `forge` (partition oracle) and **`study`** (card oracle — see
+   [docs/BRIEF.md](docs/BRIEF.md)). `brief` itself makes **zero** model calls.
 2. **Completeness beats ordering.** Never merge a change that lowers golden
    `bundle_full` (currently **1.00**).
 3. **The graph never ranks.** Import/call edges supply candidates and map
@@ -72,13 +77,15 @@ The tree mirrors the pipeline; full detail in [ARCHITECTURE.md](ARCHITECTURE.md)
 | `chunkers/` | content → chunks behind one `FileResult` contract. `cast` is the shared engine; `python` (stdlib ast), `treesitter` (+`LangSpec`: TS/JS, Ruby, Go, Rust, PHP), `php` (legacy shape-router), `markdown` (no-LLM) |
 | `indexing/` | `indexer` (incremental walk + 60 s auto-refresh) · `strategies` (ext → strategy registry, the OCP extension point) · `graph` (import/call edges) · `ignore` |
 | `retrieval/` | **no LLM in here.** `scoring` (lane pipeline) · `bundle` (rank/tier/prune) · `render` · `state` (warm `SearchState`) · `issue` · `bm25` · `files` · `rerank` (the one opt-in LLM lane) |
-| `ask/` | `narrator` (walkthrough + `_Splicer`) · `agents` (v2: classifier → planner → parallel sub-agents → synthesizer, `stream_events` drives every surface) · `warmup` (flow pre-caching + starter questions) |
-| `storage/` | `store` (SQLite) · `flows` (flow cache) · `registry` (machine-global repo list) |
+| `ask/` | `narrator` (walkthrough + `splice`) · `agents` (classifier → planner → parallel sub-agents → synthesizer, the event stream drives every surface) · `repair` (a citation that resolved to nothing, re-asked) |
+| `atlas/` | **the mental map** — `author` (the ONLY module here that calls a model, at *index* time) · `oracle` (accepts/rejects a card, no LLM) · `_plan` (`CARD_SCHEMA` + the cache key) · `brief` (query time, 0 LLM: the bundle's own file list, re-presented) · `render` |
+| `enrich/` | `Bundle → Bundle`, opt-in, fail-open to the input. `rerank` = the judge lane: the model returns IDS, never code |
+| `storage/` | `store` (SQLite, the ONLY package that writes SQL) · `_cards` (the study cards — no vector column: cards never rank) · `_flows` · `locate` (`resolve_root` + `INDEX_FILE`, the layout in one line) |
 | `providers/` | model APIs: chat routing, `claude` (Agent SDK), `embeddings` |
 | `forge/` | `coverage` (LLM-written chunkers, partition-gated, trust-installed) · `specialize`+`ab_gate` (measure-only, NO LLM) |
 | `graph.py` | the knowledge graph (numpy only) |
-| `app.py` | the use-case layer — one function per verb; every frontend maps its transport args to these |
-| `server/` | `cli` · `mcp` · `http` (studio + serve-api, `ui/` is the studio bundle) · `session` · `install` |
+| `usecases/` | the use-case layer — **one file per verb**; every transport maps its args to these. `build` composes `index` + `study` behind `llm=True`, so no surface can disagree about what "index with the LLM" means |
+| `transports/` | `cli` (one module per verb) · `mcp` (three tools; `inputSchema` GENERATED from `contracts/tools.py`) · `http` (studio + JSON API, `ui/` is the built studio bundle) · `install` (`megabrain install` — the six-assistant MCP registration table) |
 
 Runnable examples live in their own repo, `~/megabrain-examples`.
 

@@ -9,7 +9,6 @@
 import { api } from "../api.js";
 import type { ScanReport } from "../contracts.js";
 import { el, fill, need } from "../dom.js";
-import { icon } from "../icons.js";
 import { indexProgress } from "./progress.js";
 
 /* One door for both jobs. A path that is ALREADY indexed is not a different
@@ -26,10 +25,6 @@ export function addRepoOverlay(current: string | undefined, onIndexed: () => voi
   const start = el("button", { class: "btn-primary" }, "Index it");
   const preview = el("button", { class: "chip" }, "Scan");
   start.setAttribute("disabled", "true");
-  /* OFF by default, and it has to be: indexing is free after the embeddings,
-   * the mental map is a model call per file. An expensive box that arrives
-   * ticked is a bill nobody agreed to. */
-  const withBrief = briefOption();
 
   const close = (): void => fill(host);
   const closer = el("button", { class: "close-btn" }, "✕");
@@ -55,10 +50,10 @@ export function addRepoOverlay(current: string | undefined, onIndexed: () => voi
   }
 
   function index(): void {
-    const steps = indexProgress(withBrief.on());
+    const steps = indexProgress();
     fill(census, steps.root);
     start.setAttribute("disabled", "true");
-    const running = api.index(input.value.trim(), withBrief.on(), (name, data) => {
+    const running = api.index(input.value.trim(), (name, data) => {
       const event = data as Record<string, unknown>;
       if (name === "progress") steps.event(event);
       else if (name === "done") { steps.finish(event); onIndexed(); }
@@ -91,36 +86,12 @@ export function addRepoOverlay(current: string | undefined, onIndexed: () => voi
         closer),
       el("div", { style: "padding:0 24px 22px;display:grid;gap:14px;overflow:auto" },
         el("div", { style: "display:flex;gap:8px" }, input, preview),
-        census, withBrief.root,
+        census,
         el("div", { style: "display:flex;justify-content:flex-end" }, start)))));
   input.focus();
   if (input.value) void look();     // the selected repo, already censused
 }
 
-interface Option {
-  root: HTMLElement;
-  on(): boolean;
-}
-
-/* A real checkbox, not a styled div: it is focusable, it toggles on Space, and
- * a screen reader already knows what it is. */
-function briefOption(): Option {
-  const box = el("input", { type: "checkbox", class: "opt-box" }) as HTMLInputElement;
-  const root = el("label", { class: "opt-row" }, box,
-    el("div", {},
-      el("div", { class: "opt-title" }, icon("brain", 13),
-         "Also build the mental map"),
-      el("div", { class: "opt-note" },
-         "One model call per file writes what each one IS, so the Brief tab can "
-         + "answer instantly afterwards. Costs money and minutes; the index "
-         + "itself does not need it.")));
-  return { root, on: () => box.checked };
-}
-
-/* The finding that used to be silence. A repository this build cannot read came
- * back as "0 files" with no hint that 412 `.ts` files were sitting right there —
- * so it is stated, with what it found and what it reads, and it is loud when
- * NOTHING is readable because then it is the whole answer. */
 function unreadable(report: ScanReport): HTMLElement[] {
   const found = Object.entries(report.unsupported);
   if (!found.length) return [];

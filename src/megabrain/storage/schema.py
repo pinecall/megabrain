@@ -38,13 +38,6 @@ CREATE TABLE IF NOT EXISTS edges (
     PRIMARY KEY (src, dst, kind)
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
-CREATE TABLE IF NOT EXISTS cards (
-    file TEXT PRIMARY KEY,                  -- one card per file
-    key  TEXT NOT NULL,                     -- hash(schema, model, skeleton)
-    model TEXT,                             -- which chat model wrote it
-    degraded INTEGER DEFAULT 0,             -- oracle rejected: text is the skeleton
-    text TEXT NOT NULL                      -- no vector: cards never rank
-);
 CREATE TABLE IF NOT EXISTS flows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     question TEXT NOT NULL,                 -- the ask that produced this flow

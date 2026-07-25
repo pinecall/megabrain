@@ -72,31 +72,6 @@ export interface Bundle {
   judge: { kept: number; of: number } | null;
 }
 
-export interface BriefSymbol {
-  name: string;
-  kind: string;
-  line: number;
-  signature: string;
-}
-
-export interface BriefFile {
-  file: string;
-  card: string;
-  degraded: boolean;
-  score: number;
-  imports: string[];
-  imported_by: string[];
-  symbols: BriefSymbol[];
-}
-
-export interface Brief {
-  repo: string;
-  query: string;
-  files: BriefFile[];
-  considered: number;
-  ms: number;
-}
-
 export interface FileView extends Span {
   text: string;
   symbols: SymbolRef[];
@@ -109,8 +84,6 @@ export interface RepoEntry {
   name: string;
   files: number;
   chunks: number;
-  /* Files with a mental-map card. 0 means the Brief tab cannot answer yet. */
-  cards: number;
 }
 
 export interface GraphNode {
@@ -268,7 +241,7 @@ export interface Project {
   /* "file" (the repo committed them) · "derived" (from its own graph, no model)
    * · "none". Shown, because a guess must not look like a declaration. */
   queries_source: string;
-  models: { narrator: string; rerank: string; study: string };
+  models: { narrator: string; rerank: string };
   malformed: boolean;
 }
 

@@ -12,7 +12,7 @@
  */
 import { el, fill } from "../dom.js";
 
-export type PhaseName = "scan" | "embed" | "write" | "cards";
+export type PhaseName = "scan" | "embed" | "write";
 
 interface Phase {
   name: PhaseName;
@@ -35,12 +35,10 @@ const TITLES: Record<PhaseName, string> = {
   scan: "Reading files",
   embed: "Embedding what changed",
   write: "Writing the index",
-  cards: "Writing the mental map",
 };
 
-export function indexProgress(withCards: boolean): Progress {
-  const names: PhaseName[] = withCards ? ["scan", "embed", "write", "cards"]
-    : ["scan", "embed", "write"];
+export function indexProgress(): Progress {
+  const names: PhaseName[] = ["scan", "embed", "write"];
   const phases = names.map(phase);
   const summary = el("div", { class: "install-summary" });
   const root = el("div", { class: "install" }, ...phases.map((one) => one.row), summary);
@@ -71,12 +69,11 @@ export function indexProgress(withCards: boolean): Progress {
       if (kind === "file") tick(enter("scan"), data, "file");
       else if (kind === "embed") ticked(enter("embed"), Number(data["done"] ?? 0),
                                        Number(data["total"] ?? 0), "vector");
-      else if (kind === "card") tick(enter("cards"), data, "card");
     },
     finish(report) {
       for (const one of phases) settle(one, "done");
-      fill(summary, ...report_lines(report, withCards));
-      close(phases, report, withCards);
+      fill(summary, ...report_lines(report));
+      close(phases, report);
     },
     fail(message) {
       const running = phases.find((one) => one.state === "running") ?? phases[0];
@@ -126,52 +123,24 @@ function settle(target: Phase, state: "done" | "skipped"): void {
 /* The counts each phase ENDED with, once the report is in. A phase whose bar
  * filled but whose real answer was "nothing to do" has to say the second thing:
  * this is exactly where "0 chunks · 0 edges" used to read as a failure. */
-function close(phases: Phase[], report: Record<string, unknown>,
-               withCards: boolean): void {
+function close(phases: Phase[], report: Record<string, unknown>): void {
   const changed = Number(report["changed"] ?? 0);
-  const cards = report["study"] as Record<string, unknown> | undefined;
-  const written = Number(cards?.["written"] ?? 0);
   const detail: Record<PhaseName, string> = {
     scan: `${report["files"]} files · ${changed} changed`
       + (Number(report["skipped"] ?? 0) ? ` · ${report["skipped"]} skipped` : ""),
     embed: changed ? `${changed} files embedded` : "nothing changed — nothing to embed",
     write: changed ? `${report["chunks"]} chunks · ${report["edges"]} edges`
       : `no writes — the index already holds ${report["total_chunks"]} chunks`,
-    cards: cardDetail(report, cards),
   };
   for (const one of phases) {
     fill(one.detail, detail[one.name]);
-    const nothing = one.name === "embed" || one.name === "write" ? !changed
-      : one.name === "cards" ? withCards && !written : false;
-    if (nothing) settle(one, "skipped");
+    if (one.name !== "scan" && !changed) settle(one, "skipped");
   }
-}
-
-function cardDetail(report: Record<string, unknown>,
-                    cards: Record<string, unknown> | undefined): string {
-  const failure = report["study_error"];
-  if (typeof failure === "string") return `not written: ${failure}`;
-  if (!cards) return "not requested";
-  const written = Number(cards["written"] ?? 0);
-  const held = written + Number(cards["unchanged"] ?? 0);
-  const degraded = Number(cards["degraded"] ?? 0);
-  const skipped = Number(cards["skipped"] ?? 0);
-  if (!held && skipped) {
-    // The case that read as a silent failure: every file was skipped because it
-    // declares nothing, so there was never a card to write. Saying "0 written"
-    // and stopping there is what made it look broken.
-    return `nothing to describe — ${skipped} files declare no symbols`;
-  }
-  return (written ? `${written} written · ` : "already complete · ")
-    + `${held} cards in the map`
-    + (degraded ? ` · ${degraded} degraded to the raw skeleton` : "")
-    + (skipped ? ` · ${skipped} skipped (no symbols)` : "");
 }
 
 /* One sentence, and it must be true of BOTH outcomes: a repository that was
  * fully re-indexed and one that had nothing to do. */
-function report_lines(report: Record<string, unknown>,
-                      withCards: boolean): HTMLElement[] {
+function report_lines(report: Record<string, unknown>): HTMLElement[] {
   const changed = Number(report["changed"] ?? 0);
   const headline = changed
     ? `Indexed ${changed} changed file${changed === 1 ? "" : "s"} in ${report["seconds"]}s`
@@ -187,10 +156,6 @@ function report_lines(report: Record<string, unknown>,
     lines.push(el("div", { class: "install-note mono" },
       `${stale} cached walkthrough${stale === 1 ? "" : "s"} dropped — their `
       + "sources changed"));
-  }
-  const failure = report["study_error"];
-  if (withCards && typeof failure === "string") {
-    lines.push(el("div", { class: "warn-bar" }, `no mental map: ${failure}`));
   }
   return lines;
 }

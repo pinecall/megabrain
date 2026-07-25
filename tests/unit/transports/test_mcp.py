@@ -1,4 +1,4 @@
-"""The MCP surface: three tools, one dispatch, JSON-RPC over stdio.
+"""The MCP surface: two tools, one dispatch, JSON-RPC over stdio.
 
 Driven the way a host drives it — a JSON-RPC message in, a response object out
 — because the protocol handling IS the surface. Calling the use cases directly
@@ -16,7 +16,6 @@ from typing import Any
 
 import pytest
 
-from megabrain.storage import Store
 from megabrain.transports.mcp.protocol import PROTOCOL, respond
 from megabrain.transports.mcp.schema import json_schema
 from megabrain.transports.mcp.server import serve
@@ -44,17 +43,6 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
-@pytest.fixture
-def studied(repo: Path) -> Path:
-    """A repo with cards, written straight to the table — `study` itself needs
-    a chat provider, and what `brief` requires is the cards, not the model."""
-    with Store(repo) as store:
-        for relpath in ("svc.py", "util.py"):
-            store.cards.upsert(relpath, "key", "fake-model", False,
-                               f"what {relpath} is for.")
-    return repo
-
-
 def _call(name: str, **arguments: Any) -> dict[str, Any]:
     message = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                "params": {"name": name, "arguments": arguments}}
@@ -69,11 +57,11 @@ def _text(result: dict[str, Any]) -> str:
 
 # ── the surface ──────────────────────────────────────────────────────────
 
-def test_the_agent_sees_exactly_three_tools() -> None:
+def test_the_agent_sees_exactly_two_tools() -> None:
     """Every tool costs the calling agent context and a decision. The host
     already has Read and Grep; megabrain exposes only what it alone can do."""
     assert {tool.name for tool in TOOLS} == {
-        "megabrain_ask", "megabrain_search", "megabrain_brief"}
+        "megabrain_ask", "megabrain_search"}
 
 
 def test_every_schema_is_generated_from_its_contract() -> None:
@@ -127,20 +115,24 @@ def test_a_notification_gets_no_response() -> None:
 
 # ── the three verbs ──────────────────────────────────────────────────────
 
-def test_search_returns_the_render_not_json(repo: Path) -> None:
-    """The render IS the agent's read: bodies with true line numbers, so the
-    next step is an edit rather than a second round of file fetching."""
+def test_search_returns_a_MAP_by_default(repo: Path) -> None:
+    """The default is the map, not the bodies. Measured on a real bundle: the
+    map costs ~2 700 tokens where CORE-with-bodies costs ~8 100, and it still
+    names the file, the best span and the symbols — which is what an agent needs
+    to decide where to look. The code is one `bodies: true` away.
+    """
     text = _text(_call("megabrain_search", repo_path=str(repo),
                        task="how does Service handle a request"))
     assert "## CORE" in text and "svc.py" in text
-    assert "def handle" in text
+    assert "```" not in text, "the default rendered code bodies"
 
 
-def test_search_without_bodies_is_a_map(repo: Path) -> None:
-    text = _text(_call("megabrain_search", repo_path=str(repo), task="handle",
-                       bodies=False))
-    assert "svc.py" in text
-    assert "```" not in text, "bodies=false still rendered code"
+def test_search_WITH_bodies_inlines_the_code(repo: Path) -> None:
+    """Opt-in, and when asked for it must really carry the code — an agent that
+    passes `bodies: true` is choosing to read here instead of opening files."""
+    text = _text(_call("megabrain_search", repo_path=str(repo),
+                       task="how does Service handle a request", bodies=True))
+    assert "def handle" in text and "```" in text
 
 
 def test_search_scope_reaches_the_engine(repo: Path,
@@ -190,40 +182,6 @@ def test_ask_narrates_the_prose_when_asked(repo: Path,
     monkeypatch.setattr("megabrain.transports.mcp.dispatch.ask", spy)
     _call("megabrain_ask", repo_path=str(repo), question="q", content="docs")
     assert seen["content"] == "docs"
-
-
-def test_brief_returns_the_mental_model(studied: Path) -> None:
-    text = _text(_call("megabrain_brief", repo_path=str(studied),
-                       question="how does Service handle a request"))
-    assert "brief" in text and "svc.py" in text
-    assert "what svc.py is for." in text
-    assert "```" not in text, "a brief carries no code bodies"
-
-
-def test_brief_limit_is_clamped(studied: Path) -> None:
-    """`limit` arrives from a caller. A request for a million files is a
-    request to read the whole index into one reply."""
-    text = _text(_call("megabrain_brief", repo_path=str(studied),
-                       question="handle", limit=10**6))
-    assert "svc.py" in text
-
-
-# ── failure, as data ─────────────────────────────────────────────────────
-
-def test_an_engine_error_carries_its_stable_code(tmp_path: Path) -> None:
-    """The taxonomy's `code` is a wire value. An agent that sees
-    `index_not_found` knows to index; one that sees a traceback guesses."""
-    result = _call("megabrain_search", repo_path=str(tmp_path), task="anything")
-    assert result["isError"] is True
-    assert "index_not_found" in _text(result)
-    assert "megabrain index" in _text(result)
-
-
-def test_brief_without_a_study_names_the_command(repo: Path) -> None:
-    result = _call("megabrain_brief", repo_path=str(repo), question="handle")
-    assert result["isError"] is True
-    assert "study_not_found" in _text(result)
-    assert "megabrain study" in _text(result)
 
 
 def test_a_missing_required_argument_is_an_error_not_a_crash(repo: Path) -> None:

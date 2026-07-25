@@ -22,10 +22,13 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
                         help="prose only — markdown, guides, changelogs")
     parser.add_argument("--code", dest="content", action="store_const", const="code",
                         help="code only, so a long README cannot outrank it")
+    # The MAP is the default. Measured against the alternative on a real
+    # bundle: the map costs 2 660 tokens where CORE-with-bodies costs 8 135,
+    # and it carries what a reader needs to decide — file, best span, symbols.
+    # The code is one `--full` away, or one `get` away for a single file.
     parser.add_argument("--full", action="store_true",
-                        help="code bodies for RELATED files too, not just a map")
-    parser.add_argument("--compact", action="store_true",
-                        help="no code bodies at all — the map only")
+                        help="include the code bodies (default: the map only — "
+                             "files, spans and symbols)")
     parser.add_argument("--rerank", action="store_true",
                         help="let a model reorder RELATED by the task's edit "
                              "surface (costs a call; never drops a file)")
@@ -41,4 +44,4 @@ def run(args: argparse.Namespace) -> str:
                     content=args.content, rerank=args.rerank)
     if args.json:
         return json.dumps(bundle, indent=2)
-    return render(bundle, compact=args.compact, related_code=args.full)
+    return render(bundle, compact=not args.full, related_code=args.full)

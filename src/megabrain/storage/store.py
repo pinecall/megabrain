@@ -4,7 +4,7 @@
 place that knows the schema, and it is always the one nobody updates.
 
 `Store` owns the connection and the schema; each table is its own object
-(`store.files`, `store.chunks`, `store.symbols`, `store.cards`, `store.graph`).
+(`store.files`, `store.chunks`, `store.symbols`, `store.graph`).
 Flat methods would make this file know every table; this way it knows only the
 connection.
 """
@@ -17,7 +17,6 @@ from pathlib import Path
 from types import TracebackType
 
 from . import schema
-from ._cards import CardTable
 from ._chunks import ChunkTable
 from ._files import FileTable
 from ._flows import FlowTable
@@ -56,11 +55,6 @@ class Store:
     def flows(self) -> FlowTable:
         """The ask cache. Reads are cosine only — no LLM on the query path."""
         return FlowTable(self.db)
-
-    @cached_property
-    def cards(self) -> CardTable:
-        """Model-authored file cards — written by `study`, read by cosine."""
-        return CardTable(self.db)
 
     @cached_property
     def graph(self) -> GraphTable:

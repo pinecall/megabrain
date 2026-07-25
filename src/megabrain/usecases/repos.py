@@ -64,6 +64,5 @@ def known() -> list[RepoEntry]:
 def _entry(root: Path) -> RepoEntry:
     with Store(root) as store:
         stats = store.stats()
-        cards = store.cards.count()
     return RepoEntry(path=str(root), name=root.name,
-                     files=stats["files"], chunks=stats["chunks"], cards=cards)
+                     files=stats["files"], chunks=stats["chunks"])

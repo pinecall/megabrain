@@ -8,7 +8,7 @@ it gets when it says nothing.
 
 from __future__ import annotations
 
-__all__ = ["NARRATOR_MODEL", "RERANK_MODEL", "STUDY_MODEL"]
+__all__ = ["NARRATOR_MODEL", "RERANK_MODEL"]
 
 # The narration default. Measured against the alternatives: the fastest and
 # cheapest tier at comparable quality, because retrieval already guarantees
@@ -29,12 +29,3 @@ NARRATOR_MODEL = "google/gemini-3.1-flash-lite"
 # model, not a smart one.
 RERANK_MODEL = "google/gemini-3.5-flash-lite"
 
-# The card author's. NOT separately measured — it starts at the narration tier
-# because a card is narration, and the same value is written out rather than
-# aliasing NARRATOR_MODEL so that changing one never silently changes the other.
-#
-# Its own knob because the SHAPE of the cost differs, and that is what a
-# repository will want to tune: narration is one call per question, study is one
-# call per FILE per index. On a large repository the difference between tiers is
-# a rounding error for `ask` and the whole bill for `study`.
-STUDY_MODEL = "google/gemini-3.1-flash-lite"

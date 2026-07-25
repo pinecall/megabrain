@@ -17,7 +17,7 @@ from typing import Annotated, TypedDict
 
 from .._types import Content
 
-__all__ = ["AskParams", "SearchParams", "BriefParams"]
+__all__ = ["AskParams", "SearchParams"]
 
 Repo = Annotated[str, "path to the indexed repository root; a path INSIDE it "
                       "also works — the root is found from .megabrain"]
@@ -61,24 +61,14 @@ class SearchParams(_SearchRequired, total=False):
     content: Annotated[Content, "omit to let code and docs compete; 'code' so "
                                 "a long README cannot outrank the code it "
                                 "describes; 'docs' for prose only"]
-    bodies: Annotated[bool, "default true: code bodies render inline and the "
-                            "result IS your read. false = the map only — "
-                            "files, spans and symbols, no code"]
+    bodies: Annotated[bool, "default FALSE: the answer is a MAP — the files "
+                            "that answer the task, each with its best span and "
+                            "its symbols, no code. Measured at ~2 700 tokens "
+                            "against ~8 100 with bodies, and the span tells you "
+                            "where to look. true inlines the code when you want "
+                            "to read it here instead of opening the file"]
     rerank: Annotated[bool, "default false: the deterministic answer is "
                             "complete on its own. true asks a model to reorder "
                             "the related files by the task's edit surface — a "
                             "chat call, a second or two, and it never drops a "
                             "file"]
-
-
-class _BriefRequired(_Target):
-    question: Annotated[str, "what you want the mental model for"]
-
-
-class BriefParams(_BriefRequired, total=False):
-    limit: Annotated[int, "files in the answer (default 10, capped at 30)"]
-    rerank: Annotated[bool, "default false. true runs the same judge lane as "
-                            "search on the underlying bundle before the brief "
-                            "selects its files — one chat call, and the "
-                            "deterministic order stands whenever the judge "
-                            "cannot answer"]
