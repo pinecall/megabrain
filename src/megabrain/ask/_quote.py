@@ -15,7 +15,7 @@ import re
 
 from ..storage import Store
 
-__all__ = ["quote_citations", "CITATION"]
+__all__ = ["quote_citations", "lines_of", "CITATION"]
 
 CITATION = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]")
 
@@ -32,7 +32,7 @@ def quote_citations(text: str, store: Store) -> str:
 
 
 def _block(store: Store, path: str, lo: int, hi: int) -> str:
-    lines = _lines_of(store, path)
+    lines = lines_of(store, path)
     if not lines:
         return f"_(no file `{path}` in the index)_"
     lo, hi = max(1, lo), min(len(lines), max(lo, hi))
@@ -41,7 +41,7 @@ def _block(store: Store, path: str, lo: int, hi: int) -> str:
     return f"**`{path}` L{lo}-{hi}**\n```{lang}\n{body}\n```"
 
 
-def _lines_of(store: Store, path: str) -> list[str]:
+def lines_of(store: Store, path: str) -> list[str]:
     """The file reassembled from its chunks — an exact line partition, so the
     concatenation is the file."""
     metas = store.chunks.read_file(path)

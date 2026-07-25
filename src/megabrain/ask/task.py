@@ -16,12 +16,14 @@ backend with no tool support still returns its text.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from ..contracts import Bundle
 from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
+from ._operations import operations_from
 from ._quote import quote_citations
 from ._taskprompt import build_task_prompt
 from ._toolcall import assistant_turn, tool_result
@@ -60,7 +62,11 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
             messages.append(assistant_turn(answer))
             for call in answer.tool_calls:
                 messages.append(tool_result(store, call, emit))
-        surface = quote_citations(answer.text, store)
+        # Operations come from the RAW text: the anchors are still citations
+        # here, and quoting turns them into code blocks that no longer say
+        # which lines they were.
+        operations = operations_from(answer.text, store)
+        surface = quote_citations(answer.text, store) + _apply_block(operations)
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a
     # path that only returns its text arrives as a blank answer everywhere.
@@ -68,6 +74,27 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
     return surface
 
 
+def _apply_block(operations: list[dict[str, str]]) -> str:
+    """The whole change as ONE `megabrain_replace` batch.
+
+    MEASURED: handed the surface as prose, an agent spent two `replace` calls
+    and a `Read` applying a two-file change it had already been given — it
+    rebuilt the exact-string operations itself, one file at a time. They are
+    built here instead, from the index, so applying the change is one call and
+    the `find` strings cannot be mistyped.
+    """
+    if not operations:
+        return ""
+    return ("\n\n## Apply — ONE call, all files at once\n"
+            "```json\n" + json.dumps({"operations": operations}, indent=2)
+            + "\n```\n")
+
+
 def _body(provider: ChatProvider, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    # `parallel_tool_calls` is the half the PROMPT cannot do. Asked in words to
+    # open every file at once, the model still emitted one call per turn —
+    # measured at 908 + 838 ms of pure round trip on a two-file change, 45% of
+    # the call. Backends that do not know the field ignore it.
     return {"model": getattr(provider, "model", ""), "messages": messages,
-            "tools": TOOLS, "max_tokens": MAX_TOKENS, "temperature": 0}
+            "tools": TOOLS, "parallel_tool_calls": True,
+            "max_tokens": MAX_TOKENS, "temperature": 0}
