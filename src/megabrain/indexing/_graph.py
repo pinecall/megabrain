@@ -12,9 +12,25 @@ from typing import Sequence
 
 from ..storage import Store
 from ._plan import Planned
+from .pins import PIN_SCHEMA, write_pin_edges
 from .strategies import EDGE_SCHEMA, Registry, Strategy
 
-__all__ = ["write_edges"]
+__all__ = ["graph_passes", "write_edges"]
+
+
+def graph_passes(store: Store, registry: Registry, sources: dict[str, str],
+                 pending: Sequence[Planned]) -> int:
+    """Both graph passes: the language extractors, then the pin relation.
+
+    Pins run second, and only when something moved or this index never had
+    them. A pin joins TWO files, so either end changing can create or destroy
+    it — pretending it can be invalidated per file would be a lie, and the
+    recompute costs no network and no embedding.
+    """
+    edges = write_edges(store, registry, sources, pending)
+    if pending or store.graph.get_meta("pin_schema") != PIN_SCHEMA:
+        edges += write_pin_edges(store)
+    return edges
 
 
 def write_edges(store: Store, registry: Registry, sources: dict[str, str],

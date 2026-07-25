@@ -10,9 +10,25 @@ from __future__ import annotations
 import numpy as np
 
 from ..._arrays import Matrix
+from ..params import RetrievalParams
 from .context import QueryContext
 
-__all__ = ["DenseFileFusion"]
+__all__ = ["DenseFileFusion", "neutral_score"]
+
+
+def neutral_score(params: RetrievalParams) -> float:
+    """What a chunk with ZERO cosine already scores after this fusion.
+
+    Published because a reweighting lane that multiplies is meaningless without
+    it. Both halves map [-1, 1] to [0, 1], so no-evidence-at-all is 0.5 and not
+    0, and the fusion adds a weighted second copy of the same offset.
+
+    A lane that multiplied the raw fused score by 0.85 was therefore removing
+    0.1125 of a number whose entire useful span, on a real query, was 0.24 — a
+    "soft down-weight" that erased half the dynamic range and hit a perfect
+    match exactly as hard as a random one.
+    """
+    return 0.5 * (1.0 + params.file_fusion_w)
 
 
 class DenseFileFusion:

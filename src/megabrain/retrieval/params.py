@@ -42,6 +42,9 @@ class RetrievalParams:
     anchor_df_cap: int = 10        # an identifier in more chunks than this is
     #                                common vocabulary, not an anchor
     anchor_chunk_cap: int = 6      # most chunks the anchor floor may append
+    pin_extras: int = 2            # tests pinning the bundle's files, appended
+    #                                last. Two: a change usually has ONE
+    #                                companion test and occasionally a second
 
     # ── outline rendering ─────────────────────────────────────────────────
     outline_symbols: int = 12      # symbols shown per RELATED file

@@ -64,6 +64,16 @@ class ChunkTable:
             f"SELECT {_READ} FROM chunks WHERE vec IS NOT NULL ORDER BY id").fetchall()
         return [_meta(r) for r in rows], to_matrix([r[9] for r in rows])
 
+    def read_texts(self) -> list[tuple[str, str]]:
+        """(file, text) for every chunk — no vectors, no metadata.
+
+        Its own reader rather than `read_matrix`: the pin pass reads TEXT for
+        the whole repository, and pulling the vector matrix along would load
+        the index's heaviest structure to look at strings.
+        """
+        return [(str(r[0]), str(r[1] or ""))
+                for r in self.db.execute("SELECT file,text FROM chunks")]
+
     def read_file(self, path: str) -> list[ChunkMeta]:
         """One file's chunks in line order — what the graph node view splices
         verbatim, the same anti-hallucination stance as `ask`."""

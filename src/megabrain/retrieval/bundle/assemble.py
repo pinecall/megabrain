@@ -18,6 +18,7 @@ from ..scoring.pipeline import Scored, score_chunks
 from ..state import SearchState
 from ._anchors import render_anchors
 from ._convert import to_hit, to_outline
+from ._pins import pinning_tests
 from ._rank import Ranking, core_chunks, core_files, rank_files
 from ._related import neighbours_of, related_entry
 from .floors import file_floor
@@ -65,9 +66,8 @@ def _tiers(state: SearchState, query: str, scored: Scored,
            ranking: Ranking) -> tuple[list[str], list[str], list[str]]:
     """Which files go in CORE, which in RELATED, and which arrived by graph.
 
-    Assembled here rather than inline so the bundle's construction reads as one
-    statement: the ORDER is the contract — candidates rank, neighbours extend,
-    and the floor only ever appends.
+    The ORDER is the contract: candidates rank, neighbours extend, then the
+    floor and the pinning tests only ever append.
     """
     params = state.params
     candidates = ranking.top(params.cand_files)
@@ -77,7 +77,9 @@ def _tiers(state: SearchState, query: str, scored: Scored,
                        all_chunks=state.chunks, query_vector=scored.query_vector,
                        already=set(candidates) | set(neighbours), params=params,
                        query=query)
-    related = [f for f in candidates if f not in core] + neighbours + floor
+    held = set(candidates) | set(neighbours) | set(floor)
+    pins = pinning_tests(state.store, candidates, ranking, held, params.pin_extras)
+    related = [f for f in candidates if f not in core] + neighbours + floor + pins
     return core, related, neighbours
 
 
@@ -91,9 +93,8 @@ def _core(state: SearchState, relpath: str, ranking: Ranking, metas: list[ChunkM
         chunks=[to_hit(metas[i], float(fused[i])) for i in indexes],
         # Through the SAME narrowing door tier-2 uses. A raw storage row has
         # seven keys (including `decorators`) where the contract declares six;
-        # emitting it directly once shipped green because only fixtures from
-        # the previous engine were ever shape-checked — no fixture could
-        # contain this engine's leak.
+        # emitting it directly shipped green because only fixtures from the
+        # previous engine were ever shape-checked.
         symbols=[to_outline(s) for s in state.store.symbols.read_for(relpath)],
         neighbors=sorted(state.store.graph.neighbors(relpath) & set(bundle_files)),
     )

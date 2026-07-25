@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
+from ._graph import PIN_KIND
 from .model import ChunkMeta
 from .store import Store
 
-__all__ = ["Store", "ChunkMeta"]
+__all__ = ["Store", "ChunkMeta", "PIN_KIND"]

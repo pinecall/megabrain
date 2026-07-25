@@ -11,7 +11,7 @@ import numpy as np
 from ..._arrays import Matrix
 from ..intent import wants_tests
 from ..paths import ident_tokens
-from ._fusion import DenseFileFusion
+from ._fusion import DenseFileFusion, neutral_score
 from .context import QueryContext
 from .lane import Base, Lane
 
@@ -31,6 +31,11 @@ class TestPenalty:
     2 700 by raw cosine — and delivered it at #115 for "where are the tests for
     halt?". A down-weight aimed at the thing the reader asked for is not a
     tie-break, it is an answer being withheld.
+
+    And it scales the SIGNAL, not the score. Multiplying the fused score direct
+    subtracted a flat 0.1125 — see `neutral_score` — which on a real task put a
+    test file the retrieval had found at #7 of 285 down at #137, so the file the
+    change had to edit never entered the bundle at all.
     """
 
     name = "test-penalty"
@@ -39,7 +44,9 @@ class TestPenalty:
         return not wants_tests(ctx.query)
 
     def apply(self, ctx: QueryContext, fused: Matrix) -> Matrix:
-        return np.where(ctx.is_test, fused * ctx.params.test_penalty, fused)  # pyright: ignore[reportUnknownMemberType]
+        floor = neutral_score(ctx.params)
+        damped = floor + (fused - floor) * ctx.params.test_penalty
+        return np.where(ctx.is_test, damped, fused)  # pyright: ignore[reportUnknownMemberType]
 
 
 class LexicalBoost:

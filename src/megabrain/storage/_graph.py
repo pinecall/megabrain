@@ -12,7 +12,15 @@ import json
 import sqlite3
 from typing import Sequence
 
-__all__ = ["GraphTable"]
+__all__ = ["GraphTable", "PIN_KIND"]
+
+PIN_KIND = "pins"
+"""The edge kind for "this test exercises that file".
+
+Declared here, with the table, rather than beside the pass that writes it: the
+indexer writes this relation and retrieval reads it, and a name owned by either
+side would make the other import across a layer it has no business importing.
+"""
 
 
 class GraphTable:
@@ -32,6 +40,31 @@ class GraphTable:
         self.db.executemany(
             "INSERT OR IGNORE INTO edges(src,dst,kind) VALUES (?,?,?)",
             [(src, dst, kind) for dst, kind in edges])
+
+    def add_edges(self, src: str, dsts: Sequence[str], kind: str) -> None:
+        """Append edges of ONE kind, leaving this file's other kinds alone.
+
+        `replace_edges` deletes everything a file points at, which is right for
+        an extractor that owns a file's whole graph and wrong for a pass that
+        owns one relation across the repository — a pin pass using it would
+        silently erase the import edges a language extractor had just written.
+        """
+        self.db.executemany(
+            "INSERT OR IGNORE INTO edges(src,dst,kind) VALUES (?,?,?)",
+            [(src, dst, kind) for dst in dsts])
+
+    def clear_kind(self, kind: str) -> None:
+        """Drop every edge of one kind, repo-wide.
+
+        What makes a full recompute of a relation safe: an edge whose two ends
+        both still exist can still have STOPPED being true, and only the pass
+        that rebuilds the relation knows that."""
+        self.db.execute("DELETE FROM edges WHERE kind=?", (kind,))
+
+    def sources_of(self, dst: str, kind: str) -> set[str]:
+        """Who points AT this file with an edge of this kind."""
+        return {str(r[0]) for r in self.db.execute(
+            "SELECT src FROM edges WHERE dst=? AND kind=?", (dst, kind))}
 
     def all_edges(self) -> list[tuple[str, str, str]]:
         return [(str(r[0]), str(r[1]), str(r[2]))
