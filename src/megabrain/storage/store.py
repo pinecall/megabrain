@@ -20,6 +20,7 @@ from types import TracebackType
 from . import schema
 from ._chunks import ChunkTable
 from ._files import FileTable
+from ._flows import FlowTable
 from ._graph import GraphTable
 from ._symbols import SymbolTable
 
@@ -50,6 +51,11 @@ class Store:
     @cached_property
     def symbols(self) -> SymbolTable:
         return SymbolTable(self.db)
+
+    @cached_property
+    def flows(self) -> FlowTable:
+        """The ask cache. Reads are cosine only — no LLM on the query path."""
+        return FlowTable(self.db)
 
     @cached_property
     def graph(self) -> GraphTable:

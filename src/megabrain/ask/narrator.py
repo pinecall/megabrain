@@ -10,41 +10,17 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from ..contracts import Bundle, ChunkHit, ChunkRef
+from ..contracts import Bundle
 from ..providers.chat import ChatProvider
-from ..retrieval.paths import is_test
 from ..storage.model import ChunkMeta
+from ._candidates import candidates_of
 from .events import Emit, emit_nothing
 from .prompt import build_prompt
 from .stream import Splicer
 
-__all__ = ["narrate", "candidates_of", "MAX_CANDIDATES"]
+__all__ = ["narrate"]
 
 MAX_CANDIDATES = 40
-
-
-def candidates_of(bundle: Bundle) -> list[ChunkMeta]:
-    """The chunks the model may cite, CORE first.
-
-    Ordered by tier rather than re-scored: retrieval already ranked these, and
-    a second ordering here would be a second opinion nobody asked for. Tests
-    come last — they quote the implementation's vocabulary, so they crowd the
-    candidate list without explaining the mechanism.
-    """
-    seen: set[int] = set()
-    out: list[ChunkMeta] = []
-    for entry in bundle["tier1"]:
-        for hit in entry["chunks"]:
-            if hit["id"] not in seen:
-                seen.add(hit["id"])
-                out.append(_meta(hit))
-    for related in bundle["tier2"]:
-        best = related["best_chunk"]
-        if best and best["id"] not in seen:
-            seen.add(best["id"])
-            out.append(_meta(best))
-    out.sort(key=lambda chunk: is_test(chunk.file))     # stable: tests last
-    return out[:MAX_CANDIDATES]
 
 
 def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
@@ -55,6 +31,7 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
     candidates = candidates_of(bundle)
     if not candidates:
         return "no code was retrieved for this question — nothing to walk through"
+    context = _flow_context(bundle)
     splicer = Splicer(candidates)
     parts: list[str] = []
     emit({"type": "narrating", "candidates": len(candidates)})
@@ -64,7 +41,8 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
             parts.append(ready)
             emit({"type": "delta", "text": ready})
 
-    provider.stream_chat(_body(provider, question, candidates), on_delta=on_delta)
+    provider.stream_chat(_body(provider, question, candidates, context),
+                         on_delta=on_delta)
     if tail := splicer.flush():
         parts.append(tail)
         emit({"type": "delta", "text": tail})
@@ -72,22 +50,23 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
     return "".join(parts)
 
 
-def _body(provider: ChatProvider, question: str,
-          candidates: list[ChunkMeta]) -> dict[str, object]:
+def _body(provider: ChatProvider, question: str, candidates: list[ChunkMeta],
+          context: str = "") -> dict[str, object]:
     return {"model": getattr(provider, "model", ""),
             "max_tokens": 2400, "temperature": 0,
             "messages": [{"role": "user",
-                          "content": build_prompt(question, candidates)}]}
+                          "content": build_prompt(question, candidates, context)}]}
 
 
-def _meta(hit: ChunkRef | ChunkHit) -> ChunkMeta:
-    """A wire chunk back to the record the splice works with.
+def _flow_context(bundle: Bundle) -> str:
+    """Attached walkthroughs, with their citation chrome removed.
 
-    Typed against the CONTRACT rather than a dict: the fields are declared once
-    in contracts/, so a rename there becomes an error here instead of a
-    KeyError at the first ask.
+    The chrome must go: shown block headers as context, the model IMITATES
+    them — emitting headers instead of citations, so the splicer replaces
+    nothing and the answer names files and lines while showing no code.
     """
-    return ChunkMeta(
-        id=hit["id"], file=hit["file"], kind=hit["kind"], name=hit["name"],
-        part=hit["part"], start_line=hit["start_line"], end_line=hit["end_line"],
-        text=hit["text"], breadcrumb=hit["breadcrumb"])
+    from ..flows import strip_chrome
+
+    return "\n\n".join(
+        f'Previously asked: "{flow["question"]}"\n{strip_chrome(flow["text"])}'
+        for flow in bundle["flows"])

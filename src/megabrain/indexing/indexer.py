@@ -58,6 +58,10 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
     edges = write_edges(store, registry, sources, planned.pending)
     removed = prune_orphans(store, {f.relpath for f in found.files},
                             {s.relpath for s in found.skipped})
+    # The flow cache's second line of defence. Serving already checks the cited
+    # files against disk, but a walkthrough whose sources were rewritten must
+    # not sit in the index indefinitely waiting to be asked about.
+    stale_flows = store.flows.prune(store.files.all_shas())
 
     store.graph.set_meta("embed_model", embedder.model)
     store.graph.set_meta("last_index", {"at": time.time(), "files": len(found)})
@@ -65,6 +69,7 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
     return {"files": len(found), "changed": len(planned.pending),
             "unchanged": len(planned.unchanged), "removed": removed,
             "chunks": chunks, "edges": edges, "skipped": len(found.skipped),
+            "stale_flows": stale_flows,
             "partition_violations": planned.violations}
 
 

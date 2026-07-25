@@ -50,6 +50,12 @@ class FileTable:
         """Every indexed path. Diffed against disk to find orphans."""
         return {str(r[0]) for r in self.db.execute("SELECT path FROM files")}
 
+    def all_shas(self) -> dict[str, str]:
+        """path -> sha for the whole index. What the flow cache is pruned
+        against: a cached walkthrough may not outlive the code it cited."""
+        return {str(r[0]): str(r[1])
+                for r in self.db.execute("SELECT path, sha FROM files")}
+
     def read_matrix(self) -> tuple[list[str], list[str], Matrix]:
         """(paths, skeletons, vectors) for every file that has a skeleton."""
         rows = self.db.execute("SELECT path, skeleton, skel_vec FROM files "

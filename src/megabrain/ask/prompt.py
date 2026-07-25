@@ -40,8 +40,14 @@ RULES = """\
   be."""
 
 
-def build_prompt(question: str, candidates: list[ChunkMeta]) -> str:
-    """The cite-only walkthrough prompt over numbered chunks."""
+def build_prompt(question: str, candidates: list[ChunkMeta],
+                 context: str = "") -> str:
+    """The cite-only walkthrough prompt over numbered chunks.
+
+    `context` is a previous walkthrough of the same area, prose only. It is
+    explicitly NON-CITABLE: the model may use it to know what matters and in
+    what order, but every line of code still has to come from a numbered chunk.
+    """
     blocks: list[str] = []
     used = 0
     for index, chunk in enumerate(candidates):
@@ -55,8 +61,23 @@ def build_prompt(question: str, candidates: list[ChunkMeta]) -> str:
     return (f"You are a senior engineer giving a complete code walkthrough that "
             f"answers the developer's query. Cover the ENTIRE relevant flow end "
             f"to end — do not stop early, do not leave a thread dangling.\n\n"
-            f"STRICT RULES:\n{RULES}\n\nQUERY: {question}\n\n"
+            f"STRICT RULES:\n{RULES}\n\nQUERY: {question}\n"
+            f"{_context(context)}\n"
             f"RETRIEVED CHUNKS:\n\n" + "\n".join(blocks))
+
+
+def _context(context: str) -> str:
+    """A previous walkthrough, marked NON-CITABLE in the strongest terms.
+
+    Without that line the model cites it, the splicer finds no chunk behind the
+    citation, and the block silently disappears from the answer.
+    """
+    if not context.strip():
+        return ""
+    return ("\nCONTEXT — a previous walkthrough over the SAME code. Use it to "
+            "know what matters and in what order. It is NOT citable: every "
+            "line of code must still come from a numbered chunk below.\n\n"
+            f"{context}\n")
 
 
 def _head(index: int, chunk: ChunkMeta) -> str:

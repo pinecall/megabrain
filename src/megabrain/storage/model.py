@@ -43,3 +43,18 @@ class ChunkMeta:
         """Whether this chunk intersects a line span — how a traceback pin or a
         grep hit finds the chunk that contains it."""
         return not (self.end_line < start or self.start_line > end)
+
+
+@dataclass(frozen=True, slots=True)
+class FlowMeta:
+    """One cached walkthrough, without its vectors.
+
+    `files` is {relpath: sha}: the code this prose described, pinned. A flow
+    that outlives its sources is confident prose about a function that was
+    rewritten, which is the worst thing this cache can produce.
+    """
+
+    id: int
+    question: str
+    text: str
+    files: dict[str, str]
