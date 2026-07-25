@@ -13,7 +13,7 @@ from pathlib import Path
 from ..contracts import FileView, SymbolRef
 from ..retrieval.bundle._convert import to_outline
 from ..storage import Store
-from ._root import resolve_root
+from ..storage.locate import resolve_root
 
 __all__ = ["get_code"]
 

@@ -9,7 +9,8 @@ it.
 from __future__ import annotations
 
 from ....usecases import scan
-from ..messages import Reply, Request, error_reply, json_reply
+from ..messages import Reply, Request
+from ..replies import error_reply, json_reply
 
 __all__ = ["scan_route"]
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from ._langspec import LangSpec
+from ._tsnames import name_of
 
 __all__ = ["name_of", "unwrap", "signature_of", "assigned_method"]
 
@@ -17,36 +18,6 @@ MAX_SIGNATURE = 140
 
 _FUNCTION_VALUES = ("function", "function_expression", "generator_function",
                     "arrow_function")
-
-
-def name_of(spec: LangSpec, node: Any) -> str | None:
-    """The declared name, through whichever field this grammar puts it in."""
-    for field in (spec.name_field, *spec.extra_name_fields):
-        found = node.child_by_field_name(field)
-        if found is not None:
-            return str(found.text.decode())
-    return _nested_name(spec, node)
-
-
-def _nested_name(spec: LangSpec, node: Any) -> str | None:
-    """Names that live one level down — Go's `const_spec`, PHP's `const_element`.
-
-    The name is either a FIELD of that child or, when the grammar declares no
-    such field, a child whose TYPE is the field's name. Both shapes appear in
-    grammars that otherwise look identical.
-    """
-    via = spec.name_via.get(node.type)
-    if via is None:
-        return None
-    child_type, field = via
-    for child in node.named_children:
-        if child.type != child_type:
-            continue
-        found = child.child_by_field_name(field) or next(
-            (inner for inner in child.named_children if inner.type == field), None)
-        if found is not None:
-            return str(found.text.decode())
-    return None
 
 
 def unwrap(spec: LangSpec, node: Any) -> Any:
@@ -65,9 +36,19 @@ def unwrap(spec: LangSpec, node: Any) -> Any:
                  if child.type in spec.def_types), node)
 
 
-def signature_of(node: Any, source: bytes) -> str:
-    """The first line of the declaration, without its body."""
-    head = source[node.start_byte:node.end_byte].split(b"\n", 1)[0]
+def signature_of(node: Any, source: bytes, body_field: str = "body") -> str:
+    """The declaration, cut where its BODY begins.
+
+    Bounded by the body NODE rather than by the first `{`: a C++ one-liner puts
+    the whole body on the declaration line (`int charge() const { return
+    total_; }`) and a text cut leaks it into the file-level vector, while
+    cutting at the first brace instead mangles `function Card({ title }: ...)`
+    — TypeScript writes braces in its parameters. The grammar already knows
+    where the body starts; nothing else does.
+    """
+    body = node.child_by_field_name(body_field)
+    end = body.start_byte if body is not None else node.end_byte
+    head = source[node.start_byte:max(node.start_byte, end)].split(b"\n", 1)[0]
     line = head.decode(errors="replace").strip().rstrip("{").strip()
     return line if len(line) <= MAX_SIGNATURE else line[:MAX_SIGNATURE - 1] + "…"
 

@@ -200,10 +200,20 @@ Deleting an index: `rm -rf <repo>/.megabrain`. There is no command for it, on pu
 | `PLUMBING_TOLL` / `HUB_TOLL` | `4` / `3 + (d − floor)` | route transit cost for `__init__.py` and tests / for a hub |
 | `--no-labels` | off | skip the cached LLM community-labelling call |
 
-**This build reads `.py` and `.pyi` only.** The other chunkers have not been ported yet,
-and the census says so by name: point it at a TypeScript repository and it reports
-`215 .ts · 92 .tsx` under "nothing here can be indexed yet" rather than an empty result.
-Indexing such a path is an error (`nothing_to_index`), not a successful index of nothing.
+**Languages.** Always on: **Python** (`.py .pyi`), **TypeScript/JavaScript**
+(`.ts .tsx .js .jsx .mjs .cjs`) and **Markdown** (`.md .markdown .mdx`). With
+`pip install megabrain[languages]`: **Ruby** (`.rb .rake .gemspec`), **Go**, **Rust**,
+**PHP**, **C** (`.c .h`), **C++** (`.cpp .cc .cxx .hpp .hh .hxx`), **Java**, **C#** —
+the registry adds each one only if its grammar imports, so a missing wheel costs that
+language and nothing else.
+
+Structural **edges** are extracted for Python and TypeScript/JavaScript. The others
+chunk, search and outline without a graph: retrieval never depended on it, and the graph
+is an annotation lane an extractor can be added to later.
+
+A file no chunker claims is NAMED in the census by extension (`4 .swift · 1 .kt`), and
+indexing a path where nothing at all is readable is an error (`nothing_to_index`) rather
+than a successful index of nothing.
 
 Communities come from deterministic weighted label propagation (numpy only) — same
 input, same output, every run.

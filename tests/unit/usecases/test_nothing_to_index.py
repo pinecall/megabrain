@@ -30,16 +30,16 @@ from tests.unit.indexing.fake import CountingEmbedder, write
 
 @pytest.fixture
 def unreadable(tmp_path: Path) -> Path:
-    """A Java/Swift project — languages this build has no grammar for.
+    """A Swift/Kotlin project — languages this build has no grammar for yet.
 
-    The original fixture was TypeScript, which is exactly the repository that
-    provoked this whole check. It reads TypeScript now, so the fixture had to
-    move to a language that is still unclaimed; the RULE is unchanged.
+    The fixture has moved TWICE, which is the point working as intended: it was
+    TypeScript (the repository that provoked the check), then Java, and both are
+    read now. The RULE has never changed — only the list of what is unclaimed.
     """
     write(tmp_path, {
-        "src/App.java": "class App { void run() {} }\n",
-        "src/Util.java": "class Util {}\n",
         "ios/View.swift": "struct View {}\n",
+        "ios/Model.swift": "struct Model {}\n",
+        "android/Main.kt": "fun main() {}\n",
         "package.json": '{"name":"x"}\n',
     })
     return tmp_path
@@ -50,8 +50,8 @@ def test_the_census_names_what_it_CANNOT_read(unreadable: Path) -> None:
     question is asked — before anything is indexed or paid for."""
     report = scan(unreadable)
     assert report["would_index"] == 0
-    assert report["unsupported"][".java"] == 2
-    assert report["unsupported"][".swift"] == 1
+    assert report["unsupported"][".swift"] == 2
+    assert report["unsupported"][".kt"] == 1
     assert report["would_index"] == 0
 
 
@@ -73,7 +73,7 @@ def test_indexing_a_repo_with_nothing_readable_is_an_ERROR(unreadable: Path) -> 
     with pytest.raises(NothingToIndex) as raised:
         build_index(unreadable, embedder=CountingEmbedder())
     message = str(raised.value)
-    assert ".java" in message and ".py" in message, \
+    assert ".swift" in message and ".py" in message, \
         "it names what it found AND what it reads — either alone is a riddle"
 
 

@@ -31,7 +31,7 @@ def judge_provider(model: str | None = None) -> ChatProvider | None:
     """A provider tuned for JUDGING, not for narrating.
 
     The default and its measurements live in `_models`; a repository overrides
-    it in `.megabrain.json`. It must NOT inherit the narration model — that one
+    it in `megabrain.json`. It must NOT inherit the narration model — that one
     is chosen to explain code well and costs seconds per call, and three
     batches through it took 16s for a JSON array of integers.
 

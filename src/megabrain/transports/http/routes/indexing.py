@@ -14,7 +14,8 @@ from typing import Any, Iterator
 
 from ...._errors import MegabrainError
 from ....usecases import build_index
-from ..messages import Reply, Request, error_reply
+from ..messages import Reply, Request
+from ..replies import error_reply
 
 __all__ = ["index_stream"]
 
@@ -26,10 +27,16 @@ def index_stream(request: Request) -> Reply:
     if not path:
         return error_reply(400, "path is required", "bad_request")
     force = bool(request.body.get("force"))
-    return Reply(stream=lambda: _run(Path(path), force=force))
+    # Refused rather than ignored: `llm` spends a model call per file, and a
+    # read-only deployment that quietly did it anyway would be a public box
+    # billing its owner for every visitor who ticked a box.
+    llm = bool(request.body.get("llm"))
+    if llm and request.policy.readonly:
+        return error_reply(403, "this deployment is read-only", "readonly")
+    return Reply(stream=lambda: _run(Path(path), force=force, llm=llm))
 
 
-def _run(root: Path, *, force: bool) -> Iterator[tuple[str, object]]:
+def _run(root: Path, *, force: bool, llm: bool) -> Iterator[tuple[str, object]]:
     """Index on a worker thread, forwarding its progress as SSE frames.
 
     A thread and a queue because indexing is SYNC and reports progress through
@@ -42,7 +49,7 @@ def _run(root: Path, *, force: bool) -> Iterator[tuple[str, object]]:
 
     def work() -> None:
         try:
-            result["report"] = build_index(root, force=force,
+            result["report"] = build_index(root, force=force, llm=llm,
                                            on_progress=events.put)
         except MegabrainError as err:
             result["error"] = {"error": str(err), "code": err.code}

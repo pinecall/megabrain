@@ -4,9 +4,8 @@
 place that knows the schema, and it is always the one nobody updates.
 
 `Store` owns the connection and the schema; each table is its own object
-(`store.files`, `store.chunks`, `store.symbols`, `store.graph`). Flat methods
-here would make this file know about every table, so adding a column would
-touch both the table module and the facade. This way it knows only the
+(`store.files`, `store.chunks`, `store.symbols`, `store.cards`, `store.graph`).
+Flat methods would make this file know every table; this way it knows only the
 connection.
 """
 
@@ -18,11 +17,13 @@ from pathlib import Path
 from types import TracebackType
 
 from . import schema
+from ._cards import CardTable
 from ._chunks import ChunkTable
 from ._files import FileTable
 from ._flows import FlowTable
 from ._graph import GraphTable
 from ._symbols import SymbolTable
+from .locate import INDEX_FILE
 
 __all__ = ["Store"]
 
@@ -32,10 +33,9 @@ class Store:
         # check_same_thread=False lets a long-running server read from worker
         # threads; that server serialises access with a lock, so it stays safe.
         self.root = Path(repo_root)
-        directory = self.root / ".megabrain"
-        directory.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(directory / "db.sqlite",
-                                  check_same_thread=check_same_thread)
+        db_path = self.root / INDEX_FILE
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(db_path, check_same_thread=check_same_thread)
         schema.apply(self.db)
 
     # ---- tables (cached: one object per store, built on first touch)
@@ -56,6 +56,11 @@ class Store:
     def flows(self) -> FlowTable:
         """The ask cache. Reads are cosine only — no LLM on the query path."""
         return FlowTable(self.db)
+
+    @cached_property
+    def cards(self) -> CardTable:
+        """Model-authored file cards — written by `study`, read by cosine."""
+        return CardTable(self.db)
 
     @cached_property
     def graph(self) -> GraphTable:
@@ -90,7 +95,6 @@ class Store:
             self.close()
 
     def stats(self) -> dict[str, int]:
-        """Index shape counts — here, not in a frontend, so no caller needs to
-        know a table name in order to report on the index."""
+        """Index shape counts — here, so no frontend needs a table name."""
         return {name: int(self.db.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0])
                 for name in ("files", "chunks", "symbols", "edges")}

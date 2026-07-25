@@ -1,4 +1,4 @@
-"""`.megabrain.json` — a repository's own configuration.
+"""`megabrain.json` — a repository's own configuration.
 
 One file per project, checked in, holding what used to be spread across two
 dotfiles and four environment variables. The point is that it TRAVELS: an env

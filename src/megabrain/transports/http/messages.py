@@ -1,20 +1,23 @@
-"""What a route receives and returns.
+"""What a route receives and returns — the two records, and nothing else.
 
-Two plain records, so a route is a pure function of its input: no socket, no
+Plain records, so a route is a pure function of its input: no socket, no
 handler, no server. That is what lets the routes be tested directly and the
 socket work be tested once, instead of every route paying for a live port.
+
+The functions that BUILD a `Reply` live in `replies`, and turning a raw request
+target into these fields lives with the handler that reads the wire. Records
+here, construction there.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Iterator
-from urllib.parse import parse_qs, urlsplit
 
 from .security import Policy
 
-__all__ = ["Request", "Reply", "Route", "Frames", "json_reply", "error_reply",
-           "split_target"]
+__all__ = ["Request", "Reply", "Route", "Frames"]
 
 Frames = Callable[[], Iterator[tuple[str, object]]]
 """SSE frames — (event name, data) — behind a callable, so nothing runs until
@@ -53,6 +56,16 @@ class Request:
         found = self.query.get(name, self.body.get(name, default))
         return found if isinstance(found, str) else default
 
+    def repo(self) -> Path:
+        """Which repository to answer for, defaulting to this process's own
+        directory — what a headless single-repo deployment wants.
+
+        A method rather than a helper each route keeps privately: four had
+        written this line, and a default that disagrees between two endpoints
+        is a bug nobody reproduces.
+        """
+        return Path(self.param("repo") or ".")
+
 
 @dataclass(frozen=True, slots=True)
 class Reply:
@@ -72,28 +85,3 @@ class Reply:
 
 
 Route = Callable[[Request], Reply]
-
-
-def json_reply(payload: object, status: int = 200) -> Reply:
-    return Reply(status=status, payload=payload)
-
-
-def split_target(target: str) -> tuple[str, dict[str, str]]:
-    """A raw request target -> (path, query).
-
-    Only the FIRST value per key survives: a repeated key is a client bug, and
-    quietly taking the last one hides it. A trailing slash is stripped so
-    `/health` and `/health/` are one route rather than a 404 nobody expects.
-    """
-    parts = urlsplit(target)
-    return parts.path.rstrip("/") or "/", {
-        key: values[0] for key, values in parse_qs(parts.query).items() if values}
-
-
-def error_reply(status: int, message: str, code: str = "error") -> Reply:
-    """One error SHAPE for every failure, so a client parses one thing.
-
-    `code` is the machine-readable half — the same stable string the engine's
-    error taxonomy carries, not the HTTP status, which several causes share.
-    """
-    return Reply(status=status, payload={"error": message, "code": code})

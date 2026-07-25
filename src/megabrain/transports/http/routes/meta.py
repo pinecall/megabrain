@@ -8,7 +8,8 @@ from ...._errors import IndexNotFound
 from ...._version import __version__
 from ....storage import Store
 from ....usecases import known, resolve_root
-from ..messages import Reply, Request, error_reply, json_reply
+from ..messages import Reply, Request
+from ..replies import from_engine, json_reply
 
 __all__ = ["health", "config", "repos"]
 
@@ -26,7 +27,7 @@ def health(request: Request) -> Reply:
     try:
         root = resolve_root(Path(repo))
     except IndexNotFound as err:
-        return error_reply(err.http_status, str(err), err.code)
+        return from_engine(err)
     with Store(root) as store:
         stats = store.stats()
     # Freshness is computed only when asked for: it hashes every file, which is

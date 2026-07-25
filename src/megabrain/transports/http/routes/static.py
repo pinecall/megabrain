@@ -11,7 +11,8 @@ import mimetypes
 from pathlib import Path
 from urllib.parse import unquote
 
-from ..messages import Reply, Request, error_reply
+from ..messages import Reply, Request
+from ..replies import error_reply
 
 __all__ = ["static_route", "UI_DIR"]
 

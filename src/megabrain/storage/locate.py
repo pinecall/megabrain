@@ -3,7 +3,10 @@
 Every transport needs this and none of them should own it: a CLI is typed from
 wherever the developer happens to be standing, an editor sends the file it has
 open, and an HTTP request carries whatever the caller pasted. One rule, in one
-place.
+place — and the place is `storage`, because knowing that an index lives at
+`.megabrain/db.sqlite` is this package's knowledge. Both `Store` and every
+layer above resolve the layout through `INDEX_FILE`, so the path exists in
+exactly one line of the codebase.
 """
 
 from __future__ import annotations

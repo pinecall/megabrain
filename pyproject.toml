@@ -42,8 +42,15 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pyright>=1.1.380"]
 
 [project.optional-dependencies]
+# Every one of these is a wheel with native code in it. Making a default
+# install carry eight of them to index a Python repository is a cost paid by
+# everyone for the benefit of a few — so the registry checks which are
+# importable and adds only those. Python, TS/JS and Markdown stay in the base
+# dependencies because they are what most repositories are written in.
 languages = ["tree_sitter_ruby>=0.23", "tree_sitter_go>=0.23",
-             "tree_sitter_rust>=0.23", "tree_sitter_php>=0.23"]
+             "tree_sitter_rust>=0.23", "tree_sitter_php>=0.23",
+             "tree_sitter_c>=0.23", "tree_sitter_cpp>=0.23",
+             "tree_sitter_java>=0.23", "tree_sitter_c_sharp>=0.23"]
 claude = ["claude-agent-sdk>=0.1.0"]
 
 [project.scripts]

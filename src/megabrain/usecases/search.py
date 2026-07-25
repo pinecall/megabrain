@@ -13,7 +13,7 @@ from .._types import Content
 from ..contracts import Bundle
 from ..retrieval.bundle import search_with_state
 from ..retrieval.state import load_state
-from ._root import resolve_root
+from ..storage.locate import resolve_root
 
 __all__ = ["search"]
 

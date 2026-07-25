@@ -15,8 +15,10 @@ import json
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING, Any, cast
 
+from ._target import split_target
 from ._writer import write_reply
-from .messages import Reply, Request, error_reply, split_target
+from .messages import Reply, Request
+from .replies import error_reply
 from .router import dispatch
 
 if TYPE_CHECKING:

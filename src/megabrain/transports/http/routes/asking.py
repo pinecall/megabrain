@@ -16,7 +16,8 @@ from typing import Any, Iterator
 from ...._errors import MegabrainError
 from ...._types import Content
 from ....usecases.ask import ask
-from ..messages import Reply, Request, error_reply
+from ..messages import Reply, Request
+from ..replies import error_reply
 
 __all__ = ["ask_stream"]
 
@@ -27,12 +28,11 @@ def ask_stream(request: Request) -> Reply:
     question = request.param("question")
     if not question.strip():
         return error_reply(400, "question is required", "bad_request")
-    repo = Path(request.param("repo") or ".")
     # Defaults to code, like the use case: a walkthrough diluted with prose
     # explains the documentation instead of the mechanism.
     asked = request.param("content")
     content: Content = "docs" if asked == "docs" else "code"
-    return Reply(stream=lambda: _run(question, repo, content))
+    return Reply(stream=lambda: _run(question, request.repo(), content))
 
 
 def _run(question: str, repo: Path,

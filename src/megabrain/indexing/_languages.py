@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib.util
 from typing import Callable
 
-from ..chunkers import Parsed, go, php, ruby, rust
+from ..chunkers import Parsed, c, cpp, csharp, go, java, php, ruby, rust
 from .strategies import Strategy
 
 __all__ = ["GrammarStrategy", "optional_strategies"]
@@ -42,10 +42,17 @@ class GrammarStrategy:
 
 
 # (extensions, parser, the grammar package it needs)
-_OPTIONAL = [((".rb",), ruby.parse, "tree_sitter_ruby"),
+_OPTIONAL = [((".rb", ".rake", ".gemspec"), ruby.parse, "tree_sitter_ruby"),
              ((".go",), go.parse, "tree_sitter_go"),
              ((".rs",), rust.parse, "tree_sitter_rust"),
-             ((".php",), php.parse, "tree_sitter_php")]
+             ((".php",), php.parse, "tree_sitter_php"),
+             # `.h` goes to C rather than C++: a header is far more often C, and
+             # the C grammar reads the declarations either way — where they
+             # differ, C++ in a `.h` degrades to declarations, not to nothing.
+             ((".c", ".h"), c.parse, "tree_sitter_c"),
+             ((".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"), cpp.parse, "tree_sitter_cpp"),
+             ((".java",), java.parse, "tree_sitter_java"),
+             ((".cs",), csharp.parse, "tree_sitter_c_sharp")]
 
 
 def optional_strategies() -> list[Strategy]:

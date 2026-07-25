@@ -39,7 +39,7 @@ class FileTable:
         edge whose source happened to be processed before its destination in
         the same pass.
         """
-        for table in ("chunks", "symbols"):
+        for table in ("chunks", "symbols", "cards"):
             self.db.execute(f"DELETE FROM {table} WHERE file=?", (path,))
         self.db.execute("DELETE FROM edges WHERE src=?", (path,))
         if drop_incoming:

@@ -6,28 +6,28 @@ questions it wants asked of it, and the models it narrates and judges with.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from ...._errors import MegabrainError
 from ....project import CONFIG_FILE, load_project
 from ....usecases import resolve_root
-from ..messages import Reply, Request, error_reply, json_reply
+from ..messages import Reply, Request
+from ..replies import from_engine, json_reply
 
 __all__ = ["project_route"]
 
 
 def project_route(request: Request) -> Reply:
     try:
-        root = resolve_root(Path(request.param("repo") or "."))
+        root = resolve_root(request.repo())
     except MegabrainError as err:
-        return error_reply(err.http_status, str(err), err.code)
+        return from_engine(err)
     project = load_project(root)
     return json_reply({
         "repo": root.name,
         "config_file": CONFIG_FILE,
         "queries": list(project.queries),
         "models": {"narrator": project.narrator_model,
-                   "rerank": project.rerank_model},
+                   "rerank": project.rerank_model,
+                   "study": project.study_model},
         # Said out loud: a fallback that looks like "no config" is how somebody
         # edits a file for an hour and never learns it was never parsed.
         "malformed": project.malformed,

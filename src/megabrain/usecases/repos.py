@@ -24,8 +24,8 @@ from pathlib import Path
 from .._home import megabrain_home
 from ..contracts import RepoEntry
 from ..storage import Store
+from ..storage.locate import INDEX_FILE
 from ._registry import read_entries, write_entries
-from ._root import INDEX_FILE
 
 __all__ = ["remember", "known", "registry_path"]
 

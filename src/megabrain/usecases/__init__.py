@@ -12,15 +12,17 @@ engine and never will be.
 
 from __future__ import annotations
 
-from ._root import resolve_root
+from ..storage.locate import resolve_root
 from .ask import ask
+from .brief import brief
 from .build import build_index
 from .freshness import Freshness, freshness
 from .get import get_code
 from .repos import known, remember
 from .scan import scan
 from .search import search
+from .study import study
 
 __all__ = ["resolve_root", "build_index", "search", "ask", "get_code",
-           "known", "remember", "scan",
+           "known", "remember", "scan", "study", "brief",
            "freshness", "Freshness"]

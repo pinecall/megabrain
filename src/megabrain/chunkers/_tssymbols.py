@@ -30,7 +30,8 @@ def symbols_of(spec: LangSpec, relpath: str, node: Any, raw: bytes,
         name = name_of(spec, declared) if declared.type in spec.def_types else None
         if name:
             found.append(_symbol(relpath, declared, f"{prefix}{name}",
-                                 spec.def_types[declared.type], raw))
+                                 spec.def_types[declared.type], raw,
+                                 spec.body_field))
             body = declared.child_by_field_name(spec.body_field)
             if declared.type in spec.container_types and body is not None:
                 found += symbols_of(spec, relpath, body, raw, f"{prefix}{name}.")
@@ -38,14 +39,15 @@ def symbols_of(spec: LangSpec, relpath: str, node: Any, raw: bytes,
         assigned = assigned_method(spec, child)
         if assigned is not None:
             found.append(_symbol(relpath, child, f"{prefix}{assigned[0]}",
-                                 assigned[1], raw))
+                                 assigned[1], raw, spec.body_field))
     return found
 
 
-def _symbol(relpath: str, node: Any, name: str, kind: str, raw: bytes) -> Symbol:
+def _symbol(relpath: str, node: Any, name: str, kind: str, raw: bytes,
+            body_field: str) -> Symbol:
     return Symbol(file=relpath, name=name, kind=kind,
                   line=node.start_point[0] + 1, end_line=node.end_point[0] + 1,
-                  signature=signature_of(node, raw))
+                  signature=signature_of(node, raw, body_field))
 
 
 def skeleton_of(relpath: str, symbols: tuple[Symbol, ...]) -> str:
