@@ -6,6 +6,6 @@ branch inside an argument parser that already knows about five others.
 
 from __future__ import annotations
 
-from . import get, graph, index, search, studio
+from . import ask, get, graph, index, search, studio
 
-__all__ = ["index", "search", "get", "graph", "studio"]
+__all__ = ["index", "search", "ask", "get", "graph", "studio"]

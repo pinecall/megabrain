@@ -147,6 +147,27 @@ def test_the_first_available_provider_wins() -> None:
     assert chosen is not None and chosen.name == "ready"
 
 
+def test_an_OMITTED_key_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The three-state parameter, pinned.
+
+    Declared `str | None = None`, this constructor passed an explicit None on
+    every default construction — and an explicit None legitimately means "no
+    key", so the environment was never read and `ask` reported a missing
+    credential with the key sitting in the shell.
+    """
+    monkeypatch.setenv("OPENROUTER_API_KEY", "from-the-env")
+    assert OpenAICompatible().config.api_key == "from-the-env"
+    assert OpenAICompatible().available() is True
+
+
+def test_an_EXPLICIT_none_means_no_key_and_does_not_fall_back(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """The other half: a caller saying "no credential" must not have one
+    supplied from the environment behind its back."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "from-the-env")
+    assert OpenAICompatible(api_key=None).config.api_key is None
+
+
 def test_the_openai_backend_satisfies_the_protocol_structurally() -> None:
     """No base class to inherit: an adapter with the right shape IS a
     provider, which is what lets a caller add one without importing us."""

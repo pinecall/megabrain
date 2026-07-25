@@ -13,9 +13,11 @@ engine and never will be.
 from __future__ import annotations
 
 from ._root import resolve_root
+from .ask import ask
 from .build import build_index
 from .get import get_code
 from .repos import known, remember
 from .search import search
 
-__all__ = ["resolve_root", "build_index", "search", "get_code", "known", "remember"]
+__all__ = ["resolve_root", "build_index", "search", "ask", "get_code",
+           "known", "remember"]

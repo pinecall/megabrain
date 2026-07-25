@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from ..._types import NotGiven, not_given
 from .._stream import StreamTransport, open_with_retry
 from ..http import RetryPolicy
 from ._frames import read_stream
@@ -26,9 +27,19 @@ class OpenAICompatible:
     over `stream_chat`, which every endpoint of this shape supports."""
 
     def __init__(self, *, transport: StreamTransport | None = None,
-                 api_key: str | None = None, model: str | None = None,
+                 api_key: str | None | NotGiven = not_given,
+                 model: str | None = None,
                  base_url: str | None = None, timeout: float = 90.0,
                  policy: RetryPolicy | None = None) -> None:
+        """`api_key` is the THREE-STATE parameter, and it has to be.
+
+        Omitted reads the environment; an explicit `None` means "no key" and
+        fails loudly instead of quietly picking one up from the shell. Declared
+        as `str | None = None` — the obvious spelling — this constructor passed
+        an explicit None on every default construction, so the environment was
+        never consulted and the engine reported a missing key while the key sat
+        right there in the shell.
+        """
         self.config = ChatConfig.resolve(api_key=api_key, model=model,
                                          base_url=base_url, timeout=timeout)
         self.policy = policy or RetryPolicy()
