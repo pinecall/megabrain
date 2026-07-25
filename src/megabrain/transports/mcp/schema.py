@@ -35,6 +35,12 @@ def _property(hint: Any) -> dict[str, Any]:
     described = getattr(hint, "__metadata__", ())
     annotation = getattr(hint, "__origin__", hint) if described else hint
     schema: dict[str, Any] = {"description": " ".join(str(d) for d in described)}
+    if getattr(annotation, "__origin__", None) is list or annotation is list:
+        # An array of objects. The ITEM shape stays open on purpose: the field
+        # accepts habitual aliases (path/old/new beside file/find/replace), and
+        # a schema that pinned the canonical names would have the host reject
+        # the very spellings the engine went out of its way to tolerate.
+        return {**schema, "type": "array", "items": {"type": "object"}}
     choices = list(get_args(annotation))
     if choices and all(isinstance(c, (str, int, bool)) for c in choices):
         # A Literal: the allowed values ARE the documentation. Rendered as a

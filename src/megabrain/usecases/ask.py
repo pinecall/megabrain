@@ -32,7 +32,7 @@ __all__ = ["ask"]
 
 def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         content: Content | None = "code", cache: bool = True,
-        emit: Emit = emit_nothing) -> str:
+        task: bool | None = None, emit: Emit = emit_nothing) -> str:
     """A narrated walkthrough of the code that answers `question`.
 
     `content` defaults to CODE, unlike search: a code walkthrough diluted with
@@ -57,27 +57,20 @@ def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         # Named, not a generic failure: retrieval already worked, and the only
         # thing missing is a credential the message can point at.
         raise MissingCredential.named("MEGABRAIN_CHAT_API_KEY")
-    if is_task(question):
-        # Measured: answering a task the question-shaped way cost a second
-        # round trip — the first answer said HOW, and the agent still had to
-        # ask WHERE to type.
-        return _task_surface(root, question, bundle, provider, emit)
+    # DECLARED beats inferred: MCP's caller says `task` or `query` and is never
+    # wrong, while the CLI has one positional argument and must read the
+    # sentence. Measured — answering a task the question-shaped way cost an
+    # extra round trip, the first answer saying HOW and the agent still needing
+    # to ask WHERE to type.
+    if task if task is not None else is_task(question):
+        # Not cached: a walkthrough stays true until the code moves, an edit
+        # surface is consumed once by the change that invalidates it.
+        from ..ask.task import walk_task
+        return walk_task(provider, question, bundle, root, emit=emit)
     answer = narrate(provider, question, _with_flows(bundle, flows), emit=emit)
     if cache:
         remember_answer(root, question, answer, bundle, emit)
     return answer
-
-
-def _task_surface(root: Path, task: str, bundle: Bundle,
-                  provider: ChatProvider, emit: Emit) -> str:
-    """The edit surface, store open for the whole tool loop. Not cached: a
-    walkthrough stays true until the code moves, an edit surface is consumed
-    once by the change that invalidates it."""
-    from ..ask.task import walk_task
-    from ..storage import Store
-
-    with Store(root) as store:
-        return walk_task(provider, task, bundle, store, emit=emit)
 
 
 def _with_flows(bundle: Bundle, flows: list[FlowHit]) -> Bundle:

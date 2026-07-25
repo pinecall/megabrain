@@ -14,21 +14,15 @@ from pathlib import Path
 from typing import Any
 
 from ..._types import Content
+from ._missing import Missing
+from ._payload import operations, optional, request
 
-__all__ = ["Missing", "repo", "text", "scope", "content", "limit", "flag"]
+__all__ = ["Missing", "repo", "text", "scope", "content", "limit", "flag",
+           "request", "optional", "operations"]
 
 _CONTENT = ("code", "docs")
 BRIEF_LIMIT = 10
 BRIEF_MAX = 30
-
-
-class Missing(Exception):
-    """A required argument the caller did not send.
-
-    Private vocabulary: it never leaves the transport — `call_tool` turns it
-    into an ordinary failed Answer naming the argument, because a KeyError
-    three frames down reaches the host as a dead tool call.
-    """
 
 
 def repo(arguments: dict[str, Any]) -> Path:

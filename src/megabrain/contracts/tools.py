@@ -36,11 +36,24 @@ class _Target(TypedDict):
     repo_path: Repo
 
 
-class _AskRequired(_Target):
-    question: Annotated[str, "a how/where/why question, in natural language"]
+class AskParams(_Target, total=False):
+    """Send exactly ONE of `query` or `task` — they want opposite answers.
 
+    Declared rather than guessed. The engine can read the shape of a sentence,
+    and a caller that says which one it meant is never wrong: "how do I add a
+    cache header" says "add" and is a question.
+    """
 
-class AskParams(_AskRequired, total=False):
+    query: Annotated[str, "a how/where/why QUESTION. Returns the flow narrated "
+                          "across subsystems with the real code spliced in — "
+                          "use it to understand a mechanism before touching it"]
+    task: Annotated[str, "a CHANGE you are about to make, in the imperative "
+                         "('add a redirect_back helper that…'). Returns the "
+                         "EDIT SURFACE instead of a walkthrough: every file to "
+                         "touch, the exact line to touch it at, the existing "
+                         "code around it quoted verbatim, and the neighbouring "
+                         "test to imitate. The narrator opens the files itself, "
+                         "so you go straight from this to editing"]
     scope_path: Scope
     content: Annotated[Content, "'code' (the default) or 'docs'. A code "
                                 "walkthrough diluted with prose explains the "

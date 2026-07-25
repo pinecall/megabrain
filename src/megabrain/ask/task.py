@@ -16,6 +16,7 @@ backend with no tool support still returns its text.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from ..contracts import Bundle
@@ -40,20 +41,26 @@ a model that keeps browsing spend the caller's afternoon.
 MAX_TOKENS = 3000
 
 
-def walk_task(provider: ChatProvider, task: str, bundle: Bundle, store: Store, *,
+def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
               emit: Emit = emit_nothing) -> str:
-    """The edit surface for `task`, with every cited line spliced verbatim."""
+    """The edit surface for `task`, with every cited line spliced verbatim.
+
+    Opens the index itself and holds it for the whole loop: the tool reads
+    files and the citations read lines, and both must see the same index the
+    bundle came from.
+    """
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": build_task_prompt(task, bundle)}]
     answer = Answer(text="")
-    for _round in range(MAX_ROUNDS):
-        answer = provider.stream_chat(_body(provider, messages))
-        if not answer.tool_calls:
-            break
-        messages.append(assistant_turn(answer))
-        for call in answer.tool_calls:
-            messages.append(tool_result(store, call, emit))
-    surface = quote_citations(answer.text, store)
+    with Store(root) as store:
+        for _round in range(MAX_ROUNDS):
+            answer = provider.stream_chat(_body(provider, messages))
+            if not answer.tool_calls:
+                break
+            messages.append(assistant_turn(answer))
+            for call in answer.tool_calls:
+                messages.append(tool_result(store, call, emit))
+        surface = quote_citations(answer.text, store)
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a
     # path that only returns its text arrives as a blank answer everywhere.

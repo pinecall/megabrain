@@ -57,11 +57,19 @@ def _text(result: dict[str, Any]) -> str:
 
 # ── the surface ──────────────────────────────────────────────────────────
 
-def test_the_agent_sees_exactly_two_tools() -> None:
-    """Every tool costs the calling agent context and a decision. The host
-    already has Read and Grep; megabrain exposes only what it alone can do."""
+def test_the_agent_sees_exactly_the_four_tools() -> None:
+    """Every tool costs the calling agent context and a decision, so the
+    surface stays the shortest one that closes the loop: understand it
+    (`ask`), map a task's docs and files (`search`), CHANGE it (`replace`),
+    and make a repository answerable at all (`index`).
+
+    `replace` earns its slot on arithmetic rather than capability — the host
+    has an editor, but that editor requires a prior Read of the same file, so
+    every body megabrain already rendered gets paid for twice.
+    """
     assert {tool.name for tool in TOOLS} == {
-        "megabrain_ask", "megabrain_search"}
+        "megabrain_ask", "megabrain_search", "megabrain_replace",
+        "megabrain_index"}
 
 
 def test_every_schema_is_generated_from_its_contract() -> None:

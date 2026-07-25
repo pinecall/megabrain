@@ -11,8 +11,10 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ..._errors import MegabrainError
+from ...edits import render_edits
 from ...retrieval.render import render
-from ...usecases import ask, search
+from ...usecases import ask, build_index, search
+from ...usecases.replace import replace
 from . import arguments as arg
 from .answers import Answer, answer, failure, from_engine
 
@@ -23,10 +25,29 @@ Handler = Callable[[dict[str, Any]], str]
 
 def _ask(args: dict[str, Any]) -> str:
     """Buffered, never streamed: MCP is request/response, and the consuming
-    agent reads the final text only. Events would be written to nobody."""
-    return ask(arg.repo(args), arg.text(args, "question"),
-               path_filter=arg.scope(args),
-               content=arg.content(args) or "code")
+    agent reads the final text only. Events would be written to nobody.
+
+    `task` and `query` are the SAME verb with opposite deliverables, so the
+    caller declares which one it meant rather than having the engine read the
+    shape of the sentence. A declared intent is never wrong: "how do I add a
+    cache header" says "add" and is a question.
+    """
+    return ask(arg.repo(args), arg.request(args), path_filter=arg.scope(args),
+               content=arg.content(args) or "code",
+               task=bool(arg.optional(args, "task")))
+
+
+def _replace(args: dict[str, Any]) -> str:
+    """The batch, applied or refused whole. A refusal is a normal reply here —
+    the report is what the caller retries from, not an error to raise."""
+    return render_edits(replace(arg.repo(args), arg.operations(args)))
+
+
+def _index(args: dict[str, Any]) -> str:
+    report = build_index(arg.repo(args), force=arg.flag(args, "force", default=False))
+    return (f"# megabrain index — {report['files']} files · "
+            f"{report['total_chunks']} chunks · {report['total_edges']} edges "
+            f"({report['changed']} changed, {report['seconds']}s)")
 
 
 def _search(args: dict[str, Any]) -> str:
@@ -43,6 +64,8 @@ def _search(args: dict[str, Any]) -> str:
 HANDLERS: dict[str, Handler] = {
     "megabrain_ask": _ask,
     "megabrain_search": _search,
+    "megabrain_replace": _replace,
+    "megabrain_index": _index,
 }
 
 

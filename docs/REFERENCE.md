@@ -83,7 +83,9 @@ Every tool takes `repo_path` (any sub-path works — the root is auto-detected).
 
 | tool | returns | parameters |
 |---|---|---|
-| **`megabrain_ask`** | A narrated walkthrough of the whole relevant flow with the real code spliced in verbatim — the code cannot be invented; the prose around it is narration, so check its claims against the code it quotes. | `question` *(req)* · `scope_path` · `content` (`code` default · `docs`) |
+| **`megabrain_ask`** | Two shapes, one verb. `query` → a narrated walkthrough of the whole relevant flow with the real code spliced in verbatim — the code cannot be invented; the prose is narration, so check it against the code it quotes. `task` → the **edit surface** instead: every file to touch, the exact line, the surrounding code quoted verbatim and the neighbouring test to imitate. The narrator opens files itself (`open_file`), so a task needs one call, not one to understand plus one to locate. | one of `query` / `task` *(req)* · `scope_path` · `content` |
+| **`megabrain_replace`** | A batch of exact-string edits, applied **transactionally** — if any operation fails nothing is written and the report names which, why, and the nearest real line. Ops on the same file see each other's result. Existing files only. | `operations` *(req)* — `[{file, find, replace, count?}]`; `path`/`old`/`new` aliases and a JSON-string batch are accepted |
+| **`megabrain_index`** | Build or refresh the index. Incremental by content hash, so a warm re-index costs seconds. | `force` *(default `false`)* |
 | **`megabrain_search`** | The task's whole edit surface as a MAP: the files that answer it ranked, each with its best span (true line numbers) and the symbols it declares, plus the anchors a change must touch and the tests that pin the behaviour. ~2 700 tokens against ~8 100 with bodies. | `task` *(req)* · `scope_path` · `content` · `bodies` *(default `false`)* · `rerank` *(default `false`)* · `expand` *(default `false`)* |
 
 ---
