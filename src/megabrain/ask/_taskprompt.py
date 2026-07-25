@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from ..contracts import Bundle
 from ._anchorrules import ANCHOR_RULES
+from ._citerules import CITE_RULES
 from ._taskwords import PROMPT
 
 __all__ = ["build_task_prompt", "MAX_MAP_FILES"]
@@ -36,6 +37,7 @@ def build_task_prompt(task: str, bundle: Bundle) -> str:
     # `end`/`}`/`)` in a rule about closing delimiters — turns every task call
     # into "Single '}' encountered in format string".
     return (PROMPT.replace("{anchor_rules}", ANCHOR_RULES)
+                  .replace("{cite_rules}", CITE_RULES)
                   .replace("{task}", task)
                   .replace("{map}", "\n".join(lines) or "- (nothing found)"))
 

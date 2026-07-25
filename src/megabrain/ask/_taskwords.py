@@ -22,6 +22,15 @@ declares, no code:
 Your job is to hand back the EDIT SURFACE: every file this change must touch, \
 ready to edit. Work in two steps.
 
+FIRST, though: the change may not be needed. It may already be done, or already \
+covered by a mechanism somewhere else, or rest on a premise the code does not \
+support. If so, say so — a section "## No change needed" citing the code that \
+settles it, and NO APPLY markers anywhere in your answer. Do not invent an edit \
+to have something to hand back. Measured, that is not a hypothetical: asked \
+whether one tool had a hole its sibling had closed, this prompt proposed \
+closing it — and the "fix" would have broken a behaviour a test pins, because \
+the hole was already covered by a different mechanism.
+
 STEP 1 — open what you need, ALL AT ONCE, in a SINGLE turn: the file to \
 change, the test file covering it, and the nearest example to imitate. One \
 file per turn is a network round trip per file. Always include the test — a \
@@ -49,27 +58,7 @@ NAME the edge case. The one that cost the most: a guard added to a function \
 that CREATES files must not reject a path that does not exist yet. Say it in a \
 sentence — that sentence is worth more than any code you could write here.
 
-Then a section "## Pattern to follow", citing complete siblings — each one \
-spanning from its own first line to its own end, never the class, describe or \
-module that contains it. A container is the whole suite and costs more than \
-opening the file would.
-
-CITE EVERY HELPER YOU TELL THEM TO REUSE. Naming one is not enough — the \
-reader needs its signature, its defaults and what it does to the response \
-before they can call it correctly. Measured: told to reuse `content_type`, \
-`attachment` and `halt`, an agent had to ask a second question to learn that \
-the body setter DELETES content-length, without which it would have set that \
-header by hand and been silently wrong.
-
-When the change MIRRORS something the codebase already does — the same guard on \
-a sibling function, the same option on a sibling class — cite that original in \
-full, every occurrence of it. It is the specification: its exact wording, its \
-comment, its error string are what "the same as" means, and the reader will go \
-and open the file to get them if you only describe them.
-
-For a TEST, cite TWO OR THREE siblings, chosen to show the file's IDIOMS rather \
-than its subject: how it skips a platform, how it builds its fixture, how it \
-asserts. One example shows the shape; three show the conventions.
+{cite_rules}
 
 Never cite the same range twice anywhere in your answer.
 
