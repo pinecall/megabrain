@@ -65,6 +65,29 @@ def test_a_PRODUCTION_file_gets_no_preamble(tmp_path) -> None:
         assert already_imported(store, "[[lib/app.py:1-3]]") == ""
 
 
+def test_a_JS_require_is_INSIDE_the_preamble_not_its_end(tmp_path) -> None:
+    """The language bug, measured on express. In Python the imports are not
+    symbols, so "above the first symbol" WAS the preamble. In JavaScript
+    `const express = require('../')` IS a symbol — so the section promised the
+    imports and delivered `'use strict'` and a blank line. The reader opened the
+    file to learn the repo requires `'../'`, not `'express'`."""
+    js = ("'use strict'\n\nconst { Buffer } = require('node:buffer')\n"
+          "const express = require('../')\nconst request = require('supertest')\n"
+          "\ndescribe('.inline()', function () {\n})")
+    with repo(tmp_path) as store:
+        store.files.upsert("test/res.inline.js", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="test/res.inline.js", name="{ Buffer }", kind="const", line=3,
+                   end_line=3, signature=None, decorators=(), doc=None),
+            Symbol(file="test/res.inline.js", name="express", kind="const", line=4,
+                   end_line=4, signature=None, decorators=(), doc=None)])
+        store.chunks.insert([Chunk(file="test/res.inline.js", kind="module", name=None,
+                                   part=None, start_line=1, end_line=8, text=js,
+                                   breadcrumb="j")], None)
+        out = already_imported(store, "[[test/res.inline.js:7-8]]")
+    assert "[[test/res.inline.js:1-5]]" in out, "cut the requires it exists to show"
+
+
 def test_a_file_declaring_on_line_ONE_has_no_preamble(tmp_path) -> None:
     """There is nothing above line 1, and an empty section is still a heading
     the reader has to read to discover it says nothing."""

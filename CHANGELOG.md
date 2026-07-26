@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased — `megabrain_code`: the edit surface, measured against grep
+
+A new pair of tools for CHANGING code, and the whole design came out of A/B
+measurement against an agent restricted to grep/Read. Same task, same rules,
+clean clones, the only difference being the discovery tool:
+
+| repo | task | grep | `megabrain_code` |
+|---|---|---|---|
+| anthropic-sdk-python (1 220 files) | guard `create`, sync **and** async | 19 calls, 7 exploring | **6 calls, 2 exploring** |
+| anthropic-sdk-python | guard the `write` tool | 13 calls, 92.7 s | **5 calls** |
+| sinatra | add `send_data` beside `send_file` | — | **4 calls** |
+| sinatra | close the `back` open redirect | — | **4 calls** |
+| expressjs (145 files) | add `res.inline` beside `res.attachment` | 10 calls, 5 exploring | **10 calls, 2 exploring** |
+
+**`megabrain_code`** returns the EDIT SURFACE for a change: every file to touch,
+the exact anchor, and a prose spec of the new code. Around it, six deterministic
+widenings — each one added because a measured reader went looking for exactly
+that and paid a call for it:
+
+- the function an anchor sits inside, with its signature and its `except` (one
+  reader: *"the spec asked me to raise inside a `try:` whose handler I was never
+  shown"*)
+- the definition of every helper the spec names (three of four readers had been
+  following a `code` call with an `ask` for exactly this)
+- **the tests that PIN the changed symbol**, found through the indexer's pin
+  edges. Asked to close sinatra's `back` open redirect, this quoted the test
+  1 600 lines away that asserted the old behaviour, *before* any edit — the
+  reader fixed it in the same batch and reported *"I never saw a red suite."*
+- the test file's own imports
+- the minimal unique slice to copy as `find`
+- head-and-tail elision, so a quote past the cap keeps the closing `end` an
+  insertion aims at
+
+**`megabrain_replace`** applies a batch of exact-string edits transactionally:
+all-or-nothing, and no re-read of a body megabrain just rendered.
+
+Two things it deliberately does NOT do, both because doing them measured worse:
+it never writes your code (it once authored a guard that ran *after* the write it
+guarded, inside an unclosed `try:`), and it never hands you a prepared edit batch
+(wrong both times it was measured; both readers threw it away).
+
+Known limits, stated rather than papered over: the `APPLY` mode is the model's
+proposal and four readers found it misplaced for a guard — the prose is
+authoritative, and the enclosing body is quoted so you can judge it. Helper
+citation is one level deep. And on a repo where the laborious half is the tests
+rather than the library edit, the surface is strongest where you need it least.
+
 ## 1.0.0 — megabrain grep: literal search that understands what it found
 
 **New tool: `megabrain grep`** (CLI + `megabrain_grep` over MCP). grep gives

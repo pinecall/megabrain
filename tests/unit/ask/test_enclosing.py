@@ -56,6 +56,14 @@ def test_a_citation_that_ALREADY_spans_the_function_adds_nothing(tmp_path) -> No
         assert enclosing_bodies(store, "[[tools.py:1-8]]\nAPPLY replace_span") == ""
 
 
+def test_an_anchor_covering_MOST_of_the_function_adds_nothing(tmp_path) -> None:
+    """MEASURED: the model anchored on almost the whole method and the widening
+    reprinted it — "a quarter of the render for zero new information". The spans
+    differ by a line, so exact-range deduplication cannot see it."""
+    with repo(tmp_path) as store:
+        assert enclosing_bodies(store, "[[tools.py:1-7]]\nAPPLY insert_after") == ""
+
+
 def test_only_ANCHORS_pull_their_function(tmp_path) -> None:
     """A citation with no APPLY is an example to imitate, not a site being
     edited — its surroundings are not the reader's problem."""

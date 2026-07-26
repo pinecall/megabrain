@@ -28,6 +28,14 @@ MAX_ENCLOSING = 3
 """Enclosing bodies cited. A change touches two or three sites; past that the
 answer is a file listing, and the elision keeps each one bounded anyway."""
 
+MOSTLY = 0.7
+"""How much of its function an anchor may cover before this section adds nothing.
+
+MEASURED: when the model anchors on almost the whole method, the widening
+reprinted the body already shown as edit site #1 — "roughly a quarter of the
+render for zero new information". Exact-range deduplication cannot catch it,
+because the two spans differ by the line or two the anchor left out."""
+
 _ANCHORED = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]\s*\n\s*APPLY\s+\w+")
 """Only citations followed by an APPLY. A quote with no marker is an example to
 imitate, and what surrounds an example is not the reader's problem."""
@@ -52,18 +60,20 @@ def enclosing_bodies(store: Store, surface: str) -> str:
 
 
 def _enclosing(store: Store, path: str, lo: int, hi: int) -> tuple[str, int, int] | None:
-    """The SMALLEST spanning symbol that strictly contains the anchor.
+    """The SMALLEST spanning symbol, when the anchor is a small part of it.
 
-    Strictly: an anchor already covering its whole function needs nothing added,
-    and re-citing it would be the duplication a reader named as wasted budget.
-    Smallest, because a method inside a class is the unit being edited.
+    Smallest, because a method inside a class is the unit being edited. And a
+    part, because an anchor that already covers MOSTLY of its function needs
+    nothing added — re-citing it is duplication a reader named as wasted budget.
     """
     holders = [s for s in store.symbols.read_for(path)
                if str(s.get("kind")) in _SPANNING
                and isinstance(s.get("line"), int) and isinstance(s.get("end_line"), int)
-               and int(s["line"]) <= lo and hi <= int(s["end_line"])
-               and not (int(s["line"]) >= lo and int(s["end_line"]) <= hi)]
+               and int(s["line"]) <= lo and hi <= int(s["end_line"])]
     if not holders:
         return None
     best = min(holders, key=lambda s: int(s["end_line"]) - int(s["line"]))
-    return path, int(best["line"]), int(best["end_line"])
+    start, end = int(best["line"]), int(best["end_line"])
+    if hi - lo + 1 >= MOSTLY * (end - start + 1):
+        return None
+    return path, start, end

@@ -9,7 +9,7 @@
 > describing **v2**, with names and modules that have moved or do not exist yet: the
 > `forge` sections (§2.5), the flow-cache narrative (§3.4), `--prune`/`prune_search`
 > (§3.3), and the HTTP entry-point bullet in §5. The MCP surface is v3-accurate as of
-> phase 13 — three tools, §5.1. Verify against `src/megabrain/` before trusting a name
+> phase 13 — five tools, §5.1. Verify against `src/megabrain/` before trusting a name
 > in those sections.
 
 Every load-bearing choice below is locked by experimental data (golden-set gates,
@@ -59,7 +59,8 @@ model bakeoffs — see §8). The five hard rules:
 ```
 
 Entry points share one retrieval core: CLI (`megabrain …`), MCP stdio
-(`megabrain_ask` · `megabrain_search` · `megabrain_brief` — §5.1), HTTP
+(`megabrain_ask` · `megabrain_code` · `megabrain_replace` · `megabrain_search` ·
+`megabrain_index` — §5.1), HTTP
 (`megabrain studio`, which also serves the studio UI), and the Python API
 (`megabrain.search/…`, lazy imports, `py.typed`).
 
@@ -538,16 +539,33 @@ shortfall **reported** (`study_error`, or the `degraded` count) rather than rais
 
 ## 5. Serving surfaces
 
-### 5.1 MCP — three tools, and the reason there are only three
+### 5.1 MCP — five tools, split by whether you are CHANGING the code
 
-`transports/mcp/` (stdio, no deps): **`megabrain_ask`** (the walkthrough),
-**`megabrain_search`** (the edit surface, with bodies), **`megabrain_brief`** (the
-mental model, §4.5). Nothing else — no `get`, no `grep`, no `index`.
+`transports/mcp/` (stdio, no deps): **`megabrain_code`** (the edit surface) and
+**`megabrain_replace`** (apply it) for a change; **`megabrain_ask`** (the walkthrough) to
+understand a mechanism or copy a pattern; **`megabrain_search`** (the map, and the docs);
+**`megabrain_index`**. Nothing else — no `get`, no `grep`.
 
-That is a deliberate subtraction. Every tool costs the calling agent context and a
-routing decision, and the host it runs in already has Read, Grep and an editor. So the
-surface carries only what megabrain alone can do; a tool that fetches one span invites
-the agent to re-verify what the render already showed.
+The split is the design, and it is why intent is never inferred: `ask` and `code` retrieve
+the same way and render for opposite jobs, so the CALLER declares which one it is by
+picking the tool. Asking one model to classify the other's sentence was tried and is
+strictly worse — a task phrased as a question got a walkthrough, and the agent came back
+with "and where is that defined?", a whole extra round trip to learn where to type.
+
+`megabrain_code`'s surface is assembled from six deterministic widenings, each one added
+because a measured reader went looking for exactly that and paid a call for it:
+`_enclosing` (the function an anchor sits inside — its signature and its `except`),
+`_callees` (the definition of every helper the spec names), `_pinned` (the tests that PIN
+the changed symbol, found through the indexer's pin edges — this is the one that catches a
+test 1 600 lines away asserting the behaviour you are about to change), `_headers` (the
+test file's own imports), `_anchors` (the minimal unique slice to copy as `find`) and
+`_elide`/`_prune` (a quote past the cap keeps its head AND its tail, and a section whose
+every citation is a repeat is dropped). None of them calls a model.
+
+Everything else is a deliberate subtraction. Every tool costs the calling agent context and
+a routing decision, and the host it runs in already has Read, Grep and an editor. So the
+surface carries only what megabrain alone can do; a tool that fetches one span invites the
+agent to re-verify what the render already showed.
 
 Two properties worth knowing:
 
@@ -560,18 +578,15 @@ Two properties worth knowing:
   `usecases/`, so this layer only maps a name to a use case and picks a renderer —
   which is the whole reason the CLI, MCP and HTTP surfaces cannot drift apart.
 
-`megabrain_brief` takes `repo_path` · `question` · `limit` (default 10, capped at 30) and
-renders through the same `atlas.render_brief` the CLI prints. A repo that was never
-studied comes back as a typed failure naming `megabrain study`, not as an empty answer.
-
 - **MCP** (`transports/mcp/`, stdio, no deps): `megabrain_ask` (`question`,
   `scope_path`, `content=code|docs` — MCP is request/response, so it runs buffered:
   the consuming agent reads the final text only, and events would be written to
-  nobody), `megabrain_search` (`task`, `scope_path`, `content`, `bodies` default
-  true, `rerank` default **false** — the deterministic answer is complete on its
-  own, and a caller that wants the judge lane asks for it and accepts the call),
-  `megabrain_brief` (§5.1). Nothing else: single-file and single-symbol fetches are
-  the host's own Read/Grep job. Registered by `megabrain install`
+  nobody), `megabrain_code` (`task`, `scope_path` — the edit surface, §5.1),
+  `megabrain_replace` (`operations`, transactional), `megabrain_search` (`task`,
+  `scope_path`, `content`, `bodies`, `rerank` default **false** — the deterministic
+  answer is complete on its own, and a caller that wants the judge lane asks for it
+  and accepts the call), `megabrain_index` (`force`). Nothing else: single-file and
+  single-symbol fetches are the host's own Read/Grep job. Registered by `megabrain install`
   (`transports/install/`: a table of six assistants, one module per config format,
   only ever writing the `megabrain` key and pinning `sys.executable`) or by hand with
   `claude mcp add megabrain -- python3 -m megabrain.transports.mcp`; a stale index is

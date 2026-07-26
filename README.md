@@ -203,21 +203,38 @@ megabrain install    # detects Claude Code · Codex · Cursor · Windsurf · Gem
 | the cross-file story | reconstructed, unverified | **narrated, real code spliced in** |
 | asking it again later | the full re-exploration | **~0 ms, from the cache** |
 
-Your agent gets **three** tools, and the smallness is the design — it already has Read,
-Grep and an editor, and a tool that fetches one span only invites it to re-verify what the
-render already showed:
+Your agent gets **five** tools, and which one it reaches for is decided by ONE question:
+**am I about to change this code, or only to understand it?** The agent declares that by
+picking the tool — nothing here guesses at intent.
 
-| tool | when |
-|---|---|
-| **`megabrain_ask`** | a how/where/why question — the narrated flow, real code spliced in |
-| **`megabrain_search`** | the task's whole edit surface as a map — files, spans, symbols; `bodies: true` for the code |
+| you are about to… | tool | what comes back |
+|---|---|---|
+| **change** code | **`megabrain_code`** | the EDIT SURFACE: every file to touch, the exact anchor, a prose spec of the new code — plus the original it mirrors, the definition of every helper the spec names, the tests that pin the behaviour, and the test file's imports. All verbatim from the index |
+| …then apply it | **`megabrain_replace`** | a transactional batch of exact-string edits. All-or-nothing, and it needs no re-read of what you were just shown |
+| **understand** a mechanism, or copy a pattern from another project | **`megabrain_ask`** | the flow narrated across subsystems with the real code spliced in |
+| get the **map**, or read the **docs** | **`megabrain_search`** | the files that answer, each with its best span and the symbols it declares — no bodies (a third of the tokens); `content: "docs"` for prose, `bodies: true` for the code inline |
+| make a repo answerable | **`megabrain_index`** | the index, incremental by content hash |
 
 Each tool's `inputSchema` is generated from `contracts/tools.py`, so a parameter cannot
 exist on the wire without existing in the dispatch.
 
-> **Put this in your agent's rules:** for any question about how the code works, call
-> `megabrain_ask` **first**, before grepping. One call returns the whole flow with the
-> real code — that single instruction is the difference between 15 turns and 1.
+**Two things the engine deliberately does NOT do**, both because doing them was measured
+and was worse:
+
+- **It never writes your code.** Asked to guard a `write` tool, it once found both files
+  and both insertion points in a 1 220-file repo — and authored a guard that ran *after*
+  the write it guarded, inside an unclosed `try:`. Undoing that cost more than the whole
+  retrieval saved. `megabrain_code` hands you a specification and an address; you write
+  the code, because you run the tests.
+- **It never hands you a prepared edit batch.** Tried, and wrong both times it was
+  measured — once the placeholder landed inside the `except` it was meant to precede, once
+  the operation pointed at a test file where the mirrored function has no tests. Both
+  readers threw it away and built their own from the quoted anchor.
+
+> **Put this in your agent's rules:** if you are going to CHANGE something, `megabrain_code`
+> first — not `ask`, which explains how the code works and still leaves you hunting for
+> where to type. And do not follow a `code` call with an `ask` for a helper's body: it is
+> already quoted.
 
 [Every parameter →](docs/REFERENCE.md#mcp-tools) ·
 [Wiring recipes →](docs/RECIPES.md#give-your-coding-agent-the-whole-repo)
