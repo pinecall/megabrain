@@ -138,9 +138,15 @@ One SQLite file per repo at `<repo>/.megabrain/db.sqlite` (`chunks`, `files`,
 `symbols`, `edges`, `meta`). Indexing is incremental by SHA-256; orphans are pruned
 (incoming edges drop only then — re-index preserves them). Relpaths are **POSIX on
 every platform** (`as_posix()`; Windows backslash keys corrupted the index once —
-CI's Windows matrix is the regression guard). No daemon or watcher: CLI
-`ask`/`search`/`chunks` and the MCP server **auto-refresh a stale index (60 s TTL,
-fail-open without a key)** before answering, so results always match disk. Vectors
+CI's Windows matrix is the regression guard). No daemon, no watcher, and — unlike v2 — **no auto-refresh at query time** (§5.1's
+last bullet said so all along while this paragraph claimed the opposite; the code
+has no refresh on the `search`/`ask`/`grep` path at all). The consequence is worth
+knowing because it is invisible: the line numbers a query returns are the INDEX's,
+so your own first edit makes them drift. Measured while an agent worked — the index
+held 3 792 lines of a file the disk had grown to 3 820, and citations checked
+against the edited file looked misattributed when the splice was in fact exact.
+Re-run `megabrain index` after editing, or read the ranges before you change
+anything. Vectors
 load into one NumPy matrix; brute-force cosine is <2 ms up to ~50 K chunks, so ANN
 indexing is deliberately deferred.
 
