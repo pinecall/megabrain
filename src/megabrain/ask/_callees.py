@@ -21,11 +21,14 @@ from ._quote import CITATION
 
 __all__ = ["named_definitions", "MAX_NAMED"]
 
-MAX_NAMED = 4
+MAX_NAMED = 6
 """Helper definitions cited beyond what the answer already shows.
 
-A task's spec names two or three helpers; four leaves room for one more
-without letting a name-dropping answer paste half the codebase."""
+Six, because four was MEASURED to cut the one that mattered: the send_data
+spec named five helpers and the cap dropped `body` — the single helper whose
+subtlety (its setter deletes content-length) caused the original second
+question. The definitions are short; the cap only guards against a
+name-dropping answer pasting half the codebase."""
 
 NAMED = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)[^`\n]*`")
 """The leading identifier of a backticked span — `body`, `body(value)`,
