@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 from ._imports import imports_of
 
 if TYPE_CHECKING:
-    from .edges import ModuleIndex
+    from .python import ModuleIndex
 
 __all__ = ["attribute_files"]
 

@@ -15,9 +15,8 @@ from ..chunkers import Parsed
 from ..chunkers.languages import markdown, typescript
 from ..chunkers.languages import python as python_parser
 from ._languages import optional_strategies
-from .edges import ModuleIndex, module_index, python_edges
+from .edges import ModuleIndex, TsFiles, module_index, python_edges, ts_edges, ts_files
 from .strategies import Registry, Strategy
-from .ts_edges import TsFiles, ts_edges, ts_files
 
 __all__ = ["PythonStrategy", "TypeScriptStrategy", "DocumentStrategy",
            "default_registry"]

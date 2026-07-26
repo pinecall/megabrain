@@ -15,8 +15,8 @@ which is the point. A fix that requires `--force` is a fix nobody pays for.
 from __future__ import annotations
 
 from megabrain.chunkers.model import Symbol
-from megabrain.indexing._resymbol import SYMBOL_SCHEMA, resymbol
 from megabrain.indexing.builtin import default_registry
+from megabrain.indexing.passes.resymbol import SYMBOL_SCHEMA, resymbol
 from megabrain.storage import Store
 
 SUITE = """\

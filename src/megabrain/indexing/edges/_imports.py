@@ -10,7 +10,7 @@ import ast
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .edges import Edge, ModuleIndex
+    from .python import Edge, ModuleIndex
 
 __all__ = ["imports_of"]
 

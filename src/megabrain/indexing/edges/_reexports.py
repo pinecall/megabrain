@@ -19,7 +19,7 @@ import ast
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .edges import ModuleIndex
+    from .python import ModuleIndex
 
 __all__ = ["reexport_map"]
 

@@ -10,10 +10,10 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Callable
 
-from ..chunkers import Chunker, FileResult, validate_partition
-from ..storage import Store
-from .discover import Discovery
-from .strategies import Registry
+from ...chunkers import Chunker, FileResult, validate_partition
+from ...storage import Store
+from ..discover import Discovery
+from ..strategies import Registry
 
 __all__ = ["Planned", "Plan", "plan"]
 

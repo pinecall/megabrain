@@ -27,8 +27,8 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 
-from ..retrieval.paths import is_test
-from ..storage import PIN_KIND, Store
+from ...retrieval.paths import is_test
+from ...storage import PIN_KIND, Store
 
 __all__ = ["write_pin_edges", "PIN_SCHEMA", "MIN_SHARED"]
 

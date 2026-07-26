@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .._arrays import Vector
-from ..indexing._embed import Embeddable
+from ..indexing.passes.embed import Embeddable
 from ..storage import Store
 from .chrome import strip_chrome
 from .freshness import sha_of

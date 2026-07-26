@@ -12,9 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol, Sequence
 
-from .._arrays import Vector
-from ..chunkers import embed_text
-from ._plan import Planned
+from ..._arrays import Vector
+from ...chunkers import embed_text
+from .plan import Planned
 
 __all__ = ["Embeddable", "Vectors", "embed_all"]
 

@@ -13,7 +13,7 @@ repos are written and how a naive resolver finds nothing.
 
 from __future__ import annotations
 
-from megabrain.indexing.ts_edges import ts_edges, ts_files
+from megabrain.indexing.edges import ts_edges, ts_files
 
 FILES = {
     "src/app.ts": "",

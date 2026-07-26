@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from ..storage import Store
-from ._plan import Planned
+from ...storage import Store
+from ..passes.plan import Planned
+from ..strategies import EDGE_SCHEMA, Registry, Strategy
 from .pins import PIN_SCHEMA, write_pin_edges
-from .strategies import EDGE_SCHEMA, Registry, Strategy
 
 __all__ = ["graph_passes", "write_edges"]
 

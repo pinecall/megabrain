@@ -16,8 +16,8 @@ change is about to break.
 from __future__ import annotations
 
 from megabrain.chunkers.model import Chunk, Symbol
-from megabrain.indexing._graph import graph_passes
 from megabrain.indexing.builtin import default_registry
+from megabrain.indexing.edges._rebuild import graph_passes
 from megabrain.indexing.strategies import EDGE_SCHEMA
 from megabrain.storage import PIN_KIND, Store
 

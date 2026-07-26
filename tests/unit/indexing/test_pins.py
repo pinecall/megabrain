@@ -21,7 +21,7 @@ symbols `base.rb` alone declares.
 from __future__ import annotations
 
 from megabrain.chunkers.model import Chunk, Symbol
-from megabrain.indexing.pins import MIN_SHARED, write_pin_edges
+from megabrain.indexing.edges.pins import MIN_SHARED, write_pin_edges
 from megabrain.storage import PIN_KIND, Store
 
 

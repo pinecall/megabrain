@@ -47,7 +47,7 @@ class SymbolTable:
         What `files.delete` cannot do: it clears the chunks too, and their
         vectors are the expensive part. This exists for the case where the
         EXTRACTOR improved while the file did not change (see
-        `indexing._resymbol`), which has to be free or nobody re-runs it.
+        `indexing.passes.resymbol`), which has to be free or nobody re-runs it.
         """
         self.db.execute("DELETE FROM symbols WHERE file=?", (path,))
         self.insert(symbols)

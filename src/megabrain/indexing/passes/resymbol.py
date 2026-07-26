@@ -15,9 +15,9 @@ it runs once per bump, on a warm index, and costs nothing at the endpoint.
 
 from __future__ import annotations
 
-from ..chunkers import Chunker
-from ..storage import Store
-from .strategies import Registry
+from ...chunkers import Chunker
+from ...storage import Store
+from ..strategies import Registry
 
 __all__ = ["resymbol", "SYMBOL_SCHEMA"]
 

@@ -12,7 +12,7 @@ from typing import Sequence
 
 from .._errors import NothingToIndex
 from ..indexing import index_repo
-from ..indexing._embed import Embeddable
+from ..indexing.passes.embed import Embeddable
 from ..indexing.strategies import Strategy
 from ..storage import Store
 from .repos import remember

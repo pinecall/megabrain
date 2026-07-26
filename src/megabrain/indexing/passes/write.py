@@ -11,10 +11,10 @@ from typing import Sequence
 
 import numpy as np
 
-from .._arrays import Matrix, Vector
-from ..storage import Store
-from ._embed import Vectors
-from ._plan import Planned
+from ..._arrays import Matrix, Vector
+from ...storage import Store
+from .embed import Vectors
+from .plan import Planned
 
 __all__ = ["write_files", "prune_orphans"]
 

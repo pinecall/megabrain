@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import Sequence
 
 from ..storage import Store
-from ._embed import Embeddable, embed_all
-from ._graph import graph_passes
-from ._plan import Progress, plan, read_sources
-from ._resymbol import resymbol
-from ._write import prune_orphans, write_files
 from .builtin import default_registry
 from .discover import discover
+from .edges._rebuild import graph_passes
+from .passes.embed import Embeddable, embed_all
+from .passes.plan import Progress, plan, read_sources
+from .passes.resymbol import resymbol
+from .passes.write import prune_orphans, write_files
 from .strategies import Registry, Strategy
 
 __all__ = ["index_repo"]
