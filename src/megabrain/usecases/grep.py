@@ -55,7 +55,7 @@ def grep(start: Path | str, task: str, *, path_filter: str | None = None,
     prompt = GREP_PROMPT.replace("{task}", task).replace("{map}", blocks)
     answer = answered(provider, prompt, root, emit=emit)
     with Store(root) as store:
-        sites = sites_from(store, answer.text)
+        sites = sites_from(store, answer.text, task=task)
     # The model's own words survive ONLY when it produced no rows — that is how
     # "nothing here is relevant" reaches the caller instead of an empty answer.
     rendered = sites or answer.text.strip()

@@ -18,6 +18,8 @@ from __future__ import annotations
 import re
 
 from ..storage import Store
+from ._mentions import mentioned_sites
+from ._spans import span_of
 
 __all__ = ["sites_from", "MAX_NOTE", "ROW"]
 
@@ -27,22 +29,6 @@ MAX_NOTE = 100
 The reader is about to open the file; this line only has to say why THIS symbol
 and not its neighbour. Unbounded, it grows back into the walkthrough `ask`
 already gives you."""
-
-MAX_SPAN = 400
-"""Lines a symbol may span and still be an EDIT SITE.
-
-MEASURED on sinatra: asked where to add a helper's tests, the model named
-`HelpersTest` and the index dutifully numbered it L5-2109 — a 2 100-line class,
-which as a place to jump to is no better than the filename. A site is a method
-or a test, and past this the row is a file reference wearing a line range."""
-
-_SEPARATORS = re.compile(r"[.#:]+")
-"""Ruby writes `Klass#method`, Python `Klass.method`, C++ `Klass::method`.
-
-MEASURED: the model answered `Sinatra::Helpers#send_file` for a symbol the index
-stores as `Sinatra.Helpers.send_file`, and splitting on `.` alone left
-`Helpers#send_file`, which matched nothing. The model is reading SOURCE, so it
-spells names the way that language does."""
 
 ROW = re.compile(r"^\s*([^|\n]+?\.[A-Za-z0-9]+)\s*\|\s*([^|\n]+?)\s*\|\s*([^\n]*)$",
                  re.MULTILINE)
@@ -55,46 +41,41 @@ takes rows and ignores everything else rather than failing on the first
 paragraph."""
 
 
-def sites_from(store: Store, raw: str, *, root: str = "") -> str:
-    """The model's rows, grouped by file, with real line ranges from the index."""
-    del root
-    grouped: dict[str, list[str]] = {}
-    for path, symbol, note in ROW.findall(raw):
-        span = _span(store, path.strip(), symbol.strip())
-        if span is None:
-            continue
-        low, high = span
-        grouped.setdefault(path.strip(), []).append(
-            f"  L{low}-{high}  {symbol.strip()} — {note.strip()[:MAX_NOTE]}")
-    return "".join(f"## {path}\n" + "\n".join(rows) + "\n\n"
-                   for path, rows in grouped.items())
+def sites_from(store: Store, raw: str, *, task: str = "") -> str:
+    """The model's rows plus every site the task's own identifiers appear in.
 
-
-def _span(store: Store, path: str, symbol: str) -> tuple[int, int] | None:
-    """`Class.method` or a bare name, in THIS file, as its real line range.
-
-    Matched on the last segment so the model may write `send_file` for a symbol
-    the index stores as `App.send_file` — it is reading source, not the table.
-    None when the index cannot number it: a range invented for a symbol nobody
-    declared is worse than its absence, because the reader jumps to it.
+    Two lanes, and the second is not a nicety. MEASURED head to head against a
+    plain grep on the same feature: `grep show_envvar` returned all six sites in
+    one call, the model named two, and one of the four it dropped was where the
+    logic goes. A tool that replaces grep must return at least what grep returns,
+    so completeness is COMPUTED here rather than requested in a prompt — while
+    the model still contributes the row grep cannot find and the note saying why.
     """
-    wanted = _SEPARATORS.split(symbol.strip("`() "))
-    sized = [(_SEPARATORS.split(str(e.get("name", ""))), e)
-             for e in store.symbols.read_for(path) if _numbered(e)]
-    # QUALIFIED first, and it is not a nicety: asked for `Choice.get_metavar`,
-    # matching the last segment alone returned `ParamType.get_metavar` — the base
-    # class, 257 lines earlier, because it comes first in the file. A reader sent
-    # there reads the wrong override and finds nothing to change.
-    for depth in (min(len(wanted), 2), 1):
-        tail = wanted[-depth:]
-        for parts, entry in sized:
-            if parts[-depth:] == tail:
-                return int(entry["line"]), int(entry["end_line"])
-    return None
+    grouped: dict[str, list[tuple[int, int, str]]] = {}
+    for path, symbol, note in ROW.findall(raw):
+        span = span_of(store, path.strip(), symbol.strip())
+        if span:
+            grouped.setdefault(path.strip(), []).append(
+                (*span, f"{symbol.strip()} — {note.strip()[:MAX_NOTE]}"))
+    _add_mentions(store, task, grouped)
+    return "".join(
+        f"## {path}\n" + "\n".join(f"  L{low}-{high}  {label}"
+                                   for low, high, label in sorted(rows)) + "\n\n"
+        for path, rows in grouped.items())
 
 
-def _numbered(entry: dict[str, object]) -> bool:
-    """A symbol the index can turn into a jumpable range."""
-    low, high = entry.get("line"), entry.get("end_line")
-    return (isinstance(low, int) and isinstance(high, int)
-            and high - low < MAX_SPAN)
+def _add_mentions(store: Store, task: str,
+                  grouped: dict[str, list[tuple[int, int, str]]]) -> None:
+    """Sites the task's identifiers name that the model did not, marked as such.
+
+    Marked rather than merged silently: the reader can tell which rows carry a
+    model's judgement about why they matter and which are "this text is here",
+    and the second kind is what a grep would have given them anyway.
+    """
+    if not task:
+        return
+    for path, symbol, low, high in mentioned_sites(store, task):
+        rows = grouped.setdefault(path, [])
+        if not any(low == known_low and high == known_high
+                   for known_low, known_high, _ in rows):
+            rows.append((low, high, f"{symbol} — mentions it"))
