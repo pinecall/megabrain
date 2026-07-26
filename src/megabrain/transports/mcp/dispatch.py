@@ -37,7 +37,8 @@ def _grep(args: dict[str, Any]) -> str:
     will open those files anyway — so quoting the code back is billed twice.
     """
     return grep(arg.repo(args), arg.first_of(args, "task", "query"),
-                path_filter=arg.scope(args))
+                path_filter=arg.scope(args),
+                why=arg.flag(args, "why", default=False))
 
 
 def _index(args: dict[str, Any]) -> str:

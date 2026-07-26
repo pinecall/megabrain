@@ -19,6 +19,7 @@ import re
 
 from ..storage import Store
 from ._mentions import mentioned_sites
+from ._referenced import referenced_sites
 from ._spans import span_of
 
 __all__ = ["sites_from", "MAX_NOTE", "ROW"]
@@ -74,8 +75,22 @@ def _add_mentions(store: Store, task: str,
     """
     if not task:
         return
-    for path, symbol, low, high in mentioned_sites(store, task):
+    sites = [(path, symbol, low, high)
+             for path, symbol, low, high in mentioned_sites(store, task)]
+    _place(grouped, sites, "mentions it")
+    # One hop out from what we have, which is the only lane that reaches a file
+    # the task's own words never name: `Option.get_help_extra` is declared
+    # `-> types.OptionHelpExtra`, and that TypedDict had to gain a key.
+    settled = sites + [(path, "", low, high)
+                       for path, rows in grouped.items() for low, high, _ in rows]
+    _place(grouped, referenced_sites(store, settled), "used by a site above")
+
+
+def _place(grouped: dict[str, list[tuple[int, int, str]]],
+           sites: list[tuple[str, str, int, int]], why: str) -> None:
+    """Add each site once, keyed by its span so the model's note always wins."""
+    for path, symbol, low, high in sites:
         rows = grouped.setdefault(path, [])
         if not any(low == known_low and high == known_high
                    for known_low, known_high, _ in rows):
-            rows.append((low, high, f"{symbol} — mentions it"))
+            rows.append((low, high, f"{symbol} — {why}"))

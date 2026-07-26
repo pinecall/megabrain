@@ -60,24 +60,19 @@ class SearchParams(_SearchRequired, total=False):
     content: Annotated[Content, "omit to let code and docs compete; 'code' so "
                                 "a long README cannot outrank the code it "
                                 "describes; 'docs' for prose only"]
-    bodies: Annotated[bool, "default FALSE: the answer is a MAP — the files "
-                            "that answer the task, each with its best span and "
-                            "its symbols, no code. Measured at ~2 700 tokens "
-                            "against ~8 100 with bodies, and the span tells you "
-                            "where to look. true inlines the code when you want "
-                            "to read it here instead of opening the file"]
-    rerank: Annotated[bool, "default false: the deterministic answer is "
-                            "complete on its own. true asks a model to reorder "
-                            "the related files by the task's edit surface — a "
-                            "chat call, a second or two, and it never drops a "
-                            "file"]
+    bodies: Annotated[bool, "default FALSE: the answer is a MAP — the files that "
+                            "answer, each with its best span and its symbols, no "
+                            "code. ~2 700 tokens against ~8 100 with bodies, and "
+                            "the span tells you where to look. true inlines it"]
+    rerank: Annotated[bool, "default false: the deterministic answer is complete "
+                            "on its own. true asks a model to reorder the related "
+                            "files by the task's edit surface — one chat call, and "
+                            "it never drops a file"]
     expand: Annotated[bool, "default false. true asks a model to name the "
-                            "identifiers your wording MISSED — the method or "
-                            "class the code itself uses — and searches again "
-                            "for them, up to three rounds, stopping when a "
-                            "round adds nothing. Buys RECALL where rerank buys "
-                            "ORDER: reach for it when the answer plainly is not "
-                            "in the list, not by default"]
+                            "identifiers your wording MISSED — the method the "
+                            "code itself uses — and searches again, up to three "
+                            "rounds. Buys RECALL where rerank buys ORDER: for "
+                            "when the answer plainly is not in the list"]
 
 
 class IndexParams(_Target, total=False):
@@ -98,3 +93,8 @@ class _GrepRequired(_Target):
 
 class GrepParams(_GrepRequired, total=False):
     scope_path: Scope
+    why: Annotated[bool, "default FALSE, and the default runs NO model: the rows "
+                         "come from the index in ~50 ms. true adds one model call "
+                         "(~1.3 s) for a note on each row plus the site a literal "
+                         "search cannot reach — one whose text never contains the "
+                         "task's own words. Ask for it when the change is subtle"]

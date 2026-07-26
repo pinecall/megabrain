@@ -211,7 +211,7 @@ jobs, and answering all three the same way is what makes a tool feel almost usef
 
 | you are about to… | tool | what comes back | size |
 |---|---|---|---|
-| **EDIT** — you know roughly what to change | **`megabrain_grep`** | the files to open, the symbols in them worth opening, each one's **exact line range**, and one line on why. Ordered: the site to change, what it must match or reuse, the test that pins it | ~400 chars |
+| **EDIT** — you know roughly what to change | **`megabrain_grep`** | the files to open, the symbols in them worth opening, each one's **exact line range**. **No model at all** by default: identifiers from your task matched against the index, plus one hop to the contracts those sites reference | ~400 chars, **~50 ms** |
 | **UNDERSTAND** — a mechanism, a bug, or a pattern you want to copy out of another repo | **`megabrain_ask`** | the flow narrated end to end with the **real code spliced in**, plus the definition of every helper it names and the tests that pin what it described | ~1–2k words |
 | read the **DOCS**, or get the map | **`megabrain_search`** | the files that answer, each with its best span and symbols. `content: "docs"` for prose — this is the one to reach for when a repo's README *is* the API reference | ~2 700 tokens |
 | make a repo answerable | **`megabrain_index`** | the index, incremental by content hash | — |
@@ -236,9 +236,16 @@ $ megabrain grep "the read tool refuses non-regular files but write does not —
   L131-136  test_read_rejects_directory — The existing test pattern to replicate.
 ```
 
-Three rows, 352 characters, ~1.3 s. `grep -r "regular file"` finds the string; this finds
-the **place with no matching string at all** — `beta_write_tool`, which is the whole point,
+Three rows, 352 characters. `grep -r "regular file"` finds the string; this finds the
+**place with no matching string at all** — `beta_write_tool`, which is the whole point,
 because the code you have to change is the code that does not yet mention the thing.
+
+**And it runs no model to do it.** That was measured after being built the wrong way
+round: on click's `show_envvar_value` task the deterministic lanes alone returned 10 of 11
+rows in **0.05 s**, while adding a model pass took **1.3 s** — 26× — for one extra row and
+a note on each. A tool that stands in for `grep` cannot charge a model call by default, and
+hard rule #1 says retrieval never calls one. `--why` / `why: true` buys that row back: it
+is the one no literal search can reach, whose text never contains the task's own words.
 
 The split of labour inside is deliberate: the model names the symbol, the **engine** reads
 the line range out of the symbol table. Asking a model for line numbers was measured and

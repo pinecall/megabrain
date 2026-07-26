@@ -18,6 +18,9 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
     parser.add_argument("path", nargs="?", default=".",
                         help="anywhere inside the repo (default: .)")
     parser.add_argument("--path-filter", metavar="PREFIX", help="only files under PREFIX")
+    parser.add_argument("--why", action="store_true",
+                        help="one model call: adds a note per site, and the site "
+                             "no literal search can reach (measured: 0.05s -> 1.3s)")
     parser.add_argument("--quiet", action="store_true",
                         help="the sites only, no retrieval trace")
     parser.set_defaults(run=run)
@@ -26,7 +29,7 @@ def register(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None
 def run(args: argparse.Namespace) -> str:
     """The rows go to STDOUT, the trace to stderr — so `| grep` and `> file`
     both stay clean while the person watching still sees what was retrieved."""
-    grep(args.path, args.task, path_filter=args.path_filter,
+    grep(args.path, args.task, path_filter=args.path_filter, why=args.why,
          emit=_Live(quiet=args.quiet))
     return ""
 

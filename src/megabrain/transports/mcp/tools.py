@@ -1,4 +1,4 @@
-"""The tools an agent can see — three, and each one earns its slot.
+"""The tools an agent can see — four, and each one earns its slot.
 
 Every tool costs the calling agent context and a routing decision, and the host
 already has Read, Grep and an editor. So the surface carries only what megabrain
@@ -58,9 +58,10 @@ TOOLS: tuple[Tool, ...] = (
          "WHERE TO LOOK for a change you are about to make — the grep "
          "replacement. Returns the files to open, the symbols inside them worth "
          "opening, each one's EXACT line range from the index, and one line on "
-         "why it matters: the site to change first, then what it must match or "
-         "reuse, then the test that pins it. Ordered the way the work happens. "
-         "Typically ~400 characters, one call, a second or two. It quotes NO "
+         "why it matters. Runs NO MODEL by default — the rows come from the "
+         "index in ~50 ms, which is what lets it stand in for a grep at all; "
+         "pass `why: true` for one model call that adds a note per row plus the "
+         "site whose text never contains the task's own words. It quotes NO "
          "code on purpose — your editor opens the file anyway, so a render that "
          "pasted the body would bill you for reading it twice; the line range is "
          "what turns an open into a jump. Use it INSTEAD OF grepping a repo you "
