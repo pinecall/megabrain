@@ -27,6 +27,19 @@ Ruby and the exception in Python, so the shape rule was a preference for Python
 wearing a heuristic's clothes. The repo's own symbol table decides now: it
 declares `attachment` and has never heard of `beside`.
 
+**Admitting one-word names then cost PRECISION in Python, which is the price of
+the fix above and had to be paid back.** `Option` is a class click declares, so
+the index vouches for it, and it resolves to 10 implementation sites — 10 rows of
+noise (`str_to_bool`, `CompletionItem`, `test_string_option`) beside
+`show_envvar`'s 3. But the one-word names that WERE the target resolve to one or
+two: `attachment` 1, `inline` 1, express's `render` 5. Same admission, opposite
+verdict, and the site count separates them — so a name the index vouched for gets
+`MAX_BARE` (6) implementation sites where a name that is specific on its own
+(`resolve_envvar_value`) keeps the wide budget. Click's render went from 27 rows
+to 11, and the three in `core.py` are now exactly `Option.__init__` (the kwarg),
+`get_help_extra` (the logic) and `OptionHelpExtra` (the TypedDict that gains a
+key). Express and sinatra unchanged.
+
 **And the row cap emptied instead of trimming, which the better extractor then
 exposed.** With test cases contributing rows, three of five ordinary express
 tasks went from a useful render to NOTHING: `sendFile` resolves to 47 sites —

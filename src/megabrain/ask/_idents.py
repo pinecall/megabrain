@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["identifiers", "outermost", "MIN_IDENT"]
+__all__ = ["identifiers", "outermost", "specific", "MIN_IDENT"]
 
 MIN_IDENT = 8
 """Characters a name needs to be chased on SHAPE alone, with no index consulted.
@@ -56,12 +56,23 @@ def identifiers(task: str, known: dict[str, int] | None = None) -> set[str]:
     heard of `beside`.
     """
     words = _IDENT.findall(task)
-    shaped = {word for word in words
-              if len(word) >= MIN_IDENT and _SNAKE_OR_CAMEL.search(word)}
+    shaped = {word for word in words if specific(word)}
     if known is None:
         return shaped
     return shaped | {word for word in words if len(word) >= MIN_DECLARED
                      and 0 < known.get(word, 0) <= MAX_COMMON}
+
+
+def specific(word: str) -> bool:
+    """Whether the NAME itself says it is this task's target.
+
+    `resolve_envvar_value` names one thing; `Option` names the class half the
+    repository mentions. The distinction earns a different site budget in
+    `_spread`, because a short name that turns up in ten implementation sites is
+    the CONTAINER of the change and not the change — measured on click, where
+    `Option` contributed 10 code sites of pure noise beside `show_envvar`'s 3.
+    """
+    return len(word) >= MIN_IDENT and bool(_SNAKE_OR_CAMEL.search(word))
 
 
 def outermost(symbols: list[tuple[str, int, int]]) -> list[tuple[str, int, int]]:

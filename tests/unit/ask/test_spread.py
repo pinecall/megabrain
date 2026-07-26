@@ -44,11 +44,23 @@ def test_the_suite_is_SAMPLED_not_dropped_and_not_pasted_whole() -> None:
 
 def test_a_BROAD_name_no_longer_silences_a_specific_one() -> None:
     """"a name in forty places is the repository's idiom" is a property of the
-    NAME. Judged over the union, `status` took `redirect` down with it."""
-    got = merged({"redirect": code("lib/response.js", 8),
-                  "status": code("lib/response.js", 90, start=500)})
-    assert [row for row in got if row[2] < 100], "redirect survives"
-    assert not [row for row in got if row[2] >= 500], "status is vocabulary"
+    NAME. Judged over the union, the broad one took the narrow one down too."""
+    got = merged({"resolve_envvar_value": code("lib/response.js", 8),
+                  "get_help_record": code("lib/response.js", 90, start=500)})
+    assert [row for row in got if row[2] < 100], "the narrow name survives"
+    assert not [row for row in got if row[2] >= 500], "the broad one is vocabulary"
+
+
+def test_a_ONE_WORD_name_gets_a_TIGHTER_budget_than_a_specific_one() -> None:
+    """MEASURED on click, and it is the regression that admitting one-word names
+    introduced. `Option` is declared, so the index vouches for it — and it
+    resolves to 10 implementation sites, contributing 10 rows of noise beside
+    `show_envvar`'s 3. The one-word names that WERE the target resolve to one or
+    two. Same site count, opposite verdict, decided by the name's own shape."""
+    assert not merged({"Option": code("src/click/core.py", 10)}), "the container"
+    assert merged({"attachment": code("lib/response.js", 1)}), "the target"
+    assert merged({"resolve_envvar_value": code("src/click/core.py", 10)}), \
+        "a specific name keeps the wide budget — ten sites of it is a real trace"
 
 
 def test_vocabulary_is_judged_on_CODE_sites_only() -> None:
@@ -67,7 +79,7 @@ def test_the_MOST_SPECIFIC_name_is_served_first() -> None:
 
 
 def test_the_TOTAL_is_capped_so_a_render_stays_a_place_to_jump() -> None:
-    got = merged({f"n{i}": code(f"lib/{i}.js", 30) for i in range(5)})
+    got = merged({f"ident_number_{i}": code(f"lib/{i}.js", 30) for i in range(5)})
     assert len(got) == MAX_ROWS
 
 

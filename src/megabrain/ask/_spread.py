@@ -19,7 +19,9 @@ and an over-broad task degrades into a shorter answer instead of a blank one.
 
 from __future__ import annotations
 
-__all__ = ["merged", "MAX_SPREAD", "MAX_ROWS", "MAX_TESTS"]
+from ._idents import specific
+
+__all__ = ["merged", "MAX_SPREAD", "MAX_BARE", "MAX_ROWS", "MAX_TESTS"]
 
 Site = tuple[str, str, int, int]
 
@@ -30,6 +32,17 @@ Counted over code only, and that distinction is the measurement: in express
 `sendFile` resolves to 47 sites — THREE of them implementation and 44 of them
 test cases. Counting the union called the most specific name in the task
 "vocabulary" and dropped it."""
+
+MAX_BARE = 6
+"""Implementation sites a name the INDEX vouched for may have — see `specific`.
+
+A one-word name is admitted because the repo declares it, and that admission
+cannot tell a target from its container. The site count can: MEASURED, `Option`
+resolves to 10 implementation sites in click and contributed 10 rows of noise
+beside `show_envvar`'s 3, while the one-word names that WERE the target resolve
+to one or two (`attachment` 1, `inline` 1, express's `render` 5). Six splits
+those cleanly — and it is tuned on three repositories, so it is a threshold,
+not a law."""
 
 MAX_TESTS = 4
 """Test cases kept per identifier.
@@ -72,7 +85,7 @@ def _quota(name: str, rows: list[tuple[Site, bool]]) -> list[Site]:
     suites that merely send one — the sample should be of the thing asked about.
     """
     code = [site for site, is_test in rows if not is_test]
-    if len(code) > MAX_SPREAD:
+    if len(code) > (MAX_SPREAD if specific(name) else MAX_BARE):
         return []
     tests = sorted((site for site, is_test in rows if is_test),
                    key=lambda site: (name not in site[0], site[0], site[2]))
