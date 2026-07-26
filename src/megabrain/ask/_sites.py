@@ -1,16 +1,15 @@
-"""The edit sites: the model names symbols, the ENGINE numbers them.
+"""The edit sites: which symbols, their real ranges, and what is in scope.
 
-`grep` exists because the host's editor makes you open the file anyway, so
-citing the code back is work paid for twice — the reason `megabrain_code` was
-retired. What a grep replacement owes is narrower and cheaper: which files,
-which symbols inside them, one line on why each matters, and the exact range to
-jump to.
+`grep` exists because the host's editor opens the file anyway, so citing the code
+back is work paid for twice — the reason `megabrain_code` was retired. What a
+grep replacement owes is narrower: which files, which symbols, the exact range to
+jump to, and the metadata that saves a Read (`_surface`).
 
-The split of labour is the design, and both halves were measured. Asking a model
-for line numbers is rejected in `prompt.py`: "unnumbered, `[[k:lo-hi]]` citations
-landed a few lines off and cut functions mid-body." Asking it which symbol
-matters is what it is good at. So the model writes `send_file` and the index
-reads L425-448, where it cannot be off by one.
+Four lanes feed it, three of them with NO model: identifiers from the task
+(`_mentions`), one hop to the contracts those sites reference (`_referenced`),
+the import surface (`_surface`), and — only when asked — a model's rows and notes.
+Every range comes from the index, because asking a model for line numbers is
+rejected in `prompt.py`: unnumbered, its citations "landed a few lines off".
 """
 
 from __future__ import annotations
@@ -20,6 +19,7 @@ import re
 from ..storage import Store
 from ._mentions import mentioned_sites
 from ._referenced import referenced_sites
+from ._rows import rendered
 from ._spans import span_of
 
 __all__ = ["sites_from", "MAX_NOTE", "ROW"]
@@ -43,15 +43,13 @@ paragraph."""
 
 
 def sites_from(store: Store, raw: str, *, task: str = "") -> str:
-    """The model's rows plus every site the task's own identifiers appear in.
+    """The model's rows plus every site the task's identifiers appear in.
 
-    Two lanes, and the second is not a nicety. MEASURED head to head against a
-    plain grep on the same feature: `grep show_envvar` returned all six sites in
-    one call, the model named two, and one of the four it dropped was where the
-    logic goes. A tool that replaces grep must return at least what grep returns,
-    so completeness is COMPUTED here rather than requested in a prompt — while
-    the model still contributes the row grep cannot find and the note saying why.
-    """
+    MEASURED head to head: `grep show_envvar` returned all six sites in one call
+    while the model named two, and one it dropped was where the logic goes. A tool
+    replacing grep must return at least what grep returns, so completeness is
+    COMPUTED rather than requested — the model contributes only the row grep
+    cannot find, and the note saying why."""
     grouped: dict[str, list[tuple[int, int, str]]] = {}
     for path, symbol, note in ROW.findall(raw):
         span = span_of(store, path.strip(), symbol.strip())
@@ -59,10 +57,7 @@ def sites_from(store: Store, raw: str, *, task: str = "") -> str:
             grouped.setdefault(path.strip(), []).append(
                 (*span, f"{symbol.strip()} — {note.strip()[:MAX_NOTE]}"))
     _add_mentions(store, task, grouped)
-    return "".join(
-        f"## {path}\n" + "\n".join(f"  L{low}-{high}  {label}"
-                                   for low, high, label in sorted(rows)) + "\n\n"
-        for path, rows in grouped.items())
+    return "".join(rendered(store, path, rows) for path, rows in grouped.items())
 
 
 def _add_mentions(store: Store, task: str,
