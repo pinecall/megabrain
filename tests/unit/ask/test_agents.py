@@ -11,8 +11,8 @@ import time
 
 import pytest
 
-from megabrain.ask import _pool
-from megabrain.ask.agents import Task, run_agents
+from megabrain.ask.agents import _pool
+from megabrain.ask.agents.fanout import Task, run_agents
 from megabrain.providers.chat.base import Answer
 from tests.unit.ask.test_splice import CANDIDATES
 

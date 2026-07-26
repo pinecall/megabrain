@@ -9,7 +9,7 @@ splices the bytes.
 
 from __future__ import annotations
 
-from .citations import Citation, parse_citations
-from .splice import splice
+from .citing.citations import Citation, parse_citations
+from .citing.splice import splice
 
 __all__ = ["splice", "parse_citations", "Citation"]

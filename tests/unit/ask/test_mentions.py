@@ -17,7 +17,7 @@ the index, resolved to the symbols that contain them.
 
 from __future__ import annotations
 
-from megabrain.ask._mentions import mentioned_sites
+from megabrain.ask.sites.mentions import mentioned_sites
 from megabrain.chunkers.model import Chunk, Symbol
 from megabrain.storage import Store
 

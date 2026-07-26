@@ -1,8 +1,0 @@
-# megabrain's own index excludes (bare name = any path segment; glob/path = repo-relative)
-# swebench eval scratch: cloned foreign repos + worktrees — not our source
-clones
-wt
-wt_ask
-wt_best
-logs
-data

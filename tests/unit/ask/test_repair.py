@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import pytest
 
-from megabrain.ask.citations import parse_citations
-from megabrain.ask.repair import broken_references, repair
+from megabrain.ask.citing.citations import parse_citations
+from megabrain.ask.citing.repair import broken_references, repair
 from megabrain.providers.chat.base import Answer
 from tests.unit.ask.test_splice import CANDIDATES
 
@@ -161,7 +161,7 @@ def test_the_prompt_forbids_BOTH_failures_by_example() -> None:
     `[[k:lo-hi, lo2-hi2]]` for several ranges of one chunk, and the model
     generalised the comma to several chunks.
     """
-    from megabrain.ask.prompt import RULES
+    from megabrain.ask.prompt.prompt import RULES
 
     assert "[[1:173-240], [2:241-307]]" in RULES, "the grouped form is not shown as WRONG"
     assert "L688-757" in RULES, "the prose file reference is not shown as WRONG"
@@ -173,7 +173,7 @@ def test_the_prompt_forbids_BOTH_failures_by_example() -> None:
 def test_the_prompt_says_what_to_do_when_nothing_covers_it() -> None:
     """The escape hatch, without which a model invents a reference: told only
     that it may not name files, it names one anyway rather than admit a gap."""
-    from megabrain.ask.prompt import RULES
+    from megabrain.ask.prompt.prompt import RULES
 
     assert "no chunk below contains" in RULES
 
@@ -187,7 +187,7 @@ def test_the_ENGINES_OWN_block_headers_are_not_mistaken_for_broken_refs() -> Non
     send the whole thing back for "repair" — so this pins the distinction that
     keeps that from being a silent disaster.
     """
-    from megabrain.ask.splice import splice
+    from megabrain.ask.citing.splice import splice
 
     rendered = splice("the handler is [[0]] here", CANDIDATES)
     assert "**`svc.py`" in rendered, "the fixture stopped producing headers"

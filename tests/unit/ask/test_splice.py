@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from megabrain.ask.citations import Citation, parse_citations
-from megabrain.ask.splice import SPLICE_CAP, splice
+from megabrain.ask.citing.citations import Citation, parse_citations
+from megabrain.ask.citing.splice import SPLICE_CAP, splice
 from megabrain.storage.model import ChunkMeta
 
 

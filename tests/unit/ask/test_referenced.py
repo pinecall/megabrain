@@ -14,7 +14,7 @@ neither grep nor the model named.
 
 from __future__ import annotations
 
-from megabrain.ask._referenced import referenced_sites
+from megabrain.ask.sites.referenced import referenced_sites
 from megabrain.chunkers.model import Chunk, Symbol
 from megabrain.storage import Store
 

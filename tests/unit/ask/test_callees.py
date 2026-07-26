@@ -14,7 +14,7 @@ engine, with nothing to forget.
 
 from __future__ import annotations
 
-from megabrain.ask._callees import named_definitions
+from megabrain.ask.checks.callees import named_definitions
 from megabrain.chunkers.model import Symbol
 from megabrain.storage import Store
 

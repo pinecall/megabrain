@@ -9,7 +9,7 @@ reader's attention at exactly the point they're deciding what to write."
 
 from __future__ import annotations
 
-from megabrain.ask._prune import prune_empty_sections
+from megabrain.ask.checks.prune import prune_empty_sections
 
 HOLLOW = """## lib/app.rb — the change
 **`lib/app.rb` L1-9**

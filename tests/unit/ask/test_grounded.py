@@ -18,7 +18,7 @@ to"/"calls" language actually asserts.
 
 from __future__ import annotations
 
-from megabrain.ask._grounded import unlinked_hops
+from megabrain.ask.checks.grounded import unlinked_hops
 from megabrain.chunkers.model import Chunk
 from megabrain.storage import Store
 

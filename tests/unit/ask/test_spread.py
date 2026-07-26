@@ -15,7 +15,7 @@ A better index made the answer worse, which is the shape of bug worth a test.
 
 from __future__ import annotations
 
-from megabrain.ask._spread import MAX_ROWS, MAX_SPREAD, MAX_TESTS, merged
+from megabrain.ask.sites.spread import MAX_ROWS, MAX_SPREAD, MAX_TESTS, merged
 
 
 def code(path: str, count: int, start: int = 1):

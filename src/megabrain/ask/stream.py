@@ -12,8 +12,8 @@ immediately, which is what keeps the answer live.
 from __future__ import annotations
 
 from ..storage.model import ChunkMeta
-from .citations import PARTIAL
-from .splice import splice
+from .citing.citations import PARTIAL
+from .citing.splice import splice
 
 __all__ = ["Splicer"]
 

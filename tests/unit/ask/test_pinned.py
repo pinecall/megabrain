@@ -14,7 +14,7 @@ edges the indexer already builds.
 
 from __future__ import annotations
 
-from megabrain.ask._pinned import exercising_tests
+from megabrain.ask.checks.pinned import exercising_tests
 from megabrain.chunkers.model import Chunk, Symbol
 from megabrain.indexing.edges import write_pin_edges
 from megabrain.storage import Store

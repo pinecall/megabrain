@@ -14,7 +14,7 @@ cannot be off by one.
 
 from __future__ import annotations
 
-from megabrain.ask._sites import sites_from
+from megabrain.ask.sites.sites import sites_from
 from megabrain.chunkers.model import Symbol
 from megabrain.storage import Store
 

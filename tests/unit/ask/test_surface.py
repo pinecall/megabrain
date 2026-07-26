@@ -13,7 +13,7 @@ break the rule that `grep` never pastes a body.
 
 from __future__ import annotations
 
-from megabrain.ask._surface import import_surface
+from megabrain.ask.checks.surface import import_surface
 from megabrain.chunkers.model import Chunk, Symbol
 from megabrain.storage import Store
 

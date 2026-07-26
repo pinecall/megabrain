@@ -28,12 +28,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..ask._candidates import candidates_of
-from ..ask._chunkblocks import chunk_blocks
-from ..ask._converse import answered
-from ..ask._grepwords import GREP_PROMPT
-from ..ask._sites import sites_from
+from ..ask.converse.loop import answered
 from ..ask.events import Emit, emit_nothing
+from ..ask.prompt._candidates import candidates_of
+from ..ask.prompt._chunkblocks import chunk_blocks
+from ..ask.sites.sites import sites_from
+from ..ask.sites.words import GREP_PROMPT
 from ..storage import Store
 from ..storage.locate import resolve_root
 from .search import search

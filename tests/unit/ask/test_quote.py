@@ -12,7 +12,7 @@ before any quoting, so a cut here can never shorten an anchor.
 
 from __future__ import annotations
 
-from megabrain.ask._quote import quote_citations
+from megabrain.ask.citing._quote import quote_citations
 from megabrain.chunkers.model import Chunk
 from megabrain.storage import Store
 

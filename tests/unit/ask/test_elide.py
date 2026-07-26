@@ -14,7 +14,7 @@ a marker naming how many were dropped, last lines. A block's end carries the
 
 from __future__ import annotations
 
-from megabrain.ask._elide import MAX_QUOTE_LINES, elide
+from megabrain.ask.citing._elide import MAX_QUOTE_LINES, elide
 
 LONG = [f"line {n}" for n in range(1, 121)]
 

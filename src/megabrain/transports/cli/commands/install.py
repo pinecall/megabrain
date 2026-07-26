@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from ....transports.install import PLATFORMS, apply, detect, render, render_detected
+from ...install import PLATFORMS, apply, detect, render, render_detected
 
 __all__ = ["register"]
 

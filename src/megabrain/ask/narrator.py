@@ -28,15 +28,15 @@ from pathlib import Path
 from ..contracts import Bundle
 from ..providers.chat import ChatProvider
 from ..storage import Store
-from ._candidates import candidates_of
-from ._converse import answered
-from ._flowctx import flow_context
-from ._grounded import unlinked_hops
-from ._quote import quote_citations
-from ._rescue import rescue
-from ._widen import widen
+from .checks.grounded import unlinked_hops
+from .citing._quote import quote_citations
+from .citing._rescue import rescue
+from .converse._flowctx import flow_context
+from .converse.loop import answered
 from .events import Emit, emit_nothing
-from .prompt import build_prompt
+from .prompt._candidates import candidates_of
+from .prompt._widen import widen
+from .prompt.prompt import build_prompt
 from .stream import Splicer
 
 __all__ = ["narrate"]

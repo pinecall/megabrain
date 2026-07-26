@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 
-from ..ask.splice import BLOCK_HEADER
+from ..ask.citing.splice import BLOCK_HEADER
 
 __all__ = ["strip_chrome"]
 
