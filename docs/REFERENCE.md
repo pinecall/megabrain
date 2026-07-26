@@ -152,7 +152,8 @@ never silently mismatch.
 
 | path | what it is |
 |---|---|
-| **`<repo>/megabrain.json`** | what the repository decides about ITSELF: `ignore` · `queries` · `models` (`narrator` · `rerank`). **Visible, not a dotfile** — it is committed and meant to be found and edited by whoever clones the repo, while `.megabrain/` beside it is machine state nobody reads. The dot marks what you ignore |
+| **`<repo>/megabrain.json`** | what the repository decides about ITSELF: `ignore` · `gitignore` · `queries` · `models` (`narrator` · `rerank`). **Visible, not a dotfile** — it is committed and meant to be found and edited by whoever clones the repo, while `.megabrain/` beside it is machine state nobody reads. The dot marks what you ignore |
+| `<repo>/.gitignore` | **also read, and on by default**: what the repo already declared is not its source. shipway compiles into `bin/`, which the universal exclude list cannot cover (`bin/` is real code in a Python or Rust project) — 122 of its 196 indexed files were that output, giving every `src/` symbol a compiled twin. Set `"gitignore": false` where the repo ignores real source (measured: megabrain-v2's own `evals/`) |
 | `<repo>/.megabrain/db.sqlite` | **the whole index** — chunks, vectors, symbols, edges, cards, flows |
 | `<repo>/.megabrainignore` | legacy, still read: patterns to skip, one per line. Merged with `megabrain.json`'s `ignore` |
 | `<repo>/.megabrainqueries` | legacy, still read: starter questions, one per line, `#` comments. Merged with `queries` |
@@ -162,6 +163,7 @@ never silently mismatch.
 // megabrain.json — nothing in it is required
 {
   "ignore":  ["dist", "vendor/**"],
+  "gitignore": true,
   "queries": ["how does the retry policy work?"],
   "models":  { "narrator": "google/gemini-3.1-flash-lite",
                "rerank":   "google/gemini-3.5-flash-lite" }

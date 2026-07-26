@@ -36,9 +36,42 @@ two: `attachment` 1, `inline` 1, express's `render` 5. Same admission, opposite
 verdict, and the site count separates them — so a name the index vouched for gets
 `MAX_BARE` (6) implementation sites where a name that is specific on its own
 (`resolve_envvar_value`) keeps the wide budget. Click's render went from 27 rows
-to 11, and the three in `core.py` are now exactly `Option.__init__` (the kwarg),
+to 10, and the three in `core.py` are now exactly `Option.__init__` (the kwarg),
 `get_help_extra` (the logic) and `OptionHelpExtra` (the TypedDict that gains a
 key). Express and sinatra unchanged.
+
+**`.gitignore` now decides what is not source, which was the other half of the
+noise.** shipway compiles TypeScript into `bin/`, declared in its own
+`.gitignore` under "# Build output" — and 122 of its 196 indexed files were that
+output, so every `src/` symbol had a compiled twin and one site returned two
+rows. The universal exclude list cannot fix this, on purpose: `bin/` holds real
+code in a Python or Rust project, and baking one repo's layout into a global list
+applies it everywhere. The repo had already answered.
+
+Delegated to `git check-ignore` (one process for the whole candidate list, after
+the in-memory excluder has cut `node_modules` for free) because gitignore has
+negation, `**`, per-directory files and a global file — and a half-implementation
+drops files nobody meant to drop. Writing the negation test proved the point: git
+will NOT re-include a file whose parent DIRECTORY is excluded, so `bin/` plus
+`!bin/keep.js` keeps it ignored, and a hand-rolled matcher would have indexed the
+artifact.
+
+Fails OPEN — no git, no repo, a timeout, an exit code other than 0 or 1 all yield
+"nothing ignored". Losing the filter costs precision; losing the index costs the
+tool. Every skip is recorded with reason `gitignored`, because a file that
+vanishes without explanation is the hardest kind of bug to notice.
+
+| repo | files indexed | dropped |
+|---|---|---|
+| shipway | 196 → **75** | `bin/*.js`, `bin/*.d.ts` |
+| aldus-v2 | 338 → 284 | `dist-demo/`, `dist-lib-types/*.d.ts` |
+| pinecall/sdk | 186 → 170 | `src.bkp/` — a dead snapshot competing with live code |
+| express · click · sinatra | **unchanged** (146 · 120 · 162) | nothing |
+
+It is a heuristic with one measured false positive, so it is opt-out per repo:
+megabrain-v2 gitignores `evals/`, which IS source. `"gitignore": false` in
+`megabrain.json` — a committed field rather than a flag, so whoever hits it
+answers once for everyone who clones.
 
 **And the row cap emptied instead of trimming, which the better extractor then
 exposed.** With test cases contributing rows, three of five ordinary express

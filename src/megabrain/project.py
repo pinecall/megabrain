@@ -6,6 +6,7 @@ of it, and which models narrate and judge.
 
     {
       "ignore":  ["dist", "vendor/**"],
+      "gitignore": true,
       "queries": ["how does the retry policy work?"],
       "models":  {"narrator": "google/gemini-3.1-flash-lite",
                   "rerank":   "google/gemini-3.5-flash-lite"}
@@ -49,6 +50,16 @@ class Project:
     root: Path
     ignore: tuple[str, ...] = ()
     queries: tuple[str, ...] = ()
+    gitignore: bool = True
+    """Whether `.gitignore` also decides what is not source. Default TRUE.
+
+    True is right for the repos that made the case — shipway's `bin/`, aldus's
+    `dist-lib-types/`, sdk's `src.bkp/` are build output and dead snapshots that
+    the repo already declared. But it is a heuristic with a real false positive,
+    found in megabrain-v2 itself: `evals/` is gitignored and IS source. So the
+    escape is a committed field rather than a flag, because whoever hits this
+    knows their repo and the next person to clone it should inherit the answer.
+    """
     narrator_model: str = NARRATOR_MODEL
     rerank_model: str = RERANK_MODEL
     malformed: bool = False
@@ -68,6 +79,10 @@ def load_project(root: Path | str) -> Project:
         root=base,
         ignore=(*string_tuple(raw.get("ignore")), *lines_of(base / LEGACY_IGNORE)),
         queries=(*string_tuple(raw.get("queries")), *lines_of(base / LEGACY_QUERIES)),
+        # Only an explicit `false` turns it off: a missing key and a malformed
+        # one both have to mean the default, or a typo would silently widen the
+        # index back out with nothing to show that it had.
+        gitignore=raw.get("gitignore") is not False,
         narrator_model=models.get("narrator")
         or os.environ.get("MEGABRAIN_ASK_MODEL") or NARRATOR_MODEL,
         rerank_model=models.get("rerank")

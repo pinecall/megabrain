@@ -12,7 +12,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterable
 
-__all__ = ["Excluder", "load_ignore", "IGNORE_FILE"]
+__all__ = ["Excluder", "load_ignore", "uses_gitignore", "IGNORE_FILE"]
 
 IGNORE_FILE = ".megabrainignore"
 
@@ -70,6 +70,13 @@ class Excluder:
         return any(relpath == g or relpath.startswith(f"{g}/")
                    or fnmatch(relpath, g) or fnmatch(relpath, f"{g}/*")
                    for g in self.globs)
+
+
+def uses_gitignore(root: Path) -> bool:
+    """Whether this repo lets `.gitignore` decide too — `megabrain.json`, default on."""
+    from ..project import load_project
+
+    return load_project(root).gitignore
 
 
 def load_ignore(root: Path) -> list[str]:

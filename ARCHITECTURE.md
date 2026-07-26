@@ -731,6 +731,7 @@ src/megabrain/
         edges · _imports · _calls   import/call resolution (python)
         strategies.py    ext → Strategy registry (OCP) · builtin.py the shipped one
         _exclude.py      megabrain.json ignores + the legacy dotfiles
+        _gitignore.py    the repo's own .gitignore (on by default, opt-out)
       retrieval/       ANSWER queries — NO LLM IN HERE (rule 1, enforced by a test)
         search.py        the neutral primitive · params.py every knob, frozen
         state.py         SearchState + load_state (warm matrices)
