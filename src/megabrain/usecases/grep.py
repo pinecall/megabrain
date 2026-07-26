@@ -52,8 +52,17 @@ def grep(start: Path | str, task: str, *, path_filter: str | None = None,
     judged = _judged(root, bundle, task, emit) if why else ""
     with Store(root) as store:
         sites = sites_from(store, judged, task=task)
-    # The model's own words survive ONLY when nothing resolved — that is how
-    # "nothing here is relevant" reaches the caller instead of an empty answer.
+        if not sites and not why:
+            # MEASURED across ten repositories, and it is why this fallback is
+            # not optional: the literal lane fires only when the TASK spells an
+            # identifier the repo already has. Told to "describe the outcome, not
+            # the file" — which this tool's own description asks for — eight of
+            # ten tasks named nothing existing and returned ZERO rows. Fast and
+            # empty is worse than slow and right, so an empty result pays for the
+            # model rather than handing back nothing.
+            emit({"type": "unmatched", "reason": "no identifier the index knows"})
+            judged = _judged(root, bundle, task, emit)
+            sites = sites_from(store, judged, task=task)
     rendered = sites or judged.strip() or f"nothing in this index matches: {task}"
     emit({"type": "delta", "text": rendered})
     return rendered

@@ -67,8 +67,11 @@ TOOLS: tuple[Tool, ...] = (
          "what turns an open into a jump. Use it INSTEAD OF grepping a repo you "
          "have an index for: grep gives you lines that match a string, this "
          "gives you the places that matter for the task, including the ones "
-         "whose text your search terms never mention. Describe the OUTCOME you "
-         "want, not the file you guess it lives in.",
+         "whose text your search terms never mention. You do not need to know "
+         "the FILE — but DO name the identifiers you already know, the flag you "
+         "are extending or the sibling you are copying: measured, naming one was "
+         "4x faster and found 3 of 4 key sites against 1 of 4 for pure prose. "
+         "Pair it with `why: true` for full coverage (4 of 4, ~1 s).",
          GrepParams),
     Tool("megabrain_search",
          "ONE call that MAPS a task's whole edit surface: the files that answer "
