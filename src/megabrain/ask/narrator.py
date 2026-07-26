@@ -31,6 +31,7 @@ from ..storage import Store
 from ._candidates import candidates_of
 from ._converse import answered
 from ._flowctx import flow_context
+from ._grounded import unlinked_hops
 from ._quote import quote_citations
 from ._rescue import rescue
 from ._widen import widen
@@ -65,6 +66,7 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
         parts.append(tail)
         emit({"type": "delta", "text": tail})
     parts.append(widen(answer.text, root))
+    parts.append(unlinked_hops(answer.text, candidates, root))
     parts.extend(rescue(provider, answer.text, candidates, emit))
     result = _quoted(root, "".join(parts))
     emit({"type": "narrated", "ms": int((time.perf_counter() - started) * 1000)})
