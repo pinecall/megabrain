@@ -41,6 +41,17 @@ class SymbolTable:
             [(s.file, s.name, s.kind, s.line, s.end_line, s.signature,
               json.dumps(list(s.decorators)), s.doc) for s in symbols])
 
+    def replace_for(self, path: str, symbols: Sequence[Symbol]) -> None:
+        """One file's symbols, swapped without touching its chunks or vectors.
+
+        What `files.delete` cannot do: it clears the chunks too, and their
+        vectors are the expensive part. This exists for the case where the
+        EXTRACTOR improved while the file did not change (see
+        `indexing._resymbol`), which has to be free or nobody re-runs it.
+        """
+        self.db.execute("DELETE FROM symbols WHERE file=?", (path,))
+        self.insert(symbols)
+
     def read_for(self, path: str) -> list[dict[str, object]]:
         rows = self.db.execute(
             f"SELECT {_READ} FROM symbols WHERE file=? ORDER BY line", (path,)).fetchall()

@@ -54,3 +54,20 @@ class LangSpec:
     `Route.prototype.dispatch`. Without it those files hold no nameable symbol,
     which makes them unciteable and unsearchable by name.
     """
+
+    group_calls: frozenset[str] = frozenset()
+    """Calls whose function argument HOLDS declarations — `describe('…', fn)`.
+
+    Recursed into and never recorded: a group wraps the whole file, so a row
+    pointing at it says "this file" and buries the case that mattered.
+    """
+
+    case_calls: frozenset[str] = frozenset()
+    """Calls that DECLARE a unit, named by their string argument — `it('…', fn)`.
+
+    A test written this way declares nothing the grammar calls a declaration, so
+    without this express's `test/res.attachment.js` holds exactly two symbols,
+    both of them imports, and no lane can return a row inside it. Which is how a
+    JS repository reports 3.9 symbols per file against Python's 16.7 — the tests,
+    half of what an edit needs, were invisible.
+    """

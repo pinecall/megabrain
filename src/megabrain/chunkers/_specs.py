@@ -51,4 +51,7 @@ TS_SPEC = LangSpec(
         "variable_declaration": ("variable_declarator", "name"),
     },
     unwrap_exports=True, assign_defs=True,
+    group_calls=frozenset({"describe", "context", "suite"}),
+    case_calls=frozenset({"it", "test", "specify",
+                          "before", "beforeEach", "after", "afterEach"}),
 )

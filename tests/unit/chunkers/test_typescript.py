@@ -142,6 +142,63 @@ def test_a_COMMONJS_prototype_assignment_is_a_symbol() -> None:
                for symbol in typescript.parse("route.js", source).symbols)
 
 
+SUITE = """\
+const express = require('express');
+
+describe('res.attachment()', function () {
+  beforeEach(function () {
+    this.app = express();
+  });
+
+  it('should Content-Disposition to attachment', function (done) {
+    request(this.app).get('/').expect('Content-Disposition', 'attachment', done);
+  });
+
+  it('should add the filename param', function (done) {
+    request(this.app).get('/').expect(200, done);
+  });
+});
+"""
+
+
+def test_a_MOCHA_case_is_a_symbol() -> None:
+    """A suite declares its units by CALLING a function with a label and a
+    closure, which the grammar reads as an expression statement. Express's
+    `test/res.attachment.js` came back with two symbols, both `require`
+    bindings, while the fifteen cases a reader edits were unnameable — and
+    `_mentions` resolves a match to the symbol CONTAINING it, so no lane could
+    return a row inside any test file in a JS repository."""
+    found = names(SUITE)
+    assert any("should add the filename param" in name for name in found)
+    assert any("beforeEach" in name for name in found), "a hook is an edit site too"
+
+
+def test_a_case_carries_the_LINES_of_its_own_body_not_the_files() -> None:
+    """The range is the entire point: a row without one is a file to read, a row
+    with one is a jump."""
+    cases = [s for s in parsed(SUITE, "test/res.attachment.js").symbols
+             if "filename param" in s.name]
+    assert len(cases) == 1
+    assert (cases[0].line, cases[0].end_line) == (12, 14)
+
+
+def test_the_GROUP_is_not_a_symbol_so_it_cannot_swallow_its_cases() -> None:
+    """`describe` spans the file, and `_idents.outermost` keeps the symbol no
+    other symbol contains — so recording the group would drop every case inside
+    it and hand back one row meaning "this file", which the reader already had."""
+    assert not any(name.startswith("describe") for name in names(SUITE))
+
+
+def test_a_call_that_is_not_a_test_is_not_a_symbol() -> None:
+    """The label-plus-closure shape is what identifies a declaration here, so a
+    plain call with a callback must stay invisible — otherwise every
+    `app.get('/', handler)` in an Express app becomes a fake declaration."""
+    source = ("const app = express();\n"
+              "app.get('/users', function (req, res) { res.send('ok'); });\n")
+    assert not any("users" in name
+                   for name in {s.name for s in typescript.parse("a.js", source).symbols})
+
+
 def test_a_file_that_does_not_parse_still_partitions() -> None:
     """Broken syntax is the normal state of a file somebody is editing. It must
     stay in the index as line windows rather than vanish."""

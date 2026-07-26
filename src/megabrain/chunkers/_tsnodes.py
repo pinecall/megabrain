@@ -12,12 +12,17 @@ from typing import Any
 from ._langspec import LangSpec
 from ._tsnames import name_of
 
-__all__ = ["name_of", "unwrap", "signature_of", "assigned_method"]
+__all__ = ["name_of", "unwrap", "signature_of", "assigned_method",
+           "FUNCTION_VALUES"]
 
 MAX_SIGNATURE = 140
 
-_FUNCTION_VALUES = ("function", "function_expression", "generator_function",
-                    "arrow_function")
+FUNCTION_VALUES = ("function", "function_expression", "generator_function",
+                   "arrow_function")
+"""Node types whose value IS a function.
+
+Shared with `_tscalls`, which asks the same question of a call's last argument:
+both are looking for the place a function literal is being handed to something."""
 
 
 def unwrap(spec: LangSpec, node: Any) -> Any:
@@ -74,6 +79,6 @@ def assigned_method(spec: LangSpec, node: Any) -> tuple[str, str] | None:
         return None
     if left.type not in ("member_expression", "subscript_expression"):
         return None
-    if right.type not in _FUNCTION_VALUES:
+    if right.type not in FUNCTION_VALUES:
         return None
     return str(left.text.decode()), "method"

@@ -15,6 +15,7 @@ from ..storage import Store
 from ._embed import Embeddable, embed_all
 from ._graph import graph_passes
 from ._plan import Progress, plan, read_sources
+from ._resymbol import resymbol
 from ._write import prune_orphans, write_files
 from .builtin import default_registry
 from .discover import discover
@@ -55,6 +56,7 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
                    on_progress=on_progress)                        # 1: CPU
     vectors = embed_all(planned.pending, embedder, on_progress)    # 2: network
     chunks = write_files(store, planned.pending, vectors)          # 3: disk
+    resymbolled = resymbol(store, registry, sources, planned.unchanged)
     edges = graph_passes(store, registry, sources, planned.pending)
     removed = prune_orphans(store, {f.relpath for f in found.files},
                             {s.relpath for s in found.skipped})
@@ -72,7 +74,7 @@ def _run(store: Store, root: Path, registry: Registry, embedder: Embeddable, *,
     return {"files": len(found), "changed": len(planned.pending),
             "unchanged": len(planned.unchanged), "removed": removed,
             "chunks": chunks, "edges": edges, "skipped": len(found.skipped),
-            "stale_flows": stale_flows,
+            "stale_flows": stale_flows, "resymbolled": resymbolled,
             "partition_violations": planned.violations,
             "total_files": totals["files"], "total_chunks": totals["chunks"],
             "total_symbols": totals["symbols"], "total_edges": totals["edges"]}

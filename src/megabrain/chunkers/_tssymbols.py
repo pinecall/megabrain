@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from ._langspec import LangSpec
+from ._tscalls import called_block
 from ._tsnodes import assigned_method, name_of, signature_of, unwrap
 from .model import Symbol
 
@@ -40,7 +41,25 @@ def symbols_of(spec: LangSpec, relpath: str, node: Any, raw: bytes,
         if assigned is not None:
             found.append(_symbol(relpath, child, f"{prefix}{assigned[0]}",
                                  assigned[1], raw, spec.body_field))
+            continue
+        found += _from_call(spec, relpath, child, raw, prefix)
     return found
+
+
+def _from_call(spec: LangSpec, relpath: str, child: Any, raw: bytes,
+               prefix: str) -> list[Symbol]:
+    """A `describe`/`it` call as declarations — see `_tscalls.called_block`.
+
+    A group contributes nothing itself and its body contributes everything,
+    which is why this returns a list rather than a symbol.
+    """
+    called = called_block(spec, child)
+    if called is None:
+        return []
+    name, kind, block = called
+    if not kind:
+        return symbols_of(spec, relpath, block, raw, prefix)
+    return [_symbol(relpath, child, f"{prefix}{name}", kind, raw, spec.body_field)]
 
 
 def _symbol(relpath: str, node: Any, name: str, kind: str, raw: bytes,
