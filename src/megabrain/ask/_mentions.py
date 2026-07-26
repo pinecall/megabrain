@@ -10,81 +10,84 @@ A tool that replaces grep must return at least what grep returns, so
 completeness is COMPUTED rather than asked for: identifiers from the task,
 matched literally, resolved to the symbols containing them. The model still
 contributes what grep cannot — the site whose text mentions nothing.
+
+Resolved ONE identifier at a time, which is what lets a broad name be discarded
+without taking the specific ones with it — see `_spread`.
 """
 
 from __future__ import annotations
 
 import re
 
+from ..retrieval.paths import is_test
 from ..storage import Store
 from ._idents import identifiers, outermost
-from ._spans import MAX_SPAN
+from ._spans import site_at
+from ._spread import MAX_ROWS, MAX_SPREAD, merged
 
-__all__ = ["mentioned_sites", "MAX_SPREAD"]
+__all__ = ["mentioned_sites", "MAX_SPREAD", "MAX_ROWS"]
 
-MAX_SPREAD = 40
-"""Symbols an identifier may resolve to before it is treated as vocabulary.
-
-A name in forty places is the repository's idiom, not this task's target, and
-listing all of them would bury the rows the reader needs."""
-
-_HEADING = re.compile(r"^(h\d+|section)$")
-"""A markdown heading is a symbol too, and a useless edit site: `CHANGES.md`
-declares one per release, each spanning to the end of the file."""
+Site = tuple[str, str, int, int]
 
 
-def mentioned_sites(store: Store, task: str) -> list[tuple[str, str, int, int]]:
+def mentioned_sites(store: Store, task: str) -> list[Site]:
     """`(path, symbol, low, high)` for every symbol whose body names one.
 
     The identifiers come from the task itself, so this is the literal search a
     caller would have run by hand — with the match resolved to the symbol that
     contains it, which is the part a grep cannot do.
+
+    The repo's own symbol names decide which of the task's words are code, so a
+    one-word name like `attachment` is chased in JS exactly as `show_envvar` is
+    in Python. See `identifiers`: judging that by SHAPE quietly favoured
+    snake_case and dropped the JS name the task cared most about.
     """
-    wanted = identifiers(task)
+    wanted = identifiers(task, store.symbols.name_counts())
     if not wanted:
         return []
-    hits: list[tuple[str, str, int, int]] = []
-    for path, symbols in _by_file(store, wanted).items():
-        hits.extend((path, name, low, high) for name, low, high in outermost(symbols))
-    return hits if len(hits) <= MAX_SPREAD else []
+    texts = [(meta.file, meta.text or "", meta.start_line)
+             for meta in store.chunks.read_metas()]
+    declared: dict[str, list[dict[str, object]]] = {}
+    return merged({name: _for_one(store, name, texts, declared) for name in wanted})
 
 
-def _by_file(store: Store, wanted: set[str]) -> dict[str, list[tuple[str, int, int]]]:
-    """Symbols containing any wanted identifier, grouped by file.
+def _for_one(store: Store, name: str, texts: list[tuple[str, str, int]],
+             declared: dict[str, list[dict[str, object]]]
+             ) -> list[tuple[Site, bool]]:
+    """The sites of a SINGLE identifier, read from the chunk text.
 
-    Read from the chunk TEXT rather than a symbol name match: the identifier is
+    Read from the text rather than from a symbol name match: the identifier is
     being USED at these sites, not declared, which is exactly why a name lookup
     finds the declaration and misses the five places that touch it.
+
+    `declared` caches each file's symbols across identifiers — the walk is once
+    per name now, and re-reading them per name made a five-name task five
+    queries deep for no new information.
+
+    Each site is paired with whether it is a TEST, which is what lets `_spread`
+    serve all of the implementation and only a sample of the suite.
     """
-    pattern = re.compile(r"\b(" + "|".join(sorted(map(re.escape, wanted))) + r")\b")
+    pattern = re.compile(rf"\b{re.escape(name)}\b")
     found: dict[str, list[tuple[str, int, int]]] = {}
-    for meta in store.chunks.read_metas():
-        if not pattern.search(meta.text or ""):
+    tests: set[Site] = set()
+    for path, text, start in texts:
+        if not pattern.search(text):
             continue
-        lines = (meta.text or "").split("\n")
-        touched = {meta.start_line + offset
-                   for offset, line in enumerate(lines) if pattern.search(line)}
-        for entry in store.symbols.read_for(meta.file):
-            row = _site(entry, touched)
-            if row and row not in found.setdefault(meta.file, []):
-                found[meta.file].append(row)
-    return found
-
-
-def _site(entry: dict[str, object], touched: set[int]) -> tuple[str, int, int] | None:
-    """One symbol as a jumpable row, if it contains a match and is worth a jump.
-
-    The size rule is the same one the model's own rows get, and here it is what
-    makes the lane usable at all: markdown headings are symbols whose span runs
-    to the end of the document, so a task naming any identifier matched 29
-    `CHANGES.md` "Version x.y.z" sections at L1-1630 each — 48 sites, past the
-    spread cap, and the lane returned nothing while holding the row that mattered.
-    """
-    low, high = entry.get("line"), entry.get("end_line")
-    if not (isinstance(low, int) and isinstance(high, int)):
-        return None
-    if high - low >= MAX_SPAN or _HEADING.match(str(entry.get("kind") or "")):
-        return None
-    if not any(low <= line <= high for line in touched):
-        return None
-    return str(entry.get("name")), low, high
+        touched = {start + offset for offset, line in enumerate(text.split("\n"))
+                   if pattern.search(line)}
+        if path not in declared:
+            declared[path] = list(store.symbols.read_for(path))
+        # A pytest `def test_x()` is a function to the grammar and a test case to
+        # the reader, so the PATH decides as well as the kind. Without it the
+        # quota was a JS-only rule: Python suites counted as implementation, and
+        # a thorough one would empty the lane exactly as express's used to.
+        suite = is_test(path)
+        for entry in declared[path]:
+            row = site_at(entry, touched)
+            if row and row not in found.setdefault(path, []):
+                found[path].append(row)
+                if suite or str(entry.get("kind") or "") == "test":
+                    tests.add((path, *row))
+    return [((path, symbol, low, high), (path, symbol, low, high) in tests)
+            for path, symbols in found.items()
+            for symbol, low, high in outermost(symbols)]

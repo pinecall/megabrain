@@ -110,6 +110,29 @@ def test_a_markdown_HEADING_never_becomes_a_site(tmp_path) -> None:
                                            "Option.get_help_extra"}
 
 
+def test_a_ONE_WORD_name_the_repo_DECLARES_is_chased(tmp_path) -> None:
+    """MEASURED on express, and the bias tracked language. Asked to "add
+    res.inline beside res.attachment", the lane chased only
+    `contentDisposition`: `attachment` is ten characters of one lowercase word,
+    so a shape rule wanting snake_case or camelCase rejected the task's most
+    important name — while the index has it at `lib/response.js:606`. One-word
+    names are the norm in JS and Ruby and the exception in Python, so judging by
+    SHAPE was a preference for Python dressed up as a heuristic. The index
+    decides instead: it declares `attachment` and has never heard of `beside`.
+    """
+    with repo(tmp_path) as store:
+        store.files.upsert("lib/response.js", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="lib/response.js", name="res.attachment", kind="method",
+                   line=1, end_line=2, signature=None, decorators=(), doc=None)])
+        store.chunks.insert([Chunk(file="lib/response.js", kind="method",
+                                   name="res.attachment", part=None, start_line=1,
+                                   end_line=2, text="res.attachment = function () {}",
+                                   breadcrumb="r")], None)
+        found = mentioned_sites(store, "add res.inline beside res.attachment")
+    assert ("lib/response.js", "res.attachment", 1, 2) in found
+
+
 def test_a_nested_closure_is_not_a_second_site(tmp_path) -> None:
     """`test_show_envvar.cmd` at L759-762 lives inside `test_show_envvar` at
     L758-766. Listing both points twice at one edit."""
