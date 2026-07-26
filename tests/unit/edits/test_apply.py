@@ -131,19 +131,6 @@ def test_success_tells_the_caller_to_run_the_GATES(repo) -> None:
     assert "gates" in render_edits(result).lower()
 
 
-def test_an_UNFILLED_placeholder_is_refused(repo) -> None:
-    """A prepared batch leaves a hole for the caller's own code. Applied with
-    the hole intact it would write the marker string into the source — the one
-    failure that is silent, because the edit "succeeds"."""
-    from megabrain.contracts.edits import NEW_CODE
-
-    before = (repo / "util.py").read_text(encoding="utf-8")
-    result = apply_edits(repo, [{"file": "util.py", "find": "def flatten(xs):",
-                                 "replace": f"def flatten(xs):\n{NEW_CODE}"}])
-    assert not result["ok"] and NEW_CODE in result["report"][0]["error"]
-    assert (repo / "util.py").read_text(encoding="utf-8") == before
-
-
 def test_an_edit_that_BREAKS_the_syntax_is_refused(repo) -> None:
     """MEASURED: a generated batch inserted a guard inside a `try:` it never
     closed. The only thing between that and the working tree was an agent

@@ -12,29 +12,41 @@ a test needs something writing a function does not: the file's own preamble.
 Deterministic and free — the imports are lines in the index, so this is a
 citation, not a model call. Bounded by the first declaration, because
 everything above it IS the preamble and nothing below it is.
+
+Read from the CITATIONS, not from a list of files the caller assembled. It used
+to take the files of the prepared operations, and when one operation was
+dropped — its anchor was a blank line — the preamble silently vanished with it
+and the agent guessed at the imports instead. A cited test file is a test file
+the reader is about to write in.
 """
 
 from __future__ import annotations
 
 from ..retrieval.paths import is_test
 from ..storage import Store
+from ._quote import CITATION
 
-__all__ = ["test_preambles", "MAX_PREAMBLE_LINES"]
+__all__ = ["already_imported", "MAX_PREAMBLE_LINES"]
 
 MAX_PREAMBLE_LINES = 60
 """Cap on a preamble, for the file whose imports run to a hundred lines. Past
 this the tail is fixtures, not imports, and the reader has the file."""
 
 
-def test_preambles(store: Store, files: list[str]) -> str:
-    """The import block of each TEST file among `files`, as a citation.
+def already_imported(store: Store, surface: str) -> str:
+    """The import block of each TEST file cited in `surface`, as a citation.
+
+    NOT named for the word "test": pytest collects any module-level callable
+    whose name starts with `test`, so a `test_preambles` imported into a test
+    file is run AS a test and errors on a missing `store` fixture.
 
     Only tests: production code is reached through the symbols the map already
     lists, while a test is written by imitation and needs to know what its file
     already has in scope.
     """
+    cited = dict.fromkeys(path.strip() for path, _, _ in CITATION.findall(surface))
     sections = []
-    for relpath in dict.fromkeys(f for f in files if is_test(f)):
+    for relpath in (path for path in cited if is_test(path)):
         end = _first_declaration(store, relpath)
         if end > 1:
             sections.append(f"\n\n## {relpath} — what is already imported\n"

@@ -10,6 +10,15 @@ the surface: each file to touch, the line to touch it at, the neighbouring
 example to imitate — existing code arriving as citations megabrain replaces
 with verbatim source.
 
+What it deliberately does NOT hand back is a prepared edit batch. That was
+tried and MEASURED on two tasks: both times the pre-built operation was WRONG —
+once the hole landed inside an `except` block it was supposed to precede, once
+the operation pointed at a test file where the mirrored function has no tests
+at all — and both agents threw it away and built their own `replace` from the
+quoted anchor. It also cost the most tokens in the answer, quoting the anchor a
+third time. Guessing the exact edit is not something this engine can be right
+about; showing the reader the exact lines is.
+
 Bounded and fail-open: a model that keeps browsing stops at MAX_ROUNDS, and a
 backend with no tool support still returns its text.
 """
@@ -23,11 +32,9 @@ from ..contracts import Bundle
 from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
 from ._callees import named_definitions
-from ._headers import test_preambles
-from ._operations import operations_from
+from ._headers import already_imported
 from ._pinned import exercising_tests
 from ._quote import quote_citations
-from ._surface import apply_block
 from ._taskprompt import build_task_prompt
 from ._toolcall import assistant_turn, tool_result
 from .events import Emit, emit_nothing
@@ -65,16 +72,12 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
             messages.append(assistant_turn(answer))
             for call in answer.tool_calls:
                 messages.append(tool_result(store, call, emit))
-        # Operations come from the RAW text: the anchors are still citations
-        # here, and quoting turns them into code blocks that no longer say
-        # which lines they were.
-        operations = operations_from(answer.text, store)
-        # The preamble is appended to the RAW text so its citation is quoted
-        # by the same pass as every other one.
+        # Every widening reads the RAW text and appends more citations, so all
+        # of them are spliced by the same single quoting pass at the end.
         widened = (answer.text + named_definitions(store, answer.text)
                    + exercising_tests(store, answer.text)
-                   + test_preambles(store, [op["file"] for op in operations]))
-        surface = quote_citations(widened, store) + apply_block(operations)
+                   + already_imported(store, answer.text))
+        surface = quote_citations(widened, store)
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a
     # path that only returns its text arrives as a blank answer everywhere.

@@ -37,6 +37,14 @@ NAMED = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)[^`\n]*`")
 _CONTAINERS = {"class", "module"}
 """A class's definition is the whole file. Citing it answers nothing."""
 
+_HEADING = re.compile(r"^(h\d+|section)$")
+"""A markdown heading is a symbol too, and MEASURED as noise: `ToolError`
+matched a `## ToolError` in `tools.md` and pasted 24 lines of user-facing prose
+under a heading promising a definition — the one thing the agent said it did
+not read. Matched on the kind rather than the file extension because the
+extension list belongs to the indexer, and a second copy of it here would
+drift."""
+
 
 def named_definitions(store: Store, surface: str) -> str:
     """Citations for the definition of every helper the prose names."""
@@ -69,6 +77,7 @@ def _definition_of(store: Store, name: str,
     """
     defs = [d for d in store.symbols.find(name)
             if d.get("kind") not in _CONTAINERS
+            and not _HEADING.match(str(d.get("kind") or ""))
             and isinstance(d.get("line"), int) and isinstance(d.get("end_line"), int)]
     cited_files = {path for path, _, _ in cited}
     picked = [d for d in defs if d["file"] in cited_files] or defs

@@ -83,3 +83,16 @@ def test_a_name_the_index_does_not_KNOW_surfaces_nothing(tmp_path) -> None:
     no definition produces no section, not an empty header."""
     with repo(tmp_path) as store:
         assert named_definitions(store, "Return `nil` when `frobnicate` is empty.") == ""
+
+
+def test_a_DOC_heading_is_never_the_definition(tmp_path) -> None:
+    """MEASURED noise. A markdown heading is a symbol too, so `ToolError`
+    matched `tools.md` and pasted 24 lines of user-facing prose under a heading
+    promising a definition. The agent named it as the one thing it did not
+    read. A definition lives in CODE."""
+    with repo(tmp_path) as store:
+        store.files.upsert("docs/tools.md", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="docs/tools.md", name="ToolError", kind="h2",
+                   line=79, end_line=102, signature=None, decorators=(), doc=None)])
+        assert named_definitions(store, "Raise `ToolError` on failure.") == ""

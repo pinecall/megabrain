@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from ..contracts.edits import NEW_CODE, EditResult, EditRow
+from ..contracts.edits import EditResult, EditRow
 from ._diagnose import mismatch
 from ._fields import FILE, FIND, REPLACE, field, safe_path
 from ._syntax import refuse_if_broken
@@ -57,12 +57,6 @@ def _stage(root: Path, op: Mapping[str, Any], number: int,
         row["error"] = problem
         return row
     find, wanted = field(op, *FIND), _count(op)
-    if NEW_CODE in field(op, *REPLACE):
-        # A prepared batch leaves a hole for the caller's own code. Applied
-        # with the hole intact it would write the marker into the source.
-        row["error"] = (f"`replace` still contains {NEW_CODE} — substitute the "
-                        "code you are adding for that line before applying")
-        return row
     if not find:
         # `"".count("")` is not zero and `replace("", x)` rewrites every gap in
         # the file, so an empty find would PASS validation and destroy the text.
