@@ -16,6 +16,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 
+from ._attrs import attribute_files
 from ._calls import called_files
 from ._imports import imports_of
 
@@ -36,6 +37,7 @@ class ModuleIndex:
     by_module: dict[str, str]                 # "pkg.mod" -> relpath
     by_symbol: dict[str, str]                 # "pkg.mod.Name" -> relpath
     trees: dict[str, ast.Module]
+    by_attribute: dict[str, str]              # "audio_processor" -> relpath
 
 
 def module_index(sources: dict[str, str]) -> ModuleIndex:
@@ -44,6 +46,9 @@ def module_index(sources: dict[str, str]) -> ModuleIndex:
     Filled locally and constructed once at the end, so there is no moment when
     a half-built index is reachable — resolution against one is silently wrong,
     not loud.
+
+    The attribute map is a SECOND pass over the finished module map, because
+    resolving `self.x = Imported()` needs the import resolution to exist first.
     """
     by_module: dict[str, str] = {}
     by_symbol: dict[str, str] = {}
@@ -61,7 +66,8 @@ def module_index(sources: dict[str, str]) -> ModuleIndex:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                 by_symbol[f"{module}.{node.name}"] = relpath
-    return ModuleIndex(by_module, by_symbol, trees)
+    imports_only = ModuleIndex(by_module, by_symbol, trees, {})
+    return ModuleIndex(by_module, by_symbol, trees, attribute_files(imports_only))
 
 
 def dotted(relpath: str) -> str:
@@ -85,5 +91,6 @@ def python_edges(relpath: str, index: ModuleIndex) -> list[Edge] | None:
     if tree is None:
         return None
     imports, aliases = imports_of(relpath, tree, index)
-    calls = {(dst, "call") for dst in called_files(tree, aliases)}
+    calls = {(dst, "call")
+             for dst in called_files(tree, aliases, index.by_attribute)}
     return sorted({(dst, kind) for dst, kind in imports | calls if dst != relpath})

@@ -22,13 +22,24 @@ def graph_passes(store: Store, registry: Registry, sources: dict[str, str],
                  pending: Sequence[Planned]) -> int:
     """Both graph passes: the language extractors, then the pin relation.
 
-    Pins run second, and only when something moved or this index never had
-    them. A pin joins TWO files, so either end changing can create or destroy
-    it — pretending it can be invalidated per file would be a lie, and the
-    recompute costs no network and no embedding.
-    """
+    Pins run second, and only when something moved, or the extractor rewrote a
+    file's edges, or this index never had them. A pin joins TWO files, so either
+    end changing can create or destroy it — pretending it can be invalidated per
+    file would be a lie, and the recompute costs no network and no embedding.
+
+    `rewriting` is the condition that was MISSING, and its absence silently
+    deleted every pin in the repository: `write_edges` swaps a file's rows with
+    `replace_edges`, which drops ALL of that file's outgoing edges — and a test
+    file's outgoing edges include its pins. An EDGE_SCHEMA bump rewrites every
+    file while no content moved, so on click 352 edges became 262, all 90 lost
+    ones pins, taking out `exercising_tests` with no error anywhere.
+
+    Read BEFORE the extractor runs, from the same two facts `_targets` uses: it
+    clears the marker itself, and reports a COUNT — while a file rewritten to
+    zero edges has still had its pins dropped."""
+    rewriting = bool(pending) or store.graph.get_meta("edge_schema") != EDGE_SCHEMA
     edges = write_edges(store, registry, sources, pending)
-    if pending or store.graph.get_meta("pin_schema") != PIN_SCHEMA:
+    if rewriting or store.graph.get_meta("pin_schema") != PIN_SCHEMA:
         edges += write_pin_edges(store)
     return edges
 

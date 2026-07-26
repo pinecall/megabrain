@@ -25,12 +25,12 @@ __all__ = ["Strategy", "Registry", "EDGE_SCHEMA"]
 # extracted none and stamped it anyway told every future pass the graph was
 # current, which disables the exact rebuild the marker exists to trigger.
 #
-# 4 because indexes in the wild carry 3 and this extractor is not that one: it
-# resolves a DOTTED call receiver (`import a.b` then `a.b.run()`), which the
-# previous one could not — its alias map was keyed on the bound name only, so
-# every call written that way was invisible. Those indexes must rebuild once,
-# which is exactly what a number the engine has never seen makes them do.
-EDGE_SCHEMA = 4
+# Bumped whenever the extractor learns to see an edge it could not before, which
+# makes every stored index rebuild its graph once. 4 resolved a DOTTED receiver
+# (`import a.b` then `a.b.run()`); 5 resolves one dispatched through an ATTRIBUTE
+# (`session.audio_processor.interrupt()`), measured as a false negative that made
+# a correct walkthrough look unsupported.
+EDGE_SCHEMA = 5
 
 
 @runtime_checkable

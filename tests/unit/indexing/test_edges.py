@@ -132,6 +132,76 @@ def test_src_layout_modules_resolve_without_the_src_prefix() -> None:
     assert _edges(files, "src/pkg/a.py") == {("src/pkg/b.py", "import")}
 
 
+# ---- calls dispatched through an ATTRIBUTE, not an import -------------------
+#
+# MEASURED, and the reason this lane exists. A walkthrough of a barge-in
+# mechanism was flagged as unsupported because `bot_handler.py` calls
+# `session.audio_processor.interrupt()` — a real call, invisible to an extractor
+# whose only rule is "the receiver must be a name an import bound". `session` is
+# an untyped parameter, and the assignment that gives it a type lives in a
+# DIFFERENT file. Full type inference is not needed to see this: some file in
+# the repository writes `self.audio_processor = AudioProcessor(...)`, and
+# `AudioProcessor` there IS import-resolved.
+
+
+def test_a_call_through_an_ATTRIBUTE_assigned_from_an_imported_class() -> None:
+    """The measured case, reduced. One file binds the attribute to a class it
+    imported; another calls a method on that attribute through a parameter it
+    knows nothing about."""
+    files = {
+        "owner.py": "from proc import Processor\n"
+                    "class Session:\n    def __init__(self):\n"
+                    "        self.audio = Processor()\n",
+        "caller.py": "def stop(session):\n    session.audio.interrupt()\n",
+        "proc.py": "class Processor:\n    def interrupt(self): ...\n"}
+    assert ("proc.py", "call") in _edges(files, "caller.py")
+
+
+def test_an_AMBIGUOUS_attribute_name_is_not_an_edge() -> None:
+    """Two files bind the same attribute name to classes in different files, so
+    the name is not evidence for either. Same rule the navigator applies to a
+    jump: a link that could land anywhere is worse than no link."""
+    files = {
+        "one.py": "from a import Thing\nclass A:\n    def __init__(self):\n"
+                  "        self.client = Thing()\n",
+        "two.py": "from b import Other\nclass B:\n    def __init__(self):\n"
+                  "        self.client = Other()\n",
+        "caller.py": "def go(x):\n    x.client.send()\n",
+        "a.py": "class Thing: ...\n", "b.py": "class Other: ...\n"}
+    edges = _edges(files, "caller.py")
+    assert ("a.py", "call") not in edges and ("b.py", "call") not in edges
+
+
+def test_an_attribute_bound_to_something_UNRESOLVED_is_not_an_edge() -> None:
+    """`self.x = 5` and `self.y = helper()` where nothing was imported bind no
+    file, so a call on them claims nothing."""
+    files = {"owner.py": "class A:\n    def __init__(self):\n        self.count = 5\n",
+             "caller.py": "def go(a):\n    a.count.bit_length()\n"}
+    assert _edges(files, "caller.py") == set()
+
+
+def test_a_LOCAL_variable_assignment_does_not_bind_an_attribute_name() -> None:
+    """Only `self.X = ...` publishes an attribute. A local `proc = Processor()`
+    is private to its function and says nothing about anyone's `.proc`."""
+    files = {"owner.py": "from proc import Processor\n"
+                         "def build():\n    audio = Processor()\n    return audio\n",
+             "caller.py": "def stop(s):\n    s.audio.interrupt()\n",
+             "proc.py": "class Processor: ...\n"}
+    assert _edges(files, "caller.py") == set()
+
+
+def test_an_IMPORTED_receiver_still_wins_over_the_attribute_map() -> None:
+    """The import-resolved answer is the stronger evidence and must be
+    preferred where both could apply."""
+    files = {"owner.py": "from wrong import Thing\nclass A:\n    def __init__(self):\n"
+                         "        self.util = Thing()\n",
+             "caller.py": "from right import util\nutil.run()\n",
+             "wrong.py": "class Thing: ...\n", "right.py": "def run(): ...\n"}
+    edges = _edges(files, "caller.py")
+    assert ("right.py", "call") in edges
+    assert ("wrong.py", "call") not in edges
+
+
 # ---- the indexing pass ------------------------------------------------------
 
 

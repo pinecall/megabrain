@@ -54,12 +54,12 @@ def _checked(store: Store, raw: str, candidates: list[ChunkMeta]) -> str:
     if not pairs:
         return ""
     lines = "\n".join(f"- `{a}` -> `{b}`" for a, b in pairs)
-    return ("\n\n## Not in the import/call graph — this step is UNVERIFIED, not wrong\n"
-            "The index has no import, call or pin edge, in either direction, between "
-            "these files at the point the walkthrough moves from one to the other. That is "
-            "sometimes a fabricated relationship, and sometimes a real one the STATIC graph "
-            "cannot see — a call dispatched through an object attribute rather than an import "
-            f"(`session.thing.method()`) will always land here too:\n{lines}")
+    return ("\n\n## Not in the import/call graph — this step is UNVERIFIED\n"
+            "The index has no import, call or pin edge, in either direction, between these "
+            "files at the point the walkthrough moves from one to the other. The extractor "
+            "resolves a call through an import, a dotted module path, or an attribute that "
+            "binds to one file repo-wide — so a hop listed here is one none of those "
+            f"explain, and worth checking before you rely on it:\n{lines}")
 
 
 def _file_sequence(raw: str, candidates: list[ChunkMeta]) -> list[str]:
