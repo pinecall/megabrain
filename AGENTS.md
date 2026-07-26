@@ -25,13 +25,13 @@ megabrain brief . "how does the brief avoid ranking twice"
 megabrain ask   . "how does ask splice real code"
 ```
 
-Over MCP, **five** tools — the surface carries only what megabrain alone can do, since the
-host already has Read, Grep and an editor. Which one you reach for is decided by whether
-you are about to CHANGE the code or only to understand it, and you declare that by picking
-the tool: `megabrain_code` (the edit surface) → `megabrain_replace` (apply it) ·
-`megabrain_ask` (a mechanism narrated, or a pattern to copy) · `megabrain_search` (the map,
-and the docs) · `megabrain_index`. Prefer these over grep/Read chains, and never follow a
-`code` call with an `ask` for a helper's body — it is already quoted.
+Over MCP, **three** tools — the surface carries only what megabrain alone can do, since
+the host already has Read, Grep and an editor: `megabrain_ask` (the whole flow behind a
+question or a change, narrated, and the narrator OPENS what retrieval missed) ·
+`megabrain_search` (the map, and the docs) · `megabrain_index`. Prefer these over
+grep/Read chains. It was briefly five: `megabrain_code` and `megabrain_replace` were
+measured across five tasks in three languages and removed — the value was the opening,
+which now belongs to `ask`, and the edit machinery kept being discarded by its readers.
 
 ## Hard rules — locked by experimental data, do not violate
 
@@ -88,7 +88,7 @@ The tree mirrors the pipeline; full detail in [ARCHITECTURE.md](ARCHITECTURE.md)
 | `forge/` | `coverage` (LLM-written chunkers, partition-gated, trust-installed) · `specialize`+`ab_gate` (measure-only, NO LLM) |
 | `graph.py` | the knowledge graph (numpy only) |
 | `usecases/` | the use-case layer — **one file per verb**; every transport maps its args to these. `build` composes `index` + `study` behind `llm=True`, so no surface can disagree about what "index with the LLM" means |
-| `transports/` | `cli` (one module per verb) · `mcp` (five tools; `inputSchema` GENERATED from `contracts/tools.py`) · `http` (studio + JSON API, `ui/` is the built studio bundle) · `install` (`megabrain install` — the six-assistant MCP registration table) |
+| `transports/` | `cli` (one module per verb) · `mcp` (three tools; `inputSchema` GENERATED from `contracts/tools.py`) · `http` (studio + JSON API, `ui/` is the built studio bundle) · `install` (`megabrain install` — the six-assistant MCP registration table) |
 
 Runnable examples live in their own repo, `~/megabrain-examples`.
 

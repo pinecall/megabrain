@@ -22,7 +22,6 @@ from ..ask.narrator import narrate
 from ..contracts import Bundle, FlowHit
 from ..project import load_project
 from ..providers.chat import ChatProvider, OpenAICompatible
-from ..retrieval.intent import is_task
 from ..storage.locate import resolve_root
 from ._flows import matched_flows, remember_answer, served
 from .search import search
@@ -32,7 +31,7 @@ __all__ = ["ask"]
 
 def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         content: Content | None = "code", cache: bool = True,
-        task: bool | None = None, emit: Emit = emit_nothing) -> str:
+        emit: Emit = emit_nothing) -> str:
     """A narrated walkthrough of the code that answers `question`.
 
     `content` defaults to CODE, unlike search: a code walkthrough diluted with
@@ -57,17 +56,11 @@ def ask(start: Path | str, question: str, *, path_filter: str | None = None,
         # Named, not a generic failure: retrieval already worked, and the only
         # thing missing is a credential the message can point at.
         raise MissingCredential.named("MEGABRAIN_CHAT_API_KEY")
-    # DECLARED beats inferred: MCP's caller says `task` or `query` and is never
-    # wrong, while the CLI has one positional argument and must read the
-    # sentence. Measured — answering a task the question-shaped way cost an
-    # extra round trip, the first answer saying HOW and the agent still needing
-    # to ask WHERE to type.
-    if task if task is not None else is_task(question):
-        # Not cached: a walkthrough stays true until the code moves, an edit
-        # surface is consumed once by the change that invalidates it.
-        from ..ask.task import walk_task
-        return walk_task(provider, question, bundle, root, emit=emit)
-    answer = narrate(provider, question, _with_flows(bundle, flows), emit=emit)
+    # `root` is what lets the narrator OPEN files: retrieval is where the answer
+    # starts, and the span that matters can sit fifty lines below the chunk that
+    # matched. Without it the walkthrough is one buffered call over the chunks.
+    answer = narrate(provider, question, _with_flows(bundle, flows),
+                     root=root, emit=emit)
     if cache:
         remember_answer(root, question, answer, bundle, emit)
     return answer

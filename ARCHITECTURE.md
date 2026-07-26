@@ -9,7 +9,7 @@
 > describing **v2**, with names and modules that have moved or do not exist yet: the
 > `forge` sections (§2.5), the flow-cache narrative (§3.4), `--prune`/`prune_search`
 > (§3.3), and the HTTP entry-point bullet in §5. The MCP surface is v3-accurate as of
-> phase 13 — five tools, §5.1. Verify against `src/megabrain/` before trusting a name
+> phase 13 — three tools, §5.1. Verify against `src/megabrain/` before trusting a name
 > in those sections.
 
 Every load-bearing choice below is locked by experimental data (golden-set gates,
@@ -59,8 +59,7 @@ model bakeoffs — see §8). The five hard rules:
 ```
 
 Entry points share one retrieval core: CLI (`megabrain …`), MCP stdio
-(`megabrain_ask` · `megabrain_code` · `megabrain_replace` · `megabrain_search` ·
-`megabrain_index` — §5.1), HTTP
+(`megabrain_ask` · `megabrain_search` · `megabrain_index` — §5.1), HTTP
 (`megabrain studio`, which also serves the studio UI), and the Python API
 (`megabrain.search/…`, lazy imports, `py.typed`).
 
@@ -539,28 +538,30 @@ shortfall **reported** (`study_error`, or the `degraded` count) rather than rais
 
 ## 5. Serving surfaces
 
-### 5.1 MCP — five tools, split by whether you are CHANGING the code
+### 5.1 MCP — three tools, and the reason there are only three
 
-`transports/mcp/` (stdio, no deps): **`megabrain_code`** (the edit surface) and
-**`megabrain_replace`** (apply it) for a change; **`megabrain_ask`** (the walkthrough) to
-understand a mechanism or copy a pattern; **`megabrain_search`** (the map, and the docs);
-**`megabrain_index`**. Nothing else — no `get`, no `grep`.
+`transports/mcp/` (stdio, no deps): **`megabrain_ask`** (the whole flow, narrated),
+**`megabrain_search`** (the map, and the docs), **`megabrain_index`**. Nothing else — no
+`get`, no `grep`, and no edit tools.
 
-The split is the design, and it is why intent is never inferred: `ask` and `code` retrieve
-the same way and render for opposite jobs, so the CALLER declares which one it is by
-picking the tool. Asking one model to classify the other's sentence was tried and is
-strictly worse — a task phrased as a question got a walkthrough, and the agent came back
-with "and where is that defined?", a whole extra round trip to learn where to type.
+It was briefly five. `megabrain_code` (an edit surface) and `megabrain_replace` (a
+transactional batch) were measured across five tasks in three languages against a
+grep-only agent, and the numbers were good — 19 tool calls by hand against 6 on a
+1 220-file repository. But what CARRIED that was the narrator opening files until it had
+the whole flow, and that is now `ask`'s own behaviour. The edit machinery around it kept
+being discarded by the readers it was built for: a prepared edit batch was wrong both
+times it was measured, four readers found the proposed anchor mode misplaced for a guard,
+and applying an edit is work the host's own editor already does.
 
-`megabrain_code`'s surface is assembled from six deterministic widenings, each one added
-because a measured reader went looking for exactly that and paid a call for it:
-`_enclosing` (the function an anchor sits inside — its signature and its `except`),
-`_callees` (the definition of every helper the spec names), `_pinned` (the tests that PIN
-the changed symbol, found through the indexer's pin edges — this is the one that catches a
-test 1 600 lines away asserting the behaviour you are about to change), `_headers` (the
-test file's own imports), `_anchors` (the minimal unique slice to copy as `find`) and
-`_elide`/`_prune` (a quote past the cap keeps its head AND its tail, and a section whose
-every citation is a repeat is dropped). None of them calls a model.
+`ask` therefore runs in the régime that made opening happen (§4.2): the best eight chunk
+bodies plus a MAP of the rest, an instruction to open at the TOP of the prompt, and the
+`open_file` loop in `_converse`. Served all thirty bodies instead, the same narrator
+opened nothing on four questions — including one that said "open this file". Two
+deterministic widenings then run with no model call: `_callees` (the definition of every
+helper the prose named — three of four measured readers had been paying a second retrieval
+call for exactly this) and `_pinned` (the tests that PIN what was described, found through
+the indexer's pin edges — the one that catches a test 1 600 lines from the code it
+constrains).
 
 Everything else is a deliberate subtraction. Every tool costs the calling agent context and
 a routing decision, and the host it runs in already has Read, Grep and an editor. So the
@@ -581,8 +582,7 @@ Two properties worth knowing:
 - **MCP** (`transports/mcp/`, stdio, no deps): `megabrain_ask` (`question`,
   `scope_path`, `content=code|docs` — MCP is request/response, so it runs buffered:
   the consuming agent reads the final text only, and events would be written to
-  nobody), `megabrain_code` (`task`, `scope_path` — the edit surface, §5.1),
-  `megabrain_replace` (`operations`, transactional), `megabrain_search` (`task`,
+  nobody), `megabrain_search` (`task`,
   `scope_path`, `content`, `bodies`, `rerank` default **false** — the deterministic
   answer is complete on its own, and a caller that wants the judge lane asks for it
   and accepts the call), `megabrain_index` (`force`). Nothing else: single-file and

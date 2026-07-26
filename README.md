@@ -203,38 +203,35 @@ megabrain install    # detects Claude Code · Codex · Cursor · Windsurf · Gem
 | the cross-file story | reconstructed, unverified | **narrated, real code spliced in** |
 | asking it again later | the full re-exploration | **~0 ms, from the cache** |
 
-Your agent gets **five** tools, and which one it reaches for is decided by ONE question:
-**am I about to change this code, or only to understand it?** The agent declares that by
-picking the tool — nothing here guesses at intent.
+Your agent gets **three** tools, and the smallness is the design — it already has Read,
+Grep and an editor, so the surface carries only what megabrain alone can do:
 
-| you are about to… | tool | what comes back |
+| you want… | tool | what comes back |
 |---|---|---|
-| **change** code | **`megabrain_code`** | the EDIT SURFACE: every file to touch, the exact anchor, a prose spec of the new code — plus the original it mirrors, the definition of every helper the spec names, the tests that pin the behaviour, and the test file's imports. All verbatim from the index |
-| …then apply it | **`megabrain_replace`** | a transactional batch of exact-string edits. All-or-nothing, and it needs no re-read of what you were just shown |
-| **understand** a mechanism, or copy a pattern from another project | **`megabrain_ask`** | the flow narrated across subsystems with the real code spliced in |
-| get the **map**, or read the **docs** | **`megabrain_search`** | the files that answer, each with its best span and the symbols it declares — no bodies (a third of the tokens); `content: "docs"` for prose, `bodies: true` for the code inline |
-| make a repo answerable | **`megabrain_index`** | the index, incremental by content hash |
+| the **whole flow** behind a question, or behind a change you are about to make | **`megabrain_ask`** | a walkthrough with the real code spliced in at each step. The narrator **opens whatever the retrieved chunks left unexplained** and keeps reading until the answer is complete — so one call replaces a grep/Read chain |
+| the **map**, or the **docs** | **`megabrain_search`** | the files that answer, each with its best span and the symbols it declares — no bodies (a third of the tokens); `content: "docs"` for prose, `bodies: true` for the code inline |
+| to make a repo answerable | **`megabrain_index`** | the index, incremental by content hash |
 
 Each tool's `inputSchema` is generated from `contracts/tools.py`, so a parameter cannot
 exist on the wire without existing in the dispatch.
 
-**Two things the engine deliberately does NOT do**, both because doing them was measured
-and was worse:
+`ask` hands the model the best eight chunk bodies and a **map** of the rest, then serves
+any file it asks for, verbatim from the index. Two things get added afterwards with no
+model call: the definition of every helper the prose named, and **the tests that pin what
+it described** — which is how a change stops breaking a test 1 600 lines away that nobody
+looked at. Both were measured: three of four readers had been paying a second retrieval
+call for the first, and the second caught a test that pinned the exact bug being fixed.
 
-- **It never writes your code.** Asked to guard a `write` tool, it once found both files
-  and both insertion points in a 1 220-file repo — and authored a guard that ran *after*
-  the write it guarded, inside an unclosed `try:`. Undoing that cost more than the whole
-  retrieval saved. `megabrain_code` hands you a specification and an address; you write
-  the code, because you run the tests.
-- **It never hands you a prepared edit batch.** Tried, and wrong both times it was
-  measured — once the placeholder landed inside the `except` it was meant to precede, once
-  the operation pointed at a test file where the mirrored function has no tests. Both
-  readers threw it away and built their own from the quoted anchor.
+**It briefly had two more tools, `megabrain_code` and `megabrain_replace`, and they were
+removed.** Measured across five tasks in three languages, what carried the value was the
+narrator opening files until it had the whole flow — that now belongs to `ask`. The edit
+machinery around it kept being discarded by the readers it was built for: a prepared edit
+batch was wrong both times it was measured, and applying an edit is work the host's own
+editor already does.
 
-> **Put this in your agent's rules:** if you are going to CHANGE something, `megabrain_code`
-> first — not `ask`, which explains how the code works and still leaves you hunting for
-> where to type. And do not follow a `code` call with an `ask` for a helper's body: it is
-> already quoted.
+> **Put this in your agent's rules:** for any question about how the code works — and
+> before any change — call `megabrain_ask` **first**, before grepping. One call returns the
+> whole flow with the real code, and it goes and opens what retrieval missed.
 
 [Every parameter →](docs/REFERENCE.md#mcp-tools) ·
 [Wiring recipes →](docs/RECIPES.md#give-your-coding-agent-the-whole-repo)

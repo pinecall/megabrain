@@ -43,6 +43,17 @@ RULES = """\
 - Cite GENEROUSLY and COMPLETELY: prefer a whole [[k]] so the reader sees the
   full implementation. Sub-range only a very large chunk, and then take the
   whole enclosing function, not a few lines. Never cite the same span twice.
+- The chunks below are where the answer STARTS, not all of it. `open_file` reads
+  any file in this repository, verbatim from the index, and you should use it
+  whenever the chunks leave a step of the flow unexplained — the definition a
+  chunk calls, the caller a chunk assumes, the test that pins the behaviour.
+  Open everything you need in ONE turn; a file per turn is a round trip per file.
+  A file you opened is cited BY PATH, with real line numbers:
+
+    [[lib/sinatra/base.rb:425-448]]    lines of a file you opened
+
+  Do not answer "that is not in the retrieved context" about code this
+  repository contains. Open it.
 - Narrate the code's ACTUAL runtime behaviour, traced mechanically from the
   cited lines in execution order: what runs first, what state each step reads
   and writes, in what order. NEVER present a name, a docstring, a comment or an

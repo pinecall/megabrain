@@ -17,7 +17,7 @@ from typing import Annotated, TypedDict
 
 from .._types import Content
 
-__all__ = ["AskParams", "CodeParams", "SearchParams"]
+__all__ = ["AskParams", "SearchParams", "IndexParams"]
 
 Repo = Annotated[str, "path to the indexed repository root; a path INSIDE it "
                       "also works — the root is found from .megabrain"]
@@ -81,12 +81,10 @@ class SearchParams(_SearchRequired, total=False):
                             "in the list, not by default"]
 
 
-class _CodeRequired(_Target):
-    task: Annotated[str, "the CHANGE you are about to make, in the imperative: "
-                         "'add a redirect_back helper that falls back to a "
-                         "given path'. Describe the outcome, not the file — "
-                         "finding the file is what this does"]
+class IndexParams(_Target, total=False):
+    """Build or refresh a repository's index."""
 
-
-class CodeParams(_CodeRequired, total=False):
-    scope_path: Scope
+    force: Annotated[bool, "default false: only files whose content changed are "
+                           "re-embedded, so a warm re-index costs seconds. true "
+                           "re-embeds everything — needed after changing the "
+                           "embedding model, and wasteful otherwise"]

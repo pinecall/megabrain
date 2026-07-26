@@ -57,24 +57,21 @@ def _text(result: dict[str, Any]) -> str:
 
 # ── the surface ──────────────────────────────────────────────────────────
 
-def test_the_agent_sees_exactly_the_five_tools() -> None:
-    """Every tool costs the calling agent context and a decision, so the
-    surface stays the shortest one that closes the loop: understand it
-    (`ask`), get a change's edit surface (`code`), map its docs (`search`),
-    apply the change (`replace`), and make a repository answerable (`index`).
+def test_the_agent_sees_exactly_the_three_tools() -> None:
+    """Every tool costs the calling agent context and a routing decision, so
+    the surface stays the shortest one that closes the loop: narrate a mechanism
+    from the whole repository (`ask`), map it (`search`), and make a repository
+    answerable at all (`index`).
 
-    `ask` and `code` are the same verb with opposite deliverables, and they are
-    two TOOLS rather than one with a mode flag because a tool name is what a
-    model chooses by — an agent that knows it is about to change something
-    picks `code` without having to notice a parameter.
-
-    `replace` earns its slot on arithmetic rather than capability — the host
-    has an editor, but that editor requires a prior Read of the same file, so
-    every body megabrain already rendered gets paid for twice.
+    It was briefly five. `megabrain_code` and `megabrain_replace` were measured
+    across five tasks in three languages and REMOVED: what carried the value was
+    the narrator opening files until it had the whole flow, and that now belongs
+    to `ask`. The edit machinery around it kept being discarded by the readers it
+    was built for — a prepared batch was wrong both times it was measured — and
+    applying an edit is work the host's own editor already does.
     """
     assert {tool.name for tool in TOOLS} == {
-        "megabrain_ask", "megabrain_code", "megabrain_search",
-        "megabrain_replace", "megabrain_index"}
+        "megabrain_ask", "megabrain_search", "megabrain_index"}
 
 
 def test_every_schema_is_generated_from_its_contract() -> None:

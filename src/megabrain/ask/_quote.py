@@ -18,7 +18,13 @@ from ._elide import MAX_QUOTE_LINES, elide
 
 __all__ = ["quote_citations", "lines_of", "CITATION", "MAX_QUOTE_LINES"]
 
-CITATION = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]")
+CITATION = re.compile(r"\[\[([^\]:]*[./][^\]:]*):(\d+)-(\d+)\]\]")
+"""A citation by PATH and line range.
+
+The `[./]` is load-bearing: the walkthrough also cites retrieved chunks by
+INDEX, as `[[3:705-731]]`, and `[^\\]:]+` matches `3` just as happily as a path.
+Two citation systems share one bracket syntax, and what tells them apart is that
+a path always carries a dot or a slash while an index never does."""
 
 _LANG = {"rb": "ruby", "py": "python", "ts": "typescript", "tsx": "tsx",
          "js": "javascript", "go": "go", "rs": "rust", "java": "java",

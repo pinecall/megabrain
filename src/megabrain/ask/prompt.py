@@ -12,14 +12,30 @@ import os
 
 from ..storage.model import ChunkMeta
 
-__all__ = ["build_prompt", "MAX_CTX_CHARS", "RULES"]
+__all__ = ["build_prompt", "MAX_CTX_CHARS", "RULES", "OPENING"]
 
+from ._opening import OPENING
 from ._rules import RULES
 
 # ~50K tokens of candidate code, which fits every default cloud model. A local
 # runtime has a smaller window and will TRUNCATE the prompt silently, so it is
 # overridable rather than baked in.
 MAX_CTX_CHARS = int(os.environ.get("MEGABRAIN_ASK_CTX_CHARS", "200000"))
+
+MAX_BODIES = int(os.environ.get("MEGABRAIN_ASK_BODIES", "8"))
+"""Chunks quoted with their code. The rest are LISTED, and openable.
+
+MEASURED, and it is the difference between a tool that reads and one that
+guesses. Served all thirty candidate bodies — 165 000 characters — the narrator
+never once called `open_file`: not on a question asking for an end-to-end trace,
+not even on one that said "open this file". A model handed enough material to
+write something will write it, and the instruction to go and look was obeyed
+zero times out of four.
+
+Eight bodies is the best code retrieval found; the rest arrive as a MAP the
+model opens from. That is the régime the retired `megabrain_code` ran in, where
+opening was measured at two files per task — and a file opened whole beats a
+chunk of it, which is what a big ugly repository is full of."""
 
 def build_prompt(question: str, candidates: list[ChunkMeta],
                  context: str = "") -> str:
@@ -32,6 +48,11 @@ def build_prompt(question: str, candidates: list[ChunkMeta],
     blocks: list[str] = []
     used = 0
     for index, chunk in enumerate(candidates):
+        if index >= MAX_BODIES:
+            # Listed, not quoted. The head alone is the citable index plus where
+            # the code lives, which is exactly what `open_file` needs.
+            blocks.append(_head(index, chunk))
+            continue
         body = _numbered(chunk)
         if used + len(body) > MAX_CTX_CHARS:
             # Truncated HERE, visibly, rather than by the serving runtime —
@@ -42,6 +63,7 @@ def build_prompt(question: str, candidates: list[ChunkMeta],
     return (f"You are a senior engineer giving a complete code walkthrough that "
             f"answers the developer's query. Cover the ENTIRE relevant flow end "
             f"to end — do not stop early, do not leave a thread dangling.\n\n"
+            f"{OPENING}\n"
             f"STRICT RULES:\n{RULES}\n\nQUERY: {question}\n"
             f"{_context(context)}\n"
             f"RETRIEVED CHUNKS:\n\n" + "\n".join(blocks))

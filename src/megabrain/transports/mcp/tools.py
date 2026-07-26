@@ -1,14 +1,18 @@
-"""The tools an agent can see — five, and each one earns its slot.
+"""The tools an agent can see — three, and each one earns its slot.
 
-Every tool costs the calling agent context and a decision, so the surface is
-the shortest one that CLOSES the loop: understand it, map it, change it, and
-make a repository answerable at all.
+Every tool costs the calling agent context and a routing decision, and the host
+already has Read, Grep and an editor. So the surface carries only what megabrain
+alone can do: narrate a mechanism from the whole repository (`ask`), map it
+(`search`), and make a repository answerable at all (`index`).
 
-`replace` is the one that looks redundant and is not. The host has an editor —
-but that editor requires a prior Read of the same file, so every body megabrain
-already rendered gets paid for twice. It is here on arithmetic, not capability.
+It was briefly five. `megabrain_code` and `megabrain_replace` were measured
+across five tasks in three languages and REMOVED: what carried the value was
+the narrator opening files until it had the whole flow, and that now belongs to
+`ask` itself. The edit machinery around it — prepared batches, APPLY anchors —
+kept being thrown away by the readers it was built for, and applying an edit is
+work the host's own editor already does.
 
-Reading a span is still the caller's own tool: a surface that offers its own
+Reading a span is likewise the caller's own tool: a surface that offers its own
 invites the agent to re-verify what the render already showed.
 """
 
@@ -17,8 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ...contracts.tools import AskParams, CodeParams, SearchParams
-from ...contracts.tools_write import IndexParams, ReplaceParams
+from ...contracts.tools import AskParams, IndexParams, SearchParams
 from .schema import json_schema
 
 __all__ = ["Tool", "TOOLS", "listing"]
@@ -35,32 +38,22 @@ class Tool:
 
 TOOLS: tuple[Tool, ...] = (
     Tool("megabrain_ask",
-         "UNDERSTAND an indexed repository: a how/where/why question gets a "
-         "walkthrough of the whole relevant flow with the REAL code spliced in "
-         "at each step — verbatim from disk, true line numbers, so the CODE is "
-         "never invented; the prose around it is model narration, so check its "
-         "claims against the code it quotes, especially on a root-cause "
-         "question. Retrieval itself runs no model. Use this INSTEAD OF "
-         "opening files one by one, and do not chain one call per "
-         "sub-question: one ask covers a flow. If you already know you are "
-         "going to CHANGE something, use megabrain_code instead — this "
-         "explains how the code works and still leaves you hunting for where "
-         "to type.",
+         "The whole flow behind a how/where/why question, or behind the change "
+         "you are about to make — narrated end to end with the REAL code "
+         "spliced in at each step, verbatim from the index with true line "
+         "numbers, so the CODE is never invented. The narrator OPENS whatever "
+         "the retrieved chunks left unexplained (the definition a call lands "
+         "on, the caller a function assumes, the test that pins the behaviour) "
+         "and keeps reading until the answer is complete, so ONE call replaces "
+         "a grep/Read chain — measured at 19 tool calls by hand against 6 with "
+         "this, on a 1 220-file repository. Cited alongside, deterministically: "
+         "the definition of every helper the prose names, and the tests that PIN "
+         "what it describes — which is how a change stops breaking a test 1 600 "
+         "lines away that nobody looked at. Do NOT chain one call per "
+         "sub-question: one ask covers a flow. The prose is model narration, so "
+         "check its claims against the code it quotes, especially on a "
+         "root-cause question; retrieval itself runs no model.",
          AskParams),
-    Tool("megabrain_code",
-         "CHANGE an indexed repository: describe the change and get its EDIT "
-         "SURFACE — every file you must touch, the exact anchor to touch it "
-         "at, and a prose SPEC of the new code (never the code itself: you "
-         "write that, because you run the tests). Cited VERBATIM alongside: "
-         "the original the change mirrors, the DEFINITION of every helper the "
-         "spec names, the tests that pin the behaviour, and the test file's "
-         "imports. Everything you need is IN the surface — do not follow up "
-         "with megabrain_ask for a helper's body, it is already quoted. Then "
-         "write your code and apply it with megabrain_replace, using the "
-         "quoted anchor text as `find` — copy it from the render, it is "
-         "verbatim from the index. Describe the OUTCOME you want, not the file "
-         "you guess it lives in — finding that is the job.",
-         CodeParams),
     Tool("megabrain_search",
          "ONE call that MAPS a task's whole edit surface: the files that answer "
          "it ranked, each with its best span (true line numbers) and the "
@@ -72,18 +65,6 @@ TOOLS: tuple[Tool, ...] = (
          "knowing: it ranks what EXISTS, so when the bug is a missing call or "
          "flag it shows you the site to inspect but cannot report the absence.",
          SearchParams),
-    Tool("megabrain_replace",
-         "Apply a BATCH of exact-string edits in one call, transactionally. "
-         "Use it instead of your own Edit for code megabrain already showed "
-         "you: your editor requires a prior Read of the same file, so every "
-         "body you were just shown gets paid for twice. Each operation is "
-         "{file, find, replace, count?} and `find` is the EXACT existing text "
-         "— copy it from what you were shown. ALL-OR-NOTHING: if any operation "
-         "fails nothing is written at all, and the report names the operation, "
-         "the reason, and the nearest real line when your text did not match. "
-         "Ops on the same file see each other's result. Existing files only. "
-         "Run the tests afterwards — the edit is not the end of the task.",
-         ReplaceParams),
     Tool("megabrain_index",
          "Build or refresh a repository's index. Needed once before anything "
          "else can answer, and again only when you want changes on disk "
