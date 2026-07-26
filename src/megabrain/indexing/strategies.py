@@ -27,10 +27,11 @@ __all__ = ["Strategy", "Registry", "EDGE_SCHEMA"]
 #
 # Bumped whenever the extractor learns to see an edge it could not before, which
 # makes every stored index rebuild its graph once. 4 resolved a DOTTED receiver
-# (`import a.b` then `a.b.run()`); 5 resolves one dispatched through an ATTRIBUTE
-# (`session.audio_processor.interrupt()`), measured as a false negative that made
-# a correct walkthrough look unsupported.
-EDGE_SCHEMA = 5
+# (`import a.b` then `a.b.run()`); 5 one dispatched through an ATTRIBUTE
+# (`session.audio_processor.interrupt()`); 6 a symbol RE-EXPORTED by a package
+# `__init__` (`from ..storage import PIN_KIND`, defined in `storage/_graph.py`),
+# where the dependency existed in two hops and the graph held only the first.
+EDGE_SCHEMA = 6
 
 
 @runtime_checkable

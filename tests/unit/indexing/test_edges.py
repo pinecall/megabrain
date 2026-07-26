@@ -283,3 +283,59 @@ def test_re_indexing_one_file_keeps_the_edges_that_point_at_it(repo: Path) -> No
 
     with Store(repo) as store:
         assert store.graph.neighbors("b.py") == {"a.py"}
+
+
+# ---- symbols RE-EXPORTED through a package __init__ -------------------------
+#
+# MEASURED across nine repositories. `from ..storage import PIN_KIND` files its
+# edge against `storage/__init__.py`, because that is the module named — while
+# PIN_KIND is defined in `storage/_graph.py`, which the __init__ re-exports. The
+# real dependency exists in TWO hops and the graph held only the first, so a
+# walkthrough moving from the consumer to the defining file looked unsupported.
+# Python packages are built this way, so the gap hit every well-formed one.
+
+
+def test_a_reexported_symbol_reaches_the_file_that_DEFINES_it() -> None:
+    """Both edges are real and both are kept: importing the package executes
+    its __init__, and the symbol comes from the module behind it."""
+    files = {"caller.py": "from pkg import Thing\n",
+             "pkg/__init__.py": "from ._impl import Thing\n",
+             "pkg/_impl.py": "class Thing: ...\n"}
+    assert _edges(files, "caller.py") == {("pkg/__init__.py", "import"),
+                                          ("pkg/_impl.py", "import")}
+
+
+def test_a_call_on_a_reexported_name_reaches_the_defining_file() -> None:
+    """The alias must bind to the DEFINING file, or the call edge lands on the
+    __init__ that merely forwards the name."""
+    files = {"caller.py": "from pkg import Thing\nThing().run()\n",
+             "pkg/__init__.py": "from ._impl import Thing\n",
+             "pkg/_impl.py": "class Thing:\n    def run(self): ...\n"}
+    assert ("pkg/_impl.py", "call") in _edges(files, "caller.py")
+
+
+def test_a_RENAMED_reexport_still_resolves() -> None:
+    """`from ._impl import Thing as T` in the __init__, then `from pkg import T`
+    outside it — the name the consumer sees is the one to look up."""
+    files = {"caller.py": "from pkg import T\nT()\n",
+             "pkg/__init__.py": "from ._impl import Thing as T\n",
+             "pkg/_impl.py": "class Thing: ...\n"}
+    edges = _edges(files, "caller.py")
+    assert ("pkg/_impl.py", "import") in edges and ("pkg/_impl.py", "call") in edges
+
+
+def test_a_symbol_the_package_does_NOT_reexport_adds_no_edge() -> None:
+    """Only what the __init__ actually forwards. Inventing the module a name
+    might live in is exactly the phantom edge this extractor refuses."""
+    files = {"caller.py": "from pkg import Missing\n",
+             "pkg/__init__.py": "from ._impl import Thing\n",
+             "pkg/_impl.py": "class Thing: ...\n"}
+    assert _edges(files, "caller.py") == {("pkg/__init__.py", "import")}
+
+
+def test_a_direct_submodule_import_is_unchanged() -> None:
+    """The path that already worked must not move."""
+    files = {"caller.py": "from pkg._impl import Thing\nThing()\n",
+             "pkg/__init__.py": "", "pkg/_impl.py": "class Thing: ...\n"}
+    assert _edges(files, "caller.py") == {("pkg/_impl.py", "import"),
+                                          ("pkg/_impl.py", "call")}

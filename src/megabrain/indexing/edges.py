@@ -3,9 +3,9 @@
 The rule the whole extractor rests on: **a call edge exists only through a
 resolved import.** A cross-file Python call that was never imported cannot
 execute, so a bare-name match is not evidence — matching names across files
-mints phantom edges out of coincidence (`re.search` pointing at the repo's own
-`search()`, `qs.get` at some `Registry.get`), and a phantom edge is worse than
-a missing one: it hands a reader an unrelated file AS evidence.
+mints phantoms out of coincidence (`re.search` pointing at the repo's own
+`search()`), and a phantom edge is worse than a missing one: it hands a reader
+an unrelated file AS evidence.
 
 Edges supply candidates and annotations. They never rank — that is hard rule
 #3, decided by experiment.
@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from ._attrs import attribute_files
 from ._calls import called_files
 from ._imports import imports_of
+from ._reexports import reexport_map
 
 __all__ = ["ModuleIndex", "module_index", "python_edges"]
 
@@ -38,18 +39,16 @@ class ModuleIndex:
     by_symbol: dict[str, str]                 # "pkg.mod.Name" -> relpath
     trees: dict[str, ast.Module]
     by_attribute: dict[str, str]              # "audio_processor" -> relpath
+    reexports: dict[str, str]                 # "pkg.Name" -> defining relpath
 
 
 def module_index(sources: dict[str, str]) -> ModuleIndex:
     """Index every parseable Python file by the name it is imported AS.
 
-    Filled locally and constructed once at the end, so there is no moment when
-    a half-built index is reachable — resolution against one is silently wrong,
-    not loud.
-
-    The attribute map is a SECOND pass over the finished module map, because
-    resolving `self.x = Imported()` needs the import resolution to exist first.
-    """
+    Filled locally and constructed at the end, so no half-built index is ever
+    reachable — resolution against one is silently wrong, not loud. The two
+    derived maps are LATER passes, in order: re-exports need the modules
+    resolved, and attributes need the re-exports."""
     by_module: dict[str, str] = {}
     by_symbol: dict[str, str] = {}
     trees: dict[str, ast.Module] = {}
@@ -66,8 +65,11 @@ def module_index(sources: dict[str, str]) -> ModuleIndex:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                 by_symbol[f"{module}.{node.name}"] = relpath
-    imports_only = ModuleIndex(by_module, by_symbol, trees, {})
-    return ModuleIndex(by_module, by_symbol, trees, attribute_files(imports_only))
+    bare = ModuleIndex(by_module, by_symbol, trees, {}, {})
+    forwarded = reexport_map(bare)
+    resolved = ModuleIndex(by_module, by_symbol, trees, {}, forwarded)
+    return ModuleIndex(by_module, by_symbol, trees,
+                       attribute_files(resolved), forwarded)
 
 
 def dotted(relpath: str) -> str:

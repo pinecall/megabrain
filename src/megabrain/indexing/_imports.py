@@ -46,7 +46,17 @@ def _from_import(node: ast.ImportFrom, own: list[str], index: "ModuleIndex",
         elif module_file:
             # A re-exported symbol may live in a different file than the module
             # that exposes it; the module is the fallback, not the answer.
-            aliases[alias.asname or alias.name] = index.by_symbol.get(
+            #
+            # `reexports` is what the package's own __init__ says it forwards,
+            # and it is checked FIRST because it is a fact read from that file
+            # rather than an inference: `from ..storage import PIN_KIND` filed
+            # its only edge against `storage/__init__.py` while the symbol lives
+            # in `storage/_graph.py`, so the dependency existed in two hops and
+            # the graph held one.
+            defining = index.reexports.get(f"{target}.{alias.name}")
+            if defining:
+                edges.add((defining, "import"))
+            aliases[alias.asname or alias.name] = defining or index.by_symbol.get(
                 f"{target}.{alias.name}", module_file)
 
 
