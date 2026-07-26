@@ -14,21 +14,9 @@ from __future__ import annotations
 import re
 
 from ..storage import Store
+from ._elide import MAX_QUOTE_LINES, elide
 
 __all__ = ["quote_citations", "lines_of", "CITATION", "MAX_QUOTE_LINES"]
-
-MAX_QUOTE_LINES = 40
-"""Lines any single citation may print before it is cut, LOUDLY.
-
-Enforced here because asking did not work. Told to cite "one test, or one
-method — not the class or describe that contains it", the model cited a
-117-line `describe` block holding fifteen tests: 3 518 characters, 55% of the
-whole answer, to show what one of them looks like. Forty lines is two or three
-complete examples, which is what imitating a style actually needs.
-
-Display only. The APPLY markers are read from the raw text before any quoting,
-so a cut here can never shorten the anchor an edit is built from.
-"""
 
 CITATION = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]")
 
@@ -39,9 +27,23 @@ _LANG = {"rb": "ruby", "py": "python", "ts": "typescript", "tsx": "tsx",
 
 
 def quote_citations(text: str, store: Store) -> str:
-    """Replace every citation with a fenced block of the real lines."""
-    return CITATION.sub(lambda m: _block(store, m.group(1).strip(),
-                                         int(m.group(2)), int(m.group(3))), text)
+    """Replace every citation with a fenced block of the real lines.
+
+    A range quoted a SECOND time becomes a back-reference, not a second copy.
+    Measured: the same body arrived twice — once as the anchor, once under
+    "Pattern to follow" — for about 60 duplicated lines of one render, and the
+    reader named it as budget the elided closing lines should have had.
+    """
+    shown: set[tuple[str, int, int]] = set()
+
+    def replace(match: re.Match[str]) -> str:
+        path, lo, hi = match.group(1).strip(), int(match.group(2)), int(match.group(3))
+        if (path, lo, hi) in shown:
+            return f"**`{path}` L{lo}-{hi}** — quoted above"
+        shown.add((path, lo, hi))
+        return _block(store, path, lo, hi)
+
+    return CITATION.sub(replace, text)
 
 
 def _block(store: Store, path: str, lo: int, hi: int) -> str:
@@ -50,11 +52,10 @@ def _block(store: Store, path: str, lo: int, hi: int) -> str:
         return f"_(no file `{path}` in the index)_"
     lo, hi = max(1, lo), min(len(lines), max(lo, hi))
     lo = _with_decorators(lines, lo)
-    shown = min(hi, lo + MAX_QUOTE_LINES - 1)
-    body = "\n".join(lines[lo - 1:shown])
-    cut = (f"\n… cut at L{shown} of L{lo}-{hi}" if shown < hi else "")
+    body, note = elide(lines[lo - 1:hi], lo)
     lang = _LANG.get(path.rsplit(".", 1)[-1].lower(), "")
-    return f"**`{path}` L{lo}-{hi}**\n```{lang}\n{body}\n```{cut}"
+    return (f"**`{path}` L{lo}-{hi}**{note}\n```{lang}\n"
+            + "\n".join(body) + "\n```")
 
 
 def _with_decorators(lines: list[str], lo: int) -> int:

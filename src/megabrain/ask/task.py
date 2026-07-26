@@ -32,6 +32,7 @@ from ..contracts import Bundle
 from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
 from ._callees import named_definitions
+from ._enclosing import enclosing_bodies
 from ._headers import already_imported
 from ._pinned import exercising_tests
 from ._quote import quote_citations
@@ -74,7 +75,8 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
                 messages.append(tool_result(store, call, emit))
         # Every widening reads the RAW text and appends more citations, so all
         # of them are spliced by the same single quoting pass at the end.
-        widened = (answer.text + named_definitions(store, answer.text)
+        widened = (answer.text + enclosing_bodies(store, answer.text)
+                   + named_definitions(store, answer.text)
                    + exercising_tests(store, answer.text)
                    + already_imported(store, answer.text))
         surface = quote_citations(widened, store)

@@ -30,6 +30,14 @@ count that mattered was ONE — the block nobody looked at."""
 
 _CITED = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]")
 
+_ASSERTS = re.compile(r"\b(assert\w*|expect|should|must_\w+|refute\w*)\b")
+"""A chunk that pins behaviour makes a CLAIM about it.
+
+MEASURED as the one section a reader skimmed and discarded: a Sinatra app under
+`test/integration/` surfaced because a route in it is named `/send_file`, and 20
+of its 28 lines were an unrelated streaming route. The path says test, the
+content says fixture. A mention is not a pin; an assertion is."""
+
 
 def exercising_tests(store: Store, surface: str) -> str:
     """Citations for the tests that name a symbol this change touches."""
@@ -86,7 +94,7 @@ def _chunks_naming(store: Store, names: set[str], pinning: set[str],
                for path, lo, hi in cited):
             continue                      # already in front of the reader
         matched = set(wanted.findall(meta.text or ""))
-        if matched:
+        if matched and _ASSERTS.search(meta.text or ""):
             lo, hi = window_around(meta.text or "", meta.start_line, wanted)
             hits.append((len(matched), meta.file, lo, hi))
     return [(f, lo, hi) for _, f, lo, hi in sorted(hits, reverse=True)]

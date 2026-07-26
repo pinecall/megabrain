@@ -81,6 +81,23 @@ def test_a_test_that_does_NOT_pin_the_file_is_ignored(tmp_path) -> None:
     assert "other_test" not in out
 
 
+def test_a_FIXTURE_that_asserts_nothing_is_ignored(tmp_path) -> None:
+    """MEASURED as the one section a reader skimmed and discarded. A Sinatra
+    app under `test/integration/` surfaced because a route in it is named for
+    the symbol — the path says test, the content says fixture. A mention is not
+    a pin; a claim is."""
+    with repo(tmp_path) as store:
+        store.files.upsert("test/integration/app.rb", "sha", "", None)
+        store.chunks.insert([Chunk(
+            file="test/integration/app.rb", kind="block", name=None, part=None,
+            start_line=1, end_line=3,
+            text="get '/back' do\n  back; referer_of; host_of\nend",
+            breadcrumb="i")], None)
+        write_pin_edges(store)
+        out = exercising_tests(store, "[[lib/app.rb:2-4]]\n[[test/app_test.rb:1-63]]")
+    assert "integration/app.rb" not in out
+
+
 def test_a_change_touching_NO_symbol_surfaces_nothing(tmp_path) -> None:
     """A citation that declares nothing has nothing to be pinned by, and a
     section with no content is noise the reader still has to read."""

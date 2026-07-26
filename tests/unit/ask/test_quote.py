@@ -12,7 +12,7 @@ before any quoting, so a cut here can never shorten an anchor.
 
 from __future__ import annotations
 
-from megabrain.ask._quote import MAX_QUOTE_LINES, quote_citations
+from megabrain.ask._quote import quote_citations
 from megabrain.chunkers.model import Chunk
 from megabrain.storage import Store
 
@@ -34,19 +34,31 @@ def test_a_citation_becomes_the_real_lines(tmp_path) -> None:
     assert "line 3\nline 4\nline 5" in out and "```ruby" in out
 
 
-def test_an_OVERSIZED_citation_is_cut_and_says_so(tmp_path) -> None:
-    """A silent cut would have the reader believe they saw the whole example."""
+def test_an_OVERSIZED_citation_is_elided_and_says_so(tmp_path) -> None:
+    """Cut from the MIDDLE, not the tail. MEASURED: cutting the tail dropped
+    the `end` that closed the block an `insert_after` was aimed at, so the
+    instruction referred to a line the answer never showed."""
     with indexed(tmp_path) as store:
         out = quote_citations("[[app.rb:1-117]]", store)
-    assert f"line {MAX_QUOTE_LINES}" in out
-    assert f"line {MAX_QUOTE_LINES + 1}" not in out
-    assert "cut at" in out and "L1-117" in out, "the real range is not named"
+    assert "line 1\n" in out, "lost the opening of the block"
+    assert "line 117" in out, "lost the closing of the block"
+    assert "elided" in out and "L1-117" in out, "the real range is not named"
 
 
 def test_a_citation_within_the_ceiling_is_untouched(tmp_path) -> None:
     with indexed(tmp_path) as store:
         out = quote_citations("[[app.rb:1-10]]", store)
-    assert "cut at" not in out and "line 10" in out
+    assert "elided" not in out and "line 10" in out
+
+
+def test_the_SAME_range_twice_is_a_back_reference(tmp_path) -> None:
+    """MEASURED: the same body arrived as the anchor and again under "Pattern
+    to follow" — ~60 duplicated lines the reader named as the budget the
+    elided closing lines should have come from."""
+    with indexed(tmp_path) as store:
+        out = quote_citations("[[app.rb:3-5]] and again [[app.rb:3-5]]", store)
+    assert out.count("line 4") == 1, "quoted the same range twice"
+    assert "quoted above" in out
 
 
 def test_a_range_beyond_the_file_is_CLAMPED_not_dropped(tmp_path) -> None:
