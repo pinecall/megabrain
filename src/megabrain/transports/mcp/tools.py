@@ -49,14 +49,16 @@ TOOLS: tuple[Tool, ...] = (
          AskParams),
     Tool("megabrain_code",
          "CHANGE an indexed repository: describe the change and get its EDIT "
-         "SURFACE — every file you must touch, the exact line to touch it at, "
-         "the existing code around it quoted VERBATIM, the new lines to add, "
-         "and the neighbouring test to imitate. The engine opens the files "
-         "itself, so this is one call rather than one to understand plus one "
-         "to locate. Go straight from this to editing: apply it with "
-         "megabrain_replace, which needs no re-read of what you were just "
-         "shown. Describe the OUTCOME you want, not the file you guess it "
-         "lives in — finding that is the job.",
+         "SURFACE — every file you must touch, the exact anchor to touch it "
+         "at, and a prose SPEC of the new code (never the code itself: you "
+         "write that, because you run the tests). Cited VERBATIM alongside: "
+         "the original the change mirrors, the DEFINITION of every helper the "
+         "spec names, the tests that pin the behaviour, and the test file's "
+         "imports. Everything you need is IN the surface — do not follow up "
+         "with megabrain_ask for a helper's body, it is already quoted. Go "
+         "straight to megabrain_replace, substituting your code for the "
+         "placeholder in the prepared operations. Describe the OUTCOME you "
+         "want, not the file you guess it lives in — finding that is the job.",
          CodeParams),
     Tool("megabrain_search",
          "ONE call that MAPS a task's whole edit surface: the files that answer "
