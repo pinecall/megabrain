@@ -264,6 +264,17 @@ cases, and the reader needs one example, not forty-four.
 If you indexed a repo before this, a plain `megabrain index` picks it up with **zero
 embedding calls** — symbols cost a parse, so re-extracting them is free (`SYMBOL_SCHEMA`).
 
+**Measured against the `grep` it replaces**, on click, express and sinatra at pinned
+commits: the same job costs **4 074 tokens against 20 715** (5.1×) — or against 110 499
+(27×) when the hit lands in a 3 600-line module and you read the file. Coverage **7 of 7
+sites against 6 of 7**, and the one grep cannot reach is the one that breaks the change: a
+`TypedDict` whose text never contains the string you searched for. Latency is a tie
+(milliseconds either way — the saving is tokens and turns, and anyone selling you speed
+here is selling you nothing).
+
+**[The tables, the method, and where it is biased →](docs/BENCHMARKS.md)** — reproduce with
+`./benchmarks/setup.sh && python benchmarks/measure.py`.
+
 ### Why `search` is never the input for an edit
 
 `search` hands you chunks straight from the index with no model in the loop, which makes it
