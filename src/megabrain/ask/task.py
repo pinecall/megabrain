@@ -22,6 +22,7 @@ from typing import Any
 from ..contracts import Bundle
 from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
+from ._callees import named_definitions
 from ._headers import test_preambles
 from ._operations import operations_from
 from ._pinned import exercising_tests
@@ -70,7 +71,8 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
         operations = operations_from(answer.text, store)
         # The preamble is appended to the RAW text so its citation is quoted
         # by the same pass as every other one.
-        widened = (answer.text + exercising_tests(store, answer.text)
+        widened = (answer.text + named_definitions(store, answer.text)
+                   + exercising_tests(store, answer.text)
                    + test_preambles(store, [op["file"] for op in operations]))
         surface = quote_citations(widened, store) + apply_block(operations)
     # Emitted, not merely returned. Every surface renders from the event
