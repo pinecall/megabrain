@@ -51,6 +51,17 @@ def test_a_citation_within_the_ceiling_is_untouched(tmp_path) -> None:
     assert "elided" not in out and "line 10" in out
 
 
+def test_a_bracket_NO_grammar_accepted_is_dropped(tmp_path) -> None:
+    """MEASURED: served a body with real line numbers, the model cited it as
+    `[[1214-1215]]` — neither a chunk index nor a path — and both splicers passed
+    over it, so the reader got literal brackets mid-sentence. Dropped, the stance
+    `splice` already takes on a citation of a chunk never offered."""
+    with indexed(tmp_path) as store:
+        out = quote_citations("after filters run [[1214-1215]] unless static.", store)
+    assert "[[" not in out
+    assert "after filters run unless static." in out, "the space was left behind"
+
+
 def test_the_SAME_range_twice_is_a_back_reference(tmp_path) -> None:
     """MEASURED: the same body arrived as the anchor and again under "Pattern
     to follow" — ~60 duplicated lines the reader named as the budget the

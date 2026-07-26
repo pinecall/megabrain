@@ -15,6 +15,7 @@ import re
 
 from ..storage import Store
 from ._elide import MAX_QUOTE_LINES, elide
+from ._litter import drop_unresolved
 
 __all__ = ["quote_citations", "lines_of", "CITATION", "MAX_QUOTE_LINES"]
 
@@ -49,7 +50,7 @@ def quote_citations(text: str, store: Store) -> str:
         shown.add((path, lo, hi))
         return _block(store, path, lo, hi)
 
-    return CITATION.sub(replace, text)
+    return drop_unresolved(CITATION.sub(replace, text))
 
 
 def _block(store: Store, path: str, lo: int, hi: int) -> str:

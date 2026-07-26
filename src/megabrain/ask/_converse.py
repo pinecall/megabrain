@@ -21,6 +21,7 @@ from typing import Any
 
 from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
+from ._filled import filled
 from ._toolcall import assistant_turn, tool_result
 from .events import Emit
 from .tools import TOOLS
@@ -32,8 +33,7 @@ MAX_ROUNDS = 5
 
 Each round is one model call plus the files it asked for, and a walkthrough
 needs two or three — five leaves room to open a wrong one and recover, without
-letting a model that keeps browsing spend the caller's afternoon.
-"""
+letting a model that keeps browsing spend the caller's afternoon."""
 
 
 def answered(provider: ChatProvider, prompt: str, root: Path | None, *,
@@ -41,9 +41,8 @@ def answered(provider: ChatProvider, prompt: str, root: Path | None, *,
     """The model's final text, after any files it asked to open.
 
     Without a `root` there is no index to open FROM, so one buffered call is the
-    whole answer — the multi-agent path narrates that way, and a walkthrough
-    that refused to run without a root would break it.
-    """
+    whole answer — the multi-agent path narrates that way, and refusing to run
+    without a root would break it."""
     if root is None:
         return provider.stream_chat(
             {"model": getattr(provider, "model", ""), "max_tokens": 2400,
@@ -55,7 +54,14 @@ def answered(provider: ChatProvider, prompt: str, root: Path | None, *,
 
 def converse(provider: ChatProvider, prompt: str, store: Store, *,
              emit: Emit, on_delta: Any = None) -> Answer:
-    """Talk until the model stops asking for files; return its final answer."""
+    """Talk until the model stops asking for files; return its final answer.
+
+    One extra round is spent when the answer ADMITS it wrote without a body the
+    index holds — measured at 1 answer in 14, and the resulting prose hedged
+    about behaviour the missing code states outright. The bodies are served the
+    way an `open_file` result would be, so the model writes ONE complete answer
+    with the material rather than being patched afterwards.
+    """
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     answer = Answer(text="")
     for _round in range(MAX_ROUNDS):
@@ -65,7 +71,8 @@ def converse(provider: ChatProvider, prompt: str, store: Store, *,
         messages.append(assistant_turn(answer))
         for call in answer.tool_calls:
             messages.append(tool_result(store, call, emit))
-    return answer
+    return filled(provider, answer, messages, store, _body, emit=emit,
+                  on_delta=on_delta)
 
 
 def _body(provider: ChatProvider, messages: list[dict[str, Any]]) -> dict[str, Any]:
