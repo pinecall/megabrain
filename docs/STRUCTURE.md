@@ -1,5 +1,10 @@
 # Package structure
 
+> **DONE.** All six moves landed in six commits, each with ruff and the full suite
+> green: `chunkers/languages/` → `providers/` → `indexing/` → `ask/` →
+> `knowledge/` + `chunkers/`. Zero behaviour change — `git mv` plus re-imports.
+> The result, and the three places the code disagreed with this plan, are in §11.
+
 282 files, 16 940 lines, and **every single module is at or under 100 lines** —
 verified, because it is enforced (`tests/architecture/test_invariants.py`:
 `MAX_FILE_LINES = 100`, `MAX_FUNC_LINES = 30`; the longest file in the engine is
@@ -244,3 +249,47 @@ Worth stating so the reorg is not oversold — it buys navigation and nothing el
   `c_family.py`, `optional.py` inside `specs/`, which is an improvement in
   naming, but the split itself is still "whatever fit under 100 lines" rather
   than a real grouping of languages.
+
+---
+
+## 11. What actually landed
+
+| package | before | after (root) | subpackages |
+|---|---:|---:|---|
+| `ask/` | 44 | **4** | prompt · converse · citing · checks · agents · **sites** |
+| `chunkers/` | 31 | **4** | `_cast` · treesitter (+ specs) · languages |
+| `knowledge/` | 24 | **4** | graph · clusters · routes · symbols |
+| `indexing/` | 21 | **9** | edges · passes |
+| `providers/` | 16 | **2** | http · embeddings · chat |
+
+No package now holds more than 13 modules, and every one still flat is a registry
+where flat is correct (§1). 282 files, unchanged: nothing was merged.
+
+**Three places the code disagreed with the plan above**, all of them corrections
+the plan needed:
+
+1. **`_local.py` stays at the root of `providers/`.** §7 put it in `http/`, but
+   `chat/config.py` imports it too — it answers "is this endpoint on this
+   machine", which both backends ask before deciding whether a missing API key is
+   an error.
+2. **No `ignore/` package in `indexing/`.** It would have held `unsupported.py`,
+   which is the census of files NOTHING can chunk — not an exclusion rule. Three
+   files do not earn a folder once the package is down to nine.
+3. **`pins.py` went to `edges/`, not `registry/`.** It writes PIN_KIND edges, so
+   it is an extractor. Grouping by "what it is" beat grouping by "when it runs".
+
+**Traps worth knowing if you do this again**, each caught by the suite and not by
+lint:
+
+- Imports under `TYPE_CHECKING` are indented, so a grep for `^from` misses them.
+  Three of them pointed at `indexing/edges.py`.
+- Lazy imports inside function bodies, same reason: `from ._urllib import
+  UrllibTransport` at `providers/embeddings/client.py:79` and
+  `chat/openai_compat.py:80`.
+- The `from <package> import <module>` form, which a rewriter matching
+  `from X import <names>` will happily corrupt: `from megabrain.ask import _pool`.
+
+The last three packages were moved by a written rewriter (relative → absolute →
+map → relative, level recalculated per file) rather than by hand, at the repo
+owner's explicit request — global RULE 2 bans mass rewrites, so it printed every
+one of the 215 import lines it changed, and the suite was the net.

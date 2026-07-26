@@ -5,7 +5,9 @@
 > minutes of agent file-crawling with one grounded answer.
 
 > ⚠️ **This document is being rewritten for v3 and is partly stale.** Accurate as of
-> the v3 branch: the hard rules, §1's shape, §4.5 (the atlas) and §7's layout. Still
+> the v3 branch: the hard rules, §1's shape and §7's layout (§7 was rewritten from
+> the real tree when the packages were reorganised). §4.5's atlas does NOT exist
+> here — no `atlas/`, no cards, no `study`/`brief`; those sections are v2. Still
 > describing **v2**, with names and modules that have moved or do not exist yet: the
 > `forge` sections (§2.5), the flow-cache narrative (§3.4), `--prune`/`prune_search`
 > (§3.3), and the HTTP entry-point bullet in §5. The MCP surface is v3-accurate as of
@@ -713,25 +715,36 @@ src/megabrain/
                          no vector column: cards never rank)
         _blobs.py        the untyped sqlite↔numpy boundary
         locate.py        resolve_root + INDEX_FILE — the layout lives in ONE line
-      providers/       model APIs
-        embeddings.py    OpenAI-compatible /embeddings; batch width detection,
-                         index-set validation, content-addressed disk cache
-        http · _retry · _urllib · _wire · _width · _config · cache
+      providers/       model APIs — one folder per backend, plus what they share
+        _local.py        is this endpoint on this machine? asked by BOTH backends
+        http/            attempt.py · retry.py · _urllib.py · _stream.py
+        embeddings/      client.py (OpenAI-compatible /embeddings) · cache.py
+                         (content-addressed) · _config _send _batching _budget
+                         _oversize _wire _width _replies
         chat/            L4 — nothing under retrieval/ may import this
           base.py          ChatProvider Protocol · openai_compat.py · router.py
 
   L3  chunkers/        CONTENT → CHUNKS behind one partition-guaranteed contract
         cast.py          the ONE split-then-merge engine · units.py the language seam
-        _spans · _split · _merge · _balance · _breadcrumb · _signature · _pysymbols
-        python.py        stdlib ast · model.py Chunk/Symbol/FileResult + validate_partition
-      indexing/        BUILD the index — 3 phases = 3 functions
-        indexer.py       orchestration · discover.py the walk · _plan.py what to do
-        _embed.py        the GLOBAL batch embed (one network call per pass)
-        _write.py        rows + prune_orphans (GONE vs SKIPPED) · _graph.py edges
-        edges · _imports · _calls   import/call resolution (python)
-        strategies.py    ext → Strategy registry (OCP) · builtin.py the shipped one
+        model.py         Chunk/Symbol/FileResult + validate_partition (the oracle)
+        _cast/           the cAST recipe: _split _merge _balance _spans
+                         _breadcrumb _signature — none of them knows the language
+        treesitter/      ONE walk, parameterised by a table: chunker.py _langspec
+                         _names _nodes _symbols _calls (a mocha `it(…)` is a symbol)
+          specs/           core.py · c_family.py · optional.py — the language tables
+        languages/       one module per language, 13-18 lines each: python markdown
+                         typescript c cpp csharp go java php ruby rust (+_pysymbols)
+      indexing/        BUILD the index
+        indexer.py       orchestration · discover.py the walk · strategies.py the
+                         ext → Strategy registry (OCP) + EDGE_SCHEMA
+        passes/          plan → embed → write → resymbol. The ORDER is the design:
+                         a network failure in embed aborts before write touches a row
+        edges/           python.py · typescript.py · pins.py (test → impl) ·
+                         _imports _calls _attrs _reexports _rebuild
+        builtin.py       the shipped strategies · _languages.py which ones ship on
         _exclude.py      megabrain.json ignores + the legacy dotfiles
         _gitignore.py    the repo's own .gitignore (on by default, opt-out)
+        unsupported.py   the census of files NOTHING can chunk
       retrieval/       ANSWER queries — NO LLM IN HERE (rule 1, enforced by a test)
         search.py        the neutral primitive · params.py every knob, frozen
         state.py         SearchState + load_state (warm matrices)
@@ -742,25 +755,29 @@ src/megabrain/
                          recall floors) · _convert
         render/          markdown · _lang
       knowledge/       THE GRAPH (§6) — candidates + annotations, never ranking
-        build.py         RepoGraph + load_graph (near/out/into adjacency)
-        communities · gods · surprises · paths (BFS) · labels · views
-        uses · usesites · carriers · tolls · aliases · source · snips
+        build.py         RepoGraph + load_graph · node.py · views.py the map
+        graph/           weights · semantic · aliases — what an edge WEIGHS
+        clusters/        communities · labels · _naming · gods · surprises
+                         ← the package's ONLY LLM touch lives here, on purpose
+        routes/          paths (BFS) · route · story · carriers · tolls
+        symbols/         links · locals · resolve · uses · usesites · source · snips
 
-  L4  atlas/           THE MENTAL MAP (§4.5) — an LLM at INDEX time, never at query
-        author.py        writes one card per file  ← the only module here with an LLM
-        oracle.py        accepts/rejects a card against the skeleton it was shown
-        _plan.py         CARD_SCHEMA + the cache key (schema, model, skeleton)
-        _prompt.py       the prompt and its one retry
-        brief.py         QUERY time, 0 LLM: takes the bundle's file list as-is
-        _assemble.py     narrative order (graph BFS) + one entry's relations/interface
-        render.py        Brief → terminal markdown
-      enrich/          Bundle → Bundle, opt-in, fail-open to the input
+  L4  enrich/          Bundle → Bundle, opt-in, fail-open to the input
         rerank.py        the judge lane: the model returns IDS, never code
         _batches · _cards · _prompt · _verdict
       ask/             NARRATE — the only layer that talks to an LLM at query time
-        narrator.py · splice.py (rule 5) · agents.py · _subagent · _pool ·
-        _candidates · citations · events · prompt · stream · _rules · _block ·
-        repair.py + _broken.py  (a citation that resolved to nothing, re-asked)
+        narrator.py · events.py · stream.py
+        prompt/          what the model is HANDED: 8 bodies + a map of the rest.
+                         Served all 30, it opened nothing (§5.1)
+        converse/        the open_file loop — loop.py tools.py _toolcall _flowctx
+                         _missing _filled _admits
+        citing/          RULE 5 as a package: the model cites, the ENGINE splices.
+                         citations splice _quote _window _elide _codeonly _litter
+                         _broken repair _rescue
+        checks/          deterministic, no model: grounded pinned callees prune surface
+        agents/          fan-out, one sub-narrator per subsystem
+        sites/           WHERE TO EDIT — the lanes behind megabrain_grep, and NO
+                         model: sites mentions referenced spans idents spread rows words
       flows/           the cached-walkthrough lane (cache · serve · match · covers ·
                        freshness · chrome)
 
@@ -783,8 +800,13 @@ studio/                the studio's TypeScript workspace (esbuild → transports
   src/views/           ask · brief · search · graph · files · adding
 ```
 
-Not yet ported (deliberate, tracked): `forge/` (phase 16) · the `treesitter` / `php` /
-`markdown` chunkers and the languages they carry · the issue-mode lane.
+Not yet ported (deliberate, tracked): `forge/` (phase 16) · `atlas/` and the
+`study`/`brief` pair §4.5 still describes — **that package does not exist on this
+branch**, so every mention of a card is v2 · the issue-mode lane.
+
+The tree-sitter chunker and its languages ARE ported, contrary to what this note
+said until the packages were reorganised: eleven of them live in
+`chunkers/languages/`, gated on their grammar being installed.
 
 Runnable examples (programmatic API · custom .sql chunker · chunk heatmap ·
 web demo) live in their own repo, `~/megabrain-examples` — they need the engine
