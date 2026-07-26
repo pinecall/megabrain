@@ -13,10 +13,10 @@ from pathlib import Path
 from ..contracts import Community, GraphLink, GraphMap, GraphNode
 from ..storage.locate import resolve_root
 from .build import RepoGraph, load_graph
-from .communities import communities_of
-from .gods import god_nodes
-from .labels import label_communities
-from .surprises import surprises_of
+from .clusters.communities import communities_of
+from .clusters.gods import god_nodes
+from .clusters.labels import label_communities
+from .clusters.surprises import surprises_of
 
 __all__ = ["graph_map", "HUBS"]
 

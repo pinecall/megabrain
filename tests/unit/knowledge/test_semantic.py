@@ -16,8 +16,8 @@ import numpy as np
 import pytest
 
 from megabrain.knowledge.build import SEM_EDGE_MIN, load_graph
-from megabrain.knowledge.communities import communities_of
-from megabrain.knowledge.surprises import surprises_of
+from megabrain.knowledge.clusters.communities import communities_of
+from megabrain.knowledge.clusters.surprises import surprises_of
 from megabrain.storage import Store
 
 

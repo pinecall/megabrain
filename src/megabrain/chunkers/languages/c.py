@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .._specs_c import C_SPEC
-from ..treesitter import parse_with
+from ..treesitter.chunker import parse_with
+from ..treesitter.specs.c_family import C_SPEC
 from ..units import Parsed
 
 __all__ = ["parse"]

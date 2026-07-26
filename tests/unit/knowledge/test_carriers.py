@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from megabrain.knowledge.carriers import hop_code, hop_symbols
+from megabrain.knowledge.routes.carriers import hop_code, hop_symbols
 from megabrain.storage import Store
 from megabrain.usecases import build_index
 from tests.unit.indexing.fake import CountingEmbedder, write

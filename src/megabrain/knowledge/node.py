@@ -15,9 +15,9 @@ from ..contracts import Neighbourhood, NodeEdge, NodeView, SemanticTie
 from ..storage import Store
 from ..storage.locate import resolve_root
 from .build import load_graph
-from .communities import communities_of
-from .labels import label_communities
-from .resolve import resolve_node
+from .clusters.communities import communities_of
+from .clusters.labels import label_communities
+from .symbols.resolve import resolve_node
 
 __all__ = ["graph_node", "neighbourhood"]
 

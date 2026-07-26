@@ -29,7 +29,7 @@ from pathlib import Path
 import pytest
 
 from megabrain.knowledge.build import load_graph
-from megabrain.knowledge.communities import communities_of
+from megabrain.knowledge.clusters.communities import communities_of
 from megabrain.storage import Store
 
 

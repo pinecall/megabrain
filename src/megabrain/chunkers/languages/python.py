@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import ast
 
-from .._signature import skeleton_of
+from .._cast._signature import skeleton_of
 from ..units import Parsed, Unit
 from ._pysymbols import first_line, kind_of, symbols_of
 

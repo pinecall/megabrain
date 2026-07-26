@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from megabrain.knowledge.story import orient_hops, tell
+from megabrain.knowledge.routes.story import orient_hops, tell
 from megabrain.storage import Store
 from megabrain.usecases import build_index
 from tests.unit.indexing.fake import CountingEmbedder, write

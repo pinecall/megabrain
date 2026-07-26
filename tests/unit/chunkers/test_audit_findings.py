@@ -8,7 +8,7 @@ hid behind it.
 from __future__ import annotations
 
 from megabrain.chunkers import Chunker, nws, validate_partition
-from megabrain.chunkers._balance import balance
+from megabrain.chunkers._cast._balance import balance
 from megabrain.chunkers.languages.python import parse
 from tests.unit.chunkers.fake import parser_for, source_of
 

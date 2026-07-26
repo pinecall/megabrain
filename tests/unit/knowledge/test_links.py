@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from megabrain.knowledge.links import file_links
+from megabrain.knowledge.symbols.links import file_links
 from megabrain.storage import Store
 from megabrain.usecases import build_index
 from tests.unit.indexing.fake import CountingEmbedder, write

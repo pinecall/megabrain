@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from megabrain.knowledge.resolve import resolve_node
+from megabrain.knowledge.symbols.resolve import resolve_node
 from megabrain.storage import Store
 from megabrain.usecases import build_index
 from tests.unit.indexing.fake import CountingEmbedder, write

@@ -7,8 +7,8 @@ a reason for a repository to become unsearchable.
 
 from __future__ import annotations
 
-from .._specs import PHP_SPEC
-from ..treesitter import parse_with
+from ..treesitter.chunker import parse_with
+from ..treesitter.specs.core import PHP_SPEC
 from ..units import Parsed
 
 __all__ = ["parse"]

@@ -6,7 +6,7 @@ rest and guarantees that every line of every file belongs to exactly one chunk.
 
 from __future__ import annotations
 
-from ._breadcrumb import breadcrumb, embed_text
+from ._cast._breadcrumb import breadcrumb, embed_text
 from .cast import Chunker
 from .model import DEFAULT_BUDGET, Chunk, FileResult, Symbol, nws, validate_partition
 from .units import Parsed, ParseFn, Unit

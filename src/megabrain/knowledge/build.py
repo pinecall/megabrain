@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 from .._arrays import Matrix
 from ..storage import Store
-from .semantic import SEM_EDGE_MIN, SEM_TOP_K, semantic_lane
+from .graph.semantic import SEM_EDGE_MIN, SEM_TOP_K, semantic_lane
 
 __all__ = ["RepoGraph", "load_graph", "SEM_EDGE_MIN", "SEM_TOP_K"]
 

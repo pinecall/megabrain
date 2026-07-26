@@ -7,10 +7,10 @@ partition regardless of what the parser said.
 
 from __future__ import annotations
 
-from ._breadcrumb import breadcrumb
-from ._merge import merge
-from ._spans import Cost, Span, cover, renumber
-from ._split import split
+from ._cast._breadcrumb import breadcrumb
+from ._cast._merge import merge
+from ._cast._spans import Cost, Span, cover, renumber
+from ._cast._split import split
 from .model import DEFAULT_BUDGET, Chunk, FileResult, nws
 from .units import ParseFn, Unit
 

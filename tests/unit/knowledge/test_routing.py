@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 
 from megabrain.knowledge.build import load_graph
-from megabrain.knowledge.paths import shortest_path
+from megabrain.knowledge.routes.paths import shortest_path
 from megabrain.storage import Store
 
 
