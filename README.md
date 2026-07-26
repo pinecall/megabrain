@@ -203,35 +203,62 @@ megabrain install    # detects Claude Code · Codex · Cursor · Windsurf · Gem
 | the cross-file story | reconstructed, unverified | **narrated, real code spliced in** |
 | asking it again later | the full re-exploration | **~0 ms, from the cache** |
 
-Your agent gets **three** tools, and the smallness is the design — it already has Read,
-Grep and an editor, so the surface carries only what megabrain alone can do:
+## Three deliverables, one retrieval core
 
-| you want… | tool | what comes back |
-|---|---|---|
-| the **whole flow** behind a question, or behind a change you are about to make | **`megabrain_ask`** | a walkthrough with the real code spliced in at each step. The narrator **opens whatever the retrieved chunks left unexplained** and keeps reading until the answer is complete — so one call replaces a grep/Read chain |
-| the **map**, or the **docs** | **`megabrain_search`** | the files that answer, each with its best span and the symbols it declares — no bodies (a third of the tokens); `content: "docs"` for prose, `bodies: true` for the code inline |
-| to make a repo answerable | **`megabrain_index`** | the index, incremental by content hash |
+Your agent gets **four** tools. Three of them run the same deterministic retrieval and
+differ only in **what they hand back** — because "find me this code" is three different
+jobs, and answering all three the same way is what makes a tool feel almost useful.
+
+| you are about to… | tool | what comes back | size |
+|---|---|---|---|
+| **EDIT** — you know roughly what to change | **`megabrain_grep`** | the files to open, the symbols in them worth opening, each one's **exact line range**, and one line on why. Ordered: the site to change, what it must match or reuse, the test that pins it | ~400 chars |
+| **UNDERSTAND** — a mechanism, a bug, or a pattern you want to copy out of another repo | **`megabrain_ask`** | the flow narrated end to end with the **real code spliced in**, plus the definition of every helper it names and the tests that pin what it described | ~1–2k words |
+| read the **DOCS**, or get the map | **`megabrain_search`** | the files that answer, each with its best span and symbols. `content: "docs"` for prose — this is the one to reach for when a repo's README *is* the API reference | ~2 700 tokens |
+| make a repo answerable | **`megabrain_index`** | the index, incremental by content hash | — |
+
+### Why `grep` quotes no code, on purpose
+
+Your editor makes you open the file to change it. So a tool that pastes the body has
+billed you for reading it twice — and that is not a guess, it is why the earlier
+`megabrain_code` was **deleted**: measured across five tasks in three languages, the
+retrieval was excellent and the citation was waste.
+
+What no editor and no `grep` can give you is the **line range of the thing that matters**:
+
+```
+$ megabrain grep "the read tool refuses non-regular files but write does not — add the guard"
+
+## src/anthropic/lib/tools/agent_toolset.py
+  L619-634  beta_write_tool — Add the regular file guard here to match read/edit tools.
+  L567-616  beta_read_tool — The existing guard to copy for the write tool.
+
+## tests/lib/tools/test_agent_toolset.py
+  L131-136  test_read_rejects_directory — The existing test pattern to replicate.
+```
+
+Three rows, 352 characters, ~1.3 s. `grep -r "regular file"` finds the string; this finds
+the **place with no matching string at all** — `beta_write_tool`, which is the whole point,
+because the code you have to change is the code that does not yet mention the thing.
+
+The split of labour inside is deliberate: the model names the symbol, the **engine** reads
+the line range out of the symbol table. Asking a model for line numbers was measured and
+rejected — unnumbered, its ranges "landed a few lines off and cut functions mid-body".
+
+### Why `search` is never the input for an edit
+
+`search` hands you chunks straight from the index with no model in the loop, which makes it
+the fastest and the most honest of the three — and unusable for a change. It **ranks what
+exists**, so when the bug is a missing call, an unset flag or an absent guard, the very
+thing you need is the one thing it cannot rank. Reach for it to read a repo's docs
+(`content: "docs"`) or to get your bearings; reach for `grep` to edit.
 
 Each tool's `inputSchema` is generated from `contracts/tools.py`, so a parameter cannot
 exist on the wire without existing in the dispatch.
 
-`ask` hands the model the best eight chunk bodies and a **map** of the rest, then serves
-any file it asks for, verbatim from the index. Two things get added afterwards with no
-model call: the definition of every helper the prose named, and **the tests that pin what
-it described** — which is how a change stops breaking a test 1 600 lines away that nobody
-looked at. Both were measured: three of four readers had been paying a second retrieval
-call for the first, and the second caught a test that pinned the exact bug being fixed.
-
-**It briefly had two more tools, `megabrain_code` and `megabrain_replace`, and they were
-removed.** Measured across five tasks in three languages, what carried the value was the
-narrator opening files until it had the whole flow — that now belongs to `ask`. The edit
-machinery around it kept being discarded by the readers it was built for: a prepared edit
-batch was wrong both times it was measured, and applying an edit is work the host's own
-editor already does.
-
-> **Put this in your agent's rules:** for any question about how the code works — and
-> before any change — call `megabrain_ask` **first**, before grepping. One call returns the
-> whole flow with the real code, and it goes and opens what retrieval missed.
+> **Put this in your agent's rules:** about to change code in an indexed repo →
+> `megabrain_grep`, not `grep`. Want to understand a mechanism or copy a pattern from
+> another project → `megabrain_ask`. Reading documentation → `megabrain_search --docs`.
+> Never chain one call per sub-question: one call covers a task.
 
 [Every parameter →](docs/REFERENCE.md#mcp-tools) ·
 [Wiring recipes →](docs/RECIPES.md#give-your-coding-agent-the-whole-repo)
@@ -246,6 +273,7 @@ megabrain scan   ~/repo                       # census only: what WOULD index, a
 megabrain search ~/repo "retry logic"         # the code map, no LLM (~200 ms)
 megabrain search ~/repo "retry logic" --full  #   …with the code bodies inline
 megabrain ask    ~/repo "how does X work"     # narrated walkthrough + real code
+megabrain grep   ~/repo "add a retry to X"    # where to edit: files, symbols, line ranges
 megabrain get    ~/repo path/to/file.py       # one file, or one symbol
 megabrain graph  ~/repo                       # the repo as a knowledge graph
 megabrain studio                              # the web UI + JSON API

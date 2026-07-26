@@ -1,4 +1,4 @@
-"""The MCP surface: five tools, one dispatch, JSON-RPC over stdio.
+"""The MCP surface: four tools, one dispatch, JSON-RPC over stdio.
 
 Driven the way a host drives it — a JSON-RPC message in, a response object out
 — because the protocol handling IS the surface. Calling the use cases directly
@@ -57,21 +57,22 @@ def _text(result: dict[str, Any]) -> str:
 
 # ── the surface ──────────────────────────────────────────────────────────
 
-def test_the_agent_sees_exactly_the_three_tools() -> None:
-    """Every tool costs the calling agent context and a routing decision, so
-    the surface stays the shortest one that closes the loop: narrate a mechanism
-    from the whole repository (`ask`), map it (`search`), and make a repository
-    answerable at all (`index`).
+def test_the_agent_sees_exactly_the_four_tools() -> None:
+    """Every tool costs the calling agent context and a routing decision, so the
+    surface stays the shortest one that closes the loop. The three read tools are
+    split by DELIVERABLE over one retrieval core: where to edit (`grep`), the
+    mechanism narrated (`ask`), the map and the docs (`search`) — plus `index`,
+    which makes a repository answerable at all.
 
-    It was briefly five. `megabrain_code` and `megabrain_replace` were measured
-    across five tasks in three languages and REMOVED: what carried the value was
-    the narrator opening files until it had the whole flow, and that now belongs
-    to `ask`. The edit machinery around it kept being discarded by the readers it
-    was built for — a prepared batch was wrong both times it was measured — and
-    applying an edit is work the host's own editor already does.
+    `megabrain_code` and `megabrain_replace` were measured across five tasks in
+    three languages and REMOVED, and `grep` is what replaced the half that
+    worked. Those two quoted anchors, specs and helper bodies — and the host's
+    editor made the reader open those files anyway, so the citation was billed
+    twice. `grep` returns only what no editor can supply: which symbols matter
+    for this task, and where they are.
     """
     assert {tool.name for tool in TOOLS} == {
-        "megabrain_ask", "megabrain_search", "megabrain_index"}
+        "megabrain_ask", "megabrain_grep", "megabrain_search", "megabrain_index"}
 
 
 def test_every_schema_is_generated_from_its_contract() -> None:

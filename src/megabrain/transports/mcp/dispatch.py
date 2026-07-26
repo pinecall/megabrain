@@ -13,6 +13,7 @@ from typing import Any, Callable
 from ..._errors import MegabrainError
 from ...retrieval.render import render
 from ...usecases import ask, build_index, search
+from ...usecases.grep import grep
 from . import arguments as arg
 from .answers import Answer, answer, failure, from_engine
 
@@ -26,6 +27,17 @@ def _ask(args: dict[str, Any]) -> str:
     agent reads the final text only. Events would be written to nobody."""
     return ask(arg.repo(args), arg.first_of(args, "query", "question"),
                path_filter=arg.scope(args), content=arg.content(args) or "code")
+
+
+def _grep(args: dict[str, Any]) -> str:
+    """Where to look, and nothing else — the grep a coding agent actually needs.
+
+    Separate from `_ask` because the DELIVERABLE is different, not the retrieval:
+    an agent about to edit wants files, symbols and line ranges, and its editor
+    will open those files anyway — so quoting the code back is billed twice.
+    """
+    return grep(arg.repo(args), arg.first_of(args, "task", "query"),
+                path_filter=arg.scope(args))
 
 
 def _index(args: dict[str, Any]) -> str:
@@ -48,6 +60,7 @@ def _search(args: dict[str, Any]) -> str:
 
 HANDLERS: dict[str, Handler] = {
     "megabrain_ask": _ask,
+    "megabrain_grep": _grep,
     "megabrain_search": _search,
     "megabrain_index": _index,
 }

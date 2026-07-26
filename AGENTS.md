@@ -25,13 +25,15 @@ megabrain brief . "how does the brief avoid ranking twice"
 megabrain ask   . "how does ask splice real code"
 ```
 
-Over MCP, **three** tools — the surface carries only what megabrain alone can do, since
-the host already has Read, Grep and an editor: `megabrain_ask` (the whole flow behind a
-question or a change, narrated, and the narrator OPENS what retrieval missed) ·
-`megabrain_search` (the map, and the docs) · `megabrain_index`. Prefer these over
-grep/Read chains. It was briefly five: `megabrain_code` and `megabrain_replace` were
-measured across five tasks in three languages and removed — the value was the opening,
-which now belongs to `ask`, and the edit machinery kept being discarded by its readers.
+Over MCP, **four** tools. Three share one retrieval core and differ by DELIVERABLE,
+because "find me this code" is three jobs: `megabrain_grep` (about to EDIT — files,
+symbols, exact line ranges, no code, because your editor opens the file anyway) ·
+`megabrain_ask` (UNDERSTAND a mechanism, or copy a pattern out of another repo — narrated
+with the real code spliced in) · `megabrain_search` (the DOCS, or the map — chunks with no
+model, and never the input for an edit: it ranks what EXISTS, so a missing call is what it
+cannot show you). Plus `megabrain_index`. `megabrain_code`/`megabrain_replace` were
+measured across five tasks in three languages and removed; `grep` is the half that
+worked.
 
 ## Hard rules — locked by experimental data, do not violate
 

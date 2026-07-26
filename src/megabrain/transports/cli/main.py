@@ -18,6 +18,7 @@ from .commands import (
     ask,
     get,
     graph,
+    grep,
     index,
     install,
     scan,
@@ -27,7 +28,7 @@ from .commands import (
 
 __all__ = ["main", "build_parser"]
 
-_COMMANDS = (index, scan, search, ask, get, graph, studio, install)
+_COMMANDS = (index, scan, search, ask, grep, get, graph, studio, install)
 
 
 def build_parser() -> argparse.ArgumentParser:

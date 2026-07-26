@@ -17,17 +17,16 @@ from typing import Annotated, TypedDict
 
 from .._types import Content
 
-__all__ = ["AskParams", "SearchParams", "IndexParams"]
+__all__ = ["AskParams", "GrepParams", "SearchParams", "IndexParams"]
 
 Repo = Annotated[str, "path to the indexed repository root; a path INSIDE it "
                       "also works — the root is found from .megabrain"]
 
 Scope = Annotated[str, "optional repo-relative folder to answer from; omit for "
                        "the whole repository. Scoping EXCLUDES everything "
-                       "outside it from retrieval, so scope to a package ROOT "
-                       "(e.g. activejob), never to its src/ or lib/ subfolder "
-                       "— that cuts away the package's tests, which are "
-                       "usually the spec of the behaviour you are asking about"]
+                       "outside it, so scope to a package ROOT (e.g. activejob), "
+                       "never to its src/ or lib/ subfolder — that cuts away the "
+                       "package's tests, usually the spec of what you asked about"]
 
 
 class _Target(TypedDict):
@@ -88,3 +87,14 @@ class IndexParams(_Target, total=False):
                            "re-embedded, so a warm re-index costs seconds. true "
                            "re-embeds everything — needed after changing the "
                            "embedding model, and wasteful otherwise"]
+
+
+class _GrepRequired(_Target):
+    task: Annotated[str, "the CHANGE you are about to make, in the imperative: "
+                         "'add a send_data helper beside send_file'. Describe "
+                         "the outcome, not the file you guess it lives in — "
+                         "finding that is what this does"]
+
+
+class GrepParams(_GrepRequired, total=False):
+    scope_path: Scope

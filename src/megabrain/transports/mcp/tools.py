@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ...contracts.tools import AskParams, IndexParams, SearchParams
+from ...contracts.tools import AskParams, GrepParams, IndexParams, SearchParams
 from .schema import json_schema
 
 __all__ = ["Tool", "TOOLS", "listing"]
@@ -54,6 +54,21 @@ TOOLS: tuple[Tool, ...] = (
          "check its claims against the code it quotes, especially on a "
          "root-cause question; retrieval itself runs no model.",
          AskParams),
+    Tool("megabrain_grep",
+         "WHERE TO LOOK for a change you are about to make — the grep "
+         "replacement. Returns the files to open, the symbols inside them worth "
+         "opening, each one's EXACT line range from the index, and one line on "
+         "why it matters: the site to change first, then what it must match or "
+         "reuse, then the test that pins it. Ordered the way the work happens. "
+         "Typically ~400 characters, one call, a second or two. It quotes NO "
+         "code on purpose — your editor opens the file anyway, so a render that "
+         "pasted the body would bill you for reading it twice; the line range is "
+         "what turns an open into a jump. Use it INSTEAD OF grepping a repo you "
+         "have an index for: grep gives you lines that match a string, this "
+         "gives you the places that matter for the task, including the ones "
+         "whose text your search terms never mention. Describe the OUTCOME you "
+         "want, not the file you guess it lives in.",
+         GrepParams),
     Tool("megabrain_search",
          "ONE call that MAPS a task's whole edit surface: the files that answer "
          "it ranked, each with its best span (true line numbers) and the "
