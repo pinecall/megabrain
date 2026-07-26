@@ -85,6 +85,24 @@ def test_a_name_the_index_does_not_KNOW_surfaces_nothing(tmp_path) -> None:
         assert named_definitions(store, "Return `nil` when `frobnicate` is empty.") == ""
 
 
+def test_a_RUBY_bang_method_resolves(tmp_path) -> None:
+    """MEASURED on sinatra. Asked when before filters run, the answer said
+    `dispatch!` was "not shown in the provided chunks" — and this pass could not
+    rescue it, because the name was cut at the bang and `dispatch` matches
+    nothing. Sinatra's whole request lifecycle is bang methods, so the omission
+    hit exactly the symbols the walkthrough needed."""
+    with repo(tmp_path) as store:
+        store.files.upsert("lib/base.rb", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="lib/base.rb", name="Base.dispatch!", kind="method",
+                   line=1195, end_line=1205, signature=None, decorators=(), doc=None),
+            Symbol(file="lib/base.rb", name="Base.empty?", kind="method",
+                   line=40, end_line=42, signature=None, decorators=(), doc=None)])
+        out = named_definitions(store, "the flow runs through `dispatch!` when `empty?`")
+    assert "[[lib/base.rb:1195-1205]]" in out
+    assert "[[lib/base.rb:40-42]]" in out
+
+
 def test_a_DOC_heading_is_never_the_definition(tmp_path) -> None:
     """MEASURED noise. A markdown heading is a symbol too, so `ToolError`
     matched `tools.md` and pasted 24 lines of user-facing prose under a heading
