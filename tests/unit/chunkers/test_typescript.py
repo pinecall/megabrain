@@ -11,8 +11,8 @@ already goes through. A language contributes one function and nothing else.
 
 from __future__ import annotations
 
-from megabrain.chunkers import typescript
 from megabrain.chunkers.cast import Chunker
+from megabrain.chunkers.languages import typescript
 from megabrain.chunkers.model import validate_partition
 
 SERVICE = """\

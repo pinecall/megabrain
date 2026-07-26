@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from ._specs_c import CPP_SPEC
-from .treesitter import parse_with
-from .units import Parsed
+from .._specs_c import CPP_SPEC
+from ..treesitter import parse_with
+from ..units import Parsed
 
 __all__ = ["parse"]
 

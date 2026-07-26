@@ -10,7 +10,8 @@ from __future__ import annotations
 import importlib.util
 from typing import Callable
 
-from ..chunkers import Parsed, c, cpp, csharp, go, java, php, ruby, rust
+from ..chunkers import Parsed
+from ..chunkers.languages import c, cpp, csharp, go, java, php, ruby, rust
 from .strategies import Strategy
 
 __all__ = ["GrammarStrategy", "optional_strategies"]

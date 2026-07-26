@@ -7,9 +7,9 @@ but the binding — the walk is `treesitter`, the language is `_specs.TS_SPEC`.
 
 from __future__ import annotations
 
-from ._specs import TS_SPEC
-from .treesitter import parse_with
-from .units import Parsed
+from .._specs import TS_SPEC
+from ..treesitter import parse_with
+from ..units import Parsed
 
 __all__ = ["parse"]
 

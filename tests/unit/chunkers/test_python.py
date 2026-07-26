@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from megabrain.chunkers import Chunker, validate_partition
-from megabrain.chunkers.python import parse
+from megabrain.chunkers.languages.python import parse
 
 SOURCE = '''\
 """Module doc."""

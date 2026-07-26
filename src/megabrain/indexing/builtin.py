@@ -11,8 +11,9 @@ default install reads the languages most repositories are written in and
 
 from __future__ import annotations
 
-from ..chunkers import Parsed, markdown, typescript
-from ..chunkers import python as python_parser
+from ..chunkers import Parsed
+from ..chunkers.languages import markdown, typescript
+from ..chunkers.languages import python as python_parser
 from ._languages import optional_strategies
 from .edges import ModuleIndex, module_index, python_edges
 from .strategies import Registry, Strategy

@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import ast
 
-from ._signature import signature_of
-from .model import Symbol
+from .._signature import signature_of
+from ..model import Symbol
 
 __all__ = ["symbols_of"]
 

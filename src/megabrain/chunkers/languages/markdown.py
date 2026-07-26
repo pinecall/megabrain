@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import re
 
-from .model import Symbol
-from .units import Parsed, Unit
+from ..model import Symbol
+from ..units import Parsed, Unit
 
 __all__ = ["parse"]
 

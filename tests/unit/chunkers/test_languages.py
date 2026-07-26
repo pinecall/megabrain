@@ -18,8 +18,8 @@ from typing import Callable, NamedTuple
 
 import pytest
 
-from megabrain.chunkers import c, cpp, csharp, go, java, php, ruby, rust
 from megabrain.chunkers.cast import Chunker
+from megabrain.chunkers.languages import c, cpp, csharp, go, java, php, ruby, rust
 from megabrain.chunkers.model import validate_partition
 
 RUBY = """\
