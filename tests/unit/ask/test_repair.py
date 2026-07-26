@@ -83,6 +83,16 @@ def test_a_malformed_citation_is_detected() -> None:
     assert broken_references("see [[not-a-number]] here") == ["[[not-a-number]]"]
 
 
+def test_an_OPENED_FILE_citation_is_NOT_broken() -> None:
+    """MEASURED, and it was the worst failure this module ever produced. Told to
+    cite an opened file as `[[path/to/file:lo-hi]]`, the model did — and because
+    that shape is not a `[[k]]` chunk index, this treated it as malformed and
+    sent the WHOLE answer to repair, which re-spliced and appended a second full
+    copy. The reader saw the walkthrough twice."""
+    assert broken_references(
+        "the guard belongs in [[lib/sinatra/base.rb:425-448]] here") == []
+
+
 def test_a_correct_answer_needs_no_repair() -> None:
     assert broken_references("the handler is [[0]] and it delegates") == []
 

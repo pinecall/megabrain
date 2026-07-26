@@ -11,8 +11,11 @@ the flow by then and these are the follow-up questions:
     it constrains: a change went in clean and broke it, and the reader found out
     by running the suite.
 
-Neither calls a model. Both read the RAW model text, so a citation they add is
-spliced by the same pass as every other one.
+Neither calls a model, and NEITHER SPLICES here — both cite `[[path:lo-hi]]`,
+and the caller does one quoting pass over the whole assembled answer so a
+citation added here is spliced by the same pass as one the model opened a file
+for. Splicing twice was tried and is where a duplication bug lived: the two
+passes disagreed about what still needed converting.
 """
 
 from __future__ import annotations
@@ -22,13 +25,12 @@ from pathlib import Path
 from ..storage import Store
 from ._callees import named_definitions
 from ._pinned import exercising_tests
-from ._quote import quote_citations
 
 __all__ = ["widen"]
 
 
 def widen(raw: str, root: Path | None) -> str:
-    """The helpers and pinning tests behind `raw`, quoted, or "".
+    """The helpers and pinning tests behind `raw`, as UNSPLICED citations.
 
     Without a `root` there is no index to read from — the multi-agent path
     narrates that way — so this is empty rather than an error.
@@ -36,5 +38,4 @@ def widen(raw: str, root: Path | None) -> str:
     if root is None:
         return ""
     with Store(root) as store:
-        extra = named_definitions(store, raw) + exercising_tests(store, raw)
-        return quote_citations(extra, store) if extra.strip() else ""
+        return named_definitions(store, raw) + exercising_tests(store, raw)

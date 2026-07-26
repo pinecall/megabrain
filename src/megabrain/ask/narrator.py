@@ -8,8 +8,16 @@ sit fifty lines below the chunk that matched, so the narrator opens files
 (`_converse`) until the question is covered, and `_widen` then adds what readers
 kept coming back for. Neither step calls a model twice for the same thing.
 
-Two citation systems meet here and cannot be confused: `[[k]]` names a retrieved
-chunk, `[[path:lo-hi]]` names lines of a file the model opened.
+Two citation systems meet here, and MEASURED, they were briefly confused with a
+serious result. `[[k]]` names a retrieved chunk — spliced as it streams, by
+`Splicer`. `[[path:lo-hi]]` names lines of a file the model opened — not
+recognised by that splicer at all, so it streamed through as literal brackets;
+`broken_references` then saw an unresolved bracket pair, and the repair pass
+re-spliced and appended the WHOLE answer a second time. The reader saw the
+walkthrough twice. Fixed at the source (`_broken.py` now knows the path form is
+not broken) and closed here: ONE quoting pass over the fully assembled text
+converts every remaining path citation, from the narration or from `_widen`,
+in a single place.
 """
 
 from __future__ import annotations
@@ -19,14 +27,15 @@ from pathlib import Path
 
 from ..contracts import Bundle
 from ..providers.chat import ChatProvider
-from ..storage.model import ChunkMeta
+from ..storage import Store
 from ._candidates import candidates_of
 from ._converse import answered
+from ._flowctx import flow_context
+from ._quote import quote_citations
+from ._rescue import rescue
 from ._widen import widen
 from .events import Emit, emit_nothing
 from .prompt import build_prompt
-from .repair import broken_references, repair
-from .splice import splice
 from .stream import Splicer
 
 __all__ = ["narrate"]
@@ -41,7 +50,7 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
     candidates = candidates_of(bundle)
     if not candidates:
         return "no code was retrieved for this question — nothing to walk through"
-    prompt = build_prompt(question, candidates, _flow_context(bundle))
+    prompt = build_prompt(question, candidates, flow_context(bundle))
     splicer = Splicer(candidates)
     parts: list[str] = []
     emit({"type": "narrating", "candidates": len(candidates)})
@@ -55,41 +64,20 @@ def narrate(provider: ChatProvider, question: str, bundle: Bundle, *,
     if tail := splicer.flush():
         parts.append(tail)
         emit({"type": "delta", "text": tail})
-    if extra := widen(answer.text, root):
-        parts.append(extra)
-        emit({"type": "delta", "text": extra})
-    parts.extend(_repaired(provider, answer.text, candidates, emit))
+    parts.append(widen(answer.text, root))
+    parts.extend(rescue(provider, answer.text, candidates, emit))
+    result = _quoted(root, "".join(parts))
     emit({"type": "narrated", "ms": int((time.perf_counter() - started) * 1000)})
-    return "".join(parts)
+    return result
 
 
-def _repaired(provider: ChatProvider, raw: str, candidates: list[ChunkMeta],
-              emit: Emit) -> list[str]:
-    """Rescue the references the splice could not resolve.
+def _quoted(root: Path | None, text: str) -> str:
+    """Every `[[path:lo-hi]]` in `text`, from wherever it came from, spliced.
 
-    Checked against the RAW model output rather than the spliced text: by then
-    a resolved citation has become a code block, and what is left is exactly
-    what failed. One extra call, only when something broke, and only the broken
-    fragments go back — a second full narration would replace prose the reader
-    is already reading.
+    Without a `root` there is nothing to splice FROM — the multi-agent path
+    narrates that way, and it never opens files either, so this is a no-op.
     """
-    broken = broken_references(raw)
-    if not broken:
-        return []
-    emit({"type": "repairing", "references": broken})
-    fixed = splice(repair(raw, candidates, provider), candidates)
-    return [f"\n{fixed}"] if fixed.strip() else []
-
-
-def _flow_context(bundle: Bundle) -> str:
-    """Attached walkthroughs, with their citation chrome removed.
-
-    The chrome must go: shown block headers as context, the model IMITATES
-    them — emitting headers instead of citations, so the splicer replaces
-    nothing and the answer names files and lines while showing no code.
-    """
-    from ..flows import strip_chrome
-
-    return "\n\n".join(
-        f'Previously asked: "{flow["question"]}"\n{strip_chrome(flow["text"])}'
-        for flow in bundle["flows"])
+    if root is None:
+        return text
+    with Store(root) as store:
+        return quote_citations(text, store)

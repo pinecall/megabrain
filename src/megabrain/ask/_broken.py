@@ -9,12 +9,20 @@ and both of which read like an answer:
 Detected on the RAW model output, before splicing: afterwards a resolved
 citation has become a code block, so whatever still looks like a reference is
 exactly what failed.
+
+A THIRD shape is not broken and must never be flagged: `[[path/to/file:10-20]]`,
+what `open_file` citations look like. MEASURED, and it produced the worst
+failure mode this module has — a file opened mid-conversation, cited by path as
+instructed, flagged as malformed because it is not a `[[k]]` chunk index, sent
+to repair, which re-spliced and appended the ENTIRE answer a second time. The
+reader saw the whole walkthrough twice.
 """
 
 from __future__ import annotations
 
 import re
 
+from ._quote import CITATION as PATH_CITATION
 from .citations import CITATION
 from .splice import BLOCK_HEADER
 
@@ -39,6 +47,7 @@ def broken_references(answer: str) -> list[str]:
     """
     answer = BLOCK_HEADER.sub("", answer)
     resolved = {match.group(0) for match in CITATION.finditer(answer)}
+    resolved |= {match.group(0) for match in PATH_CITATION.finditer(answer)}
     malformed = [match.group(0) for match in _ANY_BRACKETED.finditer(answer)
                  if match.group(0) not in resolved]
     return [*malformed, *(match.group(0) for match in _PROSE_REF.finditer(answer))]
