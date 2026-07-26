@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 
 from megabrain._provider_errors import MissingCredential
-from megabrain.providers._config import EmbedConfig
 from megabrain.providers.embeddings import Embedder
+from megabrain.providers.embeddings._config import EmbedConfig
 from tests.unit.providers.fake import FakeTransport, ok
 
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import time
 
-from .._provider_errors import ProviderError
-from .http import Attempt, Response, RetryPolicy, Transport
+from ..._provider_errors import ProviderError
+from .attempt import Attempt, Response, RetryPolicy, Transport
 
 __all__ = ["request_with_retry"]
 

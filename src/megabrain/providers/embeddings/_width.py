@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._arrays import Vector
+from ..._arrays import Vector
 
 __all__ = ["decode_all"]
 

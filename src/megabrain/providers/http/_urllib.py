@@ -12,7 +12,7 @@ import urllib.request
 from typing import Iterator
 
 from ._stream import Streamed
-from .http import Response
+from .attempt import Response
 
 __all__ = ["UrllibTransport"]
 

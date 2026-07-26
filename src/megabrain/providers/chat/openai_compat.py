@@ -11,8 +11,8 @@ import json
 from typing import Any, Callable
 
 from ..._types import NotGiven, not_given
-from .._stream import StreamTransport, open_with_retry
 from ..http import RetryPolicy
+from ..http._stream import StreamTransport, open_with_retry
 from ._frames import read_stream
 from .base import Answer, OnDelta
 from .config import ChatConfig
@@ -77,6 +77,6 @@ class OpenAICompatible:
         """Imported on first use: nothing that merely imports the engine
         should pay for urllib."""
         if self._transport is None:
-            from .._urllib import UrllibTransport
+            from ..http._urllib import UrllibTransport
             self._transport = UrllibTransport()
         return self._transport

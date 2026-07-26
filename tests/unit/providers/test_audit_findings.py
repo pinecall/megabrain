@@ -16,8 +16,8 @@ import pytest
 
 from megabrain._provider_errors import ProviderError
 from megabrain.providers import Attempt, RetryPolicy, request_with_retry
-from megabrain.providers._wire import decode_batch
-from megabrain.providers.cache import EmbedCache
+from megabrain.providers.embeddings import EmbedCache
+from megabrain.providers.embeddings._wire import decode_batch
 from tests.unit.providers.fake import FakeTransport
 
 pytestmark = pytest.mark.usefixtures("no_sleep")

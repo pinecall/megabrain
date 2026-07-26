@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from typing import Callable, Sequence
 
-from .._arrays import Vector
-from .._types import NotGiven, is_given, not_given
+from ..._arrays import Vector
+from ..._types import NotGiven, is_given, not_given
+from ..http import RetryPolicy, Transport
 from ._batching import batches
 from ._config import DEFAULT_BATCH, EmbedConfig
 from ._send import send_batch
 from .cache import EmbedCache, remember, split_cached
-from .http import RetryPolicy, Transport
 
 __all__ = ["Embedder"]
 
@@ -76,7 +76,7 @@ class Embedder:
         """Imported on first use, not at module load — nothing that merely
         imports the engine should pay for urllib."""
         if self._transport is None:
-            from ._urllib import UrllibTransport
+            from ..http._urllib import UrllibTransport
             self._transport = UrllibTransport()
         return self._transport
 

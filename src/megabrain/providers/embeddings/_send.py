@@ -10,13 +10,12 @@ from __future__ import annotations
 import json
 from typing import Protocol, Sequence
 
-from .._arrays import Vector
-from .._provider_errors import ProviderError
+from ..._arrays import Vector
+from ..._provider_errors import ProviderError
+from ..http import RetryPolicy, Transport, request_with_retry
 from ._batching import fit
 from ._oversize import MAX_SPLITS, is_oversize
-from ._retry import request_with_retry
 from ._wire import decode_batch
-from .http import RetryPolicy, Transport
 
 __all__ = ["send_batch"]
 

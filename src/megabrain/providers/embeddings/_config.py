@@ -10,10 +10,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .._provider_errors import MissingCredential
-from .._types import NotGiven, is_given, not_given
+from ..._provider_errors import MissingCredential
+from ..._types import NotGiven, is_given, not_given
+from .._local import is_local_url
 from ._budget import MAX_BATCH_TOKENS, estimate_tokens
-from ._local import is_local_url
 
 # Re-exported: callers ask this module about a request's shape, and
 # splitting a file is not a reason to make them learn a second name.

@@ -20,8 +20,8 @@ from typing import Sequence
 
 import numpy as np
 
-from .._arrays import Vector
-from .._home import megabrain_home
+from ..._arrays import Vector
+from ..._home import megabrain_home
 
 __all__ = ["EmbedCache", "split_cached", "remember"]
 

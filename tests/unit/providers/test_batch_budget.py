@@ -24,9 +24,9 @@ import json
 import pytest
 
 from megabrain._provider_errors import ProviderError
-from megabrain.providers._config import MAX_BATCH_TOKENS
-from megabrain.providers._wire import decode_batch
 from megabrain.providers.embeddings import Embedder
+from megabrain.providers.embeddings._config import MAX_BATCH_TOKENS
+from megabrain.providers.embeddings._wire import decode_batch
 from megabrain.providers.http import Response
 
 

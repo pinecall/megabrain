@@ -9,7 +9,6 @@ hard rule #1, and tests/architecture is the fence.
 
 from __future__ import annotations
 
-from ._retry import request_with_retry
-from .http import Attempt, Response, RetryPolicy, Transport
+from .http import Attempt, Response, RetryPolicy, Transport, request_with_retry
 
 __all__ = ["Response", "Transport", "Attempt", "RetryPolicy", "request_with_retry"]

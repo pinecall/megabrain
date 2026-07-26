@@ -14,8 +14,8 @@ from typing import Any
 
 import numpy as np
 
-from .._arrays import Vector
-from .._provider_errors import ProviderError
+from ..._arrays import Vector
+from ..._provider_errors import ProviderError
 from ._replies import bad_shape
 from ._width import decode_all
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from .._provider_errors import ProviderError
+from ..._provider_errors import ProviderError
 
 __all__ = ["bad_shape"]
 

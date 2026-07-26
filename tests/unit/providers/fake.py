@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from megabrain.providers import Response
-from megabrain.providers._stream import Streamed
+from megabrain.providers.http._stream import Streamed
 
 
 @dataclass(frozen=True, slots=True)
