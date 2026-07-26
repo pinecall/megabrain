@@ -55,10 +55,11 @@ TOOLS: tuple[Tool, ...] = (
          "the original the change mirrors, the DEFINITION of every helper the "
          "spec names, the tests that pin the behaviour, and the test file's "
          "imports. Everything you need is IN the surface — do not follow up "
-         "with megabrain_ask for a helper's body, it is already quoted. Go "
-         "straight to megabrain_replace, substituting your code for the "
-         "placeholder in the prepared operations. Describe the OUTCOME you "
-         "want, not the file you guess it lives in — finding that is the job.",
+         "with megabrain_ask for a helper's body, it is already quoted. Then "
+         "write your code and apply it with megabrain_replace, using the "
+         "quoted anchor text as `find` — copy it from the render, it is "
+         "verbatim from the index. Describe the OUTCOME you want, not the file "
+         "you guess it lives in — finding that is the job.",
          CodeParams),
     Tool("megabrain_search",
          "ONE call that MAPS a task's whole edit surface: the files that answer "
