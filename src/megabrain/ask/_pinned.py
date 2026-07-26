@@ -18,6 +18,7 @@ import re
 
 from ..retrieval.paths import is_test
 from ..storage import PIN_KIND, Store
+from ._codeonly import outside_strings
 from ._window import window_around
 
 __all__ = ["exercising_tests", "MAX_PINNED"]
@@ -33,10 +34,9 @@ _CITED = re.compile(r"\[\[([^\]:]+):(\d+)-(\d+)\]\]")
 _ASSERTS = re.compile(r"\b(assert\w*|expect|should|must_\w+|refute\w*)\b")
 """A chunk that pins behaviour makes a CLAIM about it.
 
-MEASURED as the one section a reader skimmed and discarded: a Sinatra app under
-`test/integration/` surfaced because a route in it is named `/send_file`, and 20
-of its 28 lines were an unrelated streaming route. The path says test, the
-content says fixture. A mention is not a pin; an assertion is."""
+MEASURED as the one section a reader skimmed and discarded: a fixture app under
+`test/integration/` surfaced because a route in it is named for the symbol. The
+path says test, the content says fixture — a mention is not a pin."""
 
 
 def exercising_tests(store: Store, surface: str) -> str:
@@ -93,7 +93,7 @@ def _chunks_naming(store: Store, names: set[str], pinning: set[str],
         if any(path == meta.file and lo <= meta.end_line and meta.start_line <= hi
                for path, lo, hi in cited):
             continue                      # already in front of the reader
-        matched = set(wanted.findall(meta.text or ""))
+        matched = set(wanted.findall(outside_strings(meta.text or "")))
         if matched and _ASSERTS.search(meta.text or ""):
             lo, hi = window_around(meta.text or "", meta.start_line, wanted)
             hits.append((len(matched), meta.file, lo, hi))

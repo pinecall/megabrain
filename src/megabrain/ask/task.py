@@ -8,16 +8,15 @@ where is that defined?": a whole extra round trip to learn where to type.
 So here the model gets a TOOL. It opens what it needs from the index and writes
 the surface: each file to touch, the line to touch it at, the neighbouring
 example to imitate — existing code arriving as citations megabrain replaces
-with verbatim source.
+with verbatim source. Every widening below reads that raw text and appends more
+citations, so one quoting pass splices them all.
 
-What it deliberately does NOT hand back is a prepared edit batch. That was
-tried and MEASURED on two tasks: both times the pre-built operation was WRONG —
-once the hole landed inside an `except` block it was supposed to precede, once
-the operation pointed at a test file where the mirrored function has no tests
-at all — and both agents threw it away and built their own `replace` from the
-quoted anchor. It also cost the most tokens in the answer, quoting the anchor a
-third time. Guessing the exact edit is not something this engine can be right
-about; showing the reader the exact lines is.
+What it deliberately does NOT hand back is a prepared edit batch. MEASURED on
+two tasks, the pre-built operation was WRONG both times — once the hole landed
+inside an `except` it was meant to precede, once it pointed at a test file where
+the mirrored function has no tests — and both readers threw it away and built
+their own from the quoted anchor. Guessing the exact edit is not something this
+engine can be right about; showing the exact lines is.
 
 Bounded and fail-open: a model that keeps browsing stops at MAX_ROUNDS, and a
 backend with no tool support still returns its text.
@@ -31,10 +30,12 @@ from typing import Any
 from ..contracts import Bundle
 from ..providers.chat import Answer, ChatProvider
 from ..storage import Store
+from ._anchors import anchor_blocks
 from ._callees import named_definitions
 from ._enclosing import enclosing_bodies
 from ._headers import already_imported
 from ._pinned import exercising_tests
+from ._prune import prune_empty_sections
 from ._quote import quote_citations
 from ._taskprompt import build_task_prompt
 from ._toolcall import assistant_turn, tool_result
@@ -73,13 +74,14 @@ def walk_task(provider: ChatProvider, task: str, bundle: Bundle, root: Path, *,
             messages.append(assistant_turn(answer))
             for call in answer.tool_calls:
                 messages.append(tool_result(store, call, emit))
-        # Every widening reads the RAW text and appends more citations, so all
-        # of them are spliced by the same single quoting pass at the end.
         widened = (answer.text + enclosing_bodies(store, answer.text)
                    + named_definitions(store, answer.text)
                    + exercising_tests(store, answer.text)
                    + already_imported(store, answer.text))
-        surface = quote_citations(widened, store)
+        # Anchors are appended AFTER quoting, already rendered: they are the one
+        # block that must never be elided, which is the whole reason they exist.
+        surface = (prune_empty_sections(quote_citations(widened, store))
+                   + anchor_blocks(store, answer.text))
     # Emitted, not merely returned. Every surface renders from the event
     # stream — the CLI, the HTTP route and the studio all print `delta` — so a
     # path that only returns its text arrives as a blank answer everywhere.
