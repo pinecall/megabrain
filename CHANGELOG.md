@@ -1,51 +1,68 @@
 # Changelog
 
-## Unreleased — `megabrain_code`: the edit surface, measured against grep
+## Unreleased — a JS repository stops hiding its tests
 
-A new pair of tools for CHANGING code, and the whole design came out of A/B
-measurement against an agent restricted to grep/Read. Same task, same rules,
-clean clones, the only difference being the discovery tool:
+**`megabrain_grep` was returning three rows on express and thirty on click, and
+the reason was neither retrieval nor ranking.** Two independent bugs, both found
+by measuring the same task in two languages, and both of them a Python bias that
+had been sitting in the code looking like a heuristic.
 
-| repo | task | grep | `megabrain_code` |
+**A mocha or jest file declared nothing.** A suite declares its units by CALLING
+a function with a label and a closure, which tree-sitter reads as an expression
+statement — so `test/res.attachment.js` was indexed with two symbols, both of
+them `require` bindings, while the fifteen cases a reader actually edits were
+unnameable. The literal lane resolves a match to the symbol CONTAINING it, so no
+row could ever land inside a test file in a JS repository. `LangSpec` gained
+`group_calls`/`case_calls`: an `it`/`test`/`beforeEach` block is a symbol with
+its own line range, a `describe` is recursed into and never recorded (recording
+it would swallow every case inside and hand back one row meaning "this file").
+Express: **3.9 → 12.3 symbols per file**, and Python's 16.7 stops being a
+different sport.
+
+**A one-word identifier was not chased.** `identifiers()` demanded snake_case or
+camelCase, which is how `add res.inline beside res.attachment` yielded only
+`contentDisposition` — `attachment` is ten characters of one lowercase word, and
+the index has it at `lib/response.js:606`. One-word names are the norm in JS and
+Ruby and the exception in Python, so the shape rule was a preference for Python
+wearing a heuristic's clothes. The repo's own symbol table decides now: it
+declares `attachment` and has never heard of `beside`.
+
+**And the row cap emptied instead of trimming, which the better extractor then
+exposed.** With test cases contributing rows, three of five ordinary express
+tasks went from a useful render to NOTHING: `sendFile` resolves to 47 sites —
+three implementation and 44 test cases — and one cap over the union called the
+task's most specific name "vocabulary". Now the quota is per name and per kind:
+all of the implementation, `MAX_TESTS` of the suite, preferring the suite named
+after the identifier, and a total that TRUNCATES with the most specific name
+served first. The five tasks return 12–27 rows in 8–30 ms; three of them used to
+return nothing.
+
+**The fix reaches indexes you already have, for free.** A chunker that learns to
+see a new declaration changes nothing for an indexed repository — the indexer
+revisits a file only when its bytes change, so express kept answering 3.9 until
+it was re-indexed. `EDGE_SCHEMA` had solved this for the graph; symbols now have
+`SYMBOL_SCHEMA`, and because a symbol costs a parse and no embedding, a plain
+`megabrain index` re-extracts them with **zero embedding calls**:
+
+| repo | symbols | changed | time |
 |---|---|---|---|
-| anthropic-sdk-python (1 220 files) | guard `create`, sync **and** async | 19 calls, 7 exploring | **6 calls, 2 exploring** |
-| anthropic-sdk-python | guard the `write` tool | 13 calls, 92.7 s | **5 calls** |
-| sinatra | add `send_data` beside `send_file` | — | **4 calls** |
-| sinatra | close the `back` open redirect | — | **4 calls** |
-| expressjs (145 files) | add `res.inline` beside `res.attachment` | 10 calls, 5 exploring | **10 calls, 2 exploring** |
+| pineward | 228 → 332 (**1.46x**) | 0 | 0.9 s |
+| LumiCRM | 1 681 → 2 096 (1.25x) | 0 | 2.0 s |
+| aldus-v2 | 1 602 → 2 001 (1.25x) | 0 | 1.4 s |
+| vscode-js-debug | 3 792 → 4 319 (1.14x) | 5 | 1.4 s |
+| pinecall | 5 047 → 5 521 (1.09x) | 0 | 20.2 s |
 
-**`megabrain_code`** returns the EDIT SURFACE for a change: every file to touch,
-the exact anchor, and a prose spec of the new code. Around it, six deterministic
-widenings — each one added because a measured reader went looking for exactly
-that and paid a call for it:
+Scope, since the marker cannot enforce it: this rebuilds SYMBOLS, not chunks. A
+change to where a file may be CUT still needs `--force`, because those rows carry
+vectors that have to be bought again.
 
-- the function an anchor sits inside, with its signature and its `except` (one
-  reader: *"the spec asked me to raise inside a `try:` whose handler I was never
-  shown"*)
-- the definition of every helper the spec names (three of four readers had been
-  following a `code` call with an `ask` for exactly this)
-- **the tests that PIN the changed symbol**, found through the indexer's pin
-  edges. Asked to close sinatra's `back` open redirect, this quoted the test
-  1 600 lines away that asserted the old behaviour, *before* any edit — the
-  reader fixed it in the same batch and reported *"I never saw a red suite."*
-- the test file's own imports
-- the minimal unique slice to copy as `find`
-- head-and-tail elision, so a quote past the cap keeps the closing `end` an
-  insertion aims at
-
-**`megabrain_replace`** applies a batch of exact-string edits transactionally:
-all-or-nothing, and no re-read of a body megabrain just rendered.
-
-Two things it deliberately does NOT do, both because doing them measured worse:
-it never writes your code (it once authored a guard that ran *after* the write it
-guarded, inside an unclosed `try:`), and it never hands you a prepared edit batch
-(wrong both times it was measured; both readers threw it away).
-
-Known limits, stated rather than papered over: the `APPLY` mode is the model's
-proposal and four readers found it misplaced for a guard — the prose is
-authoritative, and the enclosing body is quoted so you can judge it. Helper
-citation is one level deep. And on a repo where the laborious half is the tests
-rather than the library edit, the surface is strongest where you need it least.
+**Also removed: `megabrain_code` and `megabrain_replace`.** Measured across five
+tasks in three languages and retired. What carried the value was the narrator
+opening files until it had the whole flow, and that now belongs to `ask` itself;
+the edit machinery around it — prepared batches, APPLY anchors — kept being
+thrown away by the readers it was built for, and applying an edit is work the
+host's editor already does. The surface is four tools: `ask`, `grep`, `search`,
+`index`.
 
 ## 1.0.0 — megabrain grep: literal search that understands what it found
 

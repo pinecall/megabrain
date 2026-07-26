@@ -9,7 +9,7 @@
 > describing **v2**, with names and modules that have moved or do not exist yet: the
 > `forge` sections (§2.5), the flow-cache narrative (§3.4), `--prune`/`prune_search`
 > (§3.3), and the HTTP entry-point bullet in §5. The MCP surface is v3-accurate as of
-> phase 13 — three tools, §5.1. Verify against `src/megabrain/` before trusting a name
+> phase 13 — four tools, §5.1. Verify against `src/megabrain/` before trusting a name
 > in those sections.
 
 Every load-bearing choice below is locked by experimental data (golden-set gates,
@@ -59,7 +59,7 @@ model bakeoffs — see §8). The five hard rules:
 ```
 
 Entry points share one retrieval core: CLI (`megabrain …`), MCP stdio
-(`megabrain_ask` · `megabrain_search` · `megabrain_index` — §5.1), HTTP
+(`megabrain_ask` · `megabrain_grep` · `megabrain_search` · `megabrain_index` — §5.1), HTTP
 (`megabrain studio`, which also serves the studio UI), and the Python API
 (`megabrain.search/…`, lazy imports, `py.typed`).
 
@@ -126,7 +126,18 @@ auto-triggers a full re-embed on the next `index` so vectors never silently mism
 
 - **Symbol table** — every def/class/method/const with qualified name, kind, line
   range, signature, doc first-line. Powers outlines, the entity-ID lexical lane and
-  `get --symbol`.
+  `get --symbol`. Two node shapes are declarations only because a real repository
+  said so: a CommonJS `res.send = function () {}` (`LangSpec.assign_defs` — half of
+  npm's API) and a mocha/jest `it('…', fn)` (`group_calls`/`case_calls`), which is
+  what took express from 3.9 to 12.3 symbols per file. A `describe` is recursed into
+  and never recorded: it spans the file, and the lanes keep the symbol no other
+  symbol contains, so recording it would swallow every case inside it.
+- **`SYMBOL_SCHEMA`** (`indexing/_resymbol.py`) — a chunker that learns to see a new
+  declaration changes nothing for an already-indexed repo, since the indexer revisits
+  a file only when its bytes change. Bumping the marker re-extracts the symbols of
+  unchanged files on the next plain `index`, with no embedding calls (measured: seven
+  repos, +2 000 symbols, `changed=0`). Symbols only — a change to where a file may be
+  CUT still needs `--force`, because those rows carry vectors.
 - **Import/call graph** (`graph.py`) — Python: `from pkg.x import Y` + call sites to
   unique defs. TS/JS: relative imports incl. `export * from`, dynamic `import()`,
   side-effect imports. PHP: `use` statements resolved against a namespace+declaration
@@ -544,11 +555,18 @@ shortfall **reported** (`study_error`, or the `degraded` count) rather than rais
 
 ## 5. Serving surfaces
 
-### 5.1 MCP — three tools, and the reason there are only three
+### 5.1 MCP — four tools, and the reason there are only four
 
 `transports/mcp/` (stdio, no deps): **`megabrain_ask`** (the whole flow, narrated),
-**`megabrain_search`** (the map, and the docs), **`megabrain_index`**. Nothing else — no
-`get`, no `grep`, and no edit tools.
+**`megabrain_grep`** (where to look for a change — files, symbols, real line ranges, and
+NO model by default), **`megabrain_search`** (the map, and the docs), **`megabrain_index`**.
+Nothing else — no `get`, and no edit tools.
+
+`grep` is the one addition that earned a slot rather than being a subtraction, and it
+earned it by replacing something the host already had: an agent about to edit an indexed
+repository was running a chain of literal greps, and the index can answer that in ~50 ms
+*including* the site whose text never contains the task's own words. It quotes no code on
+purpose — the editor opens the file anyway.
 
 It was briefly five. `megabrain_code` (an edit surface) and `megabrain_replace` (a
 transactional batch) were measured across five tasks in three languages against a

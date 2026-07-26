@@ -251,6 +251,19 @@ The split of labour inside is deliberate: the model names the symbol, the **engi
 the line range out of the symbol table. Asking a model for line numbers was measured and
 rejected — unnumbered, its ranges "landed a few lines off and cut functions mid-body".
 
+**The suite counts as a place to look, and in JS it used to be invisible.** A mocha or
+jest file declares its units by *calling* a function with a label and a closure, which
+the grammar reads as an expression statement — so express's `test/res.attachment.js` was
+indexed with two symbols, both `require` bindings, and since a match is resolved to the
+symbol *containing* it, no row could land inside any test file in a JS repository. Those
+blocks are symbols now (express: **3.9 → 12.3 symbols per file**), and every row a lane
+returns respects one quota: **all of the implementation, a sample of the tests**, because
+the two answer different questions — `sendFile` has three implementation sites and 44
+cases, and the reader needs one example, not forty-four.
+
+If you indexed a repo before this, a plain `megabrain index` picks it up with **zero
+embedding calls** — symbols cost a parse, so re-extracting them is free (`SYMBOL_SCHEMA`).
+
 ### Why `search` is never the input for an edit
 
 `search` hands you chunks straight from the index with no model in the loop, which makes it
