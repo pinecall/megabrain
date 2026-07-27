@@ -54,7 +54,7 @@ def test_a_SECOND_WRITER_waits_instead_of_dying(tmp_path) -> None:
         first.files.upsert("a.py", "sha", "", None)
         first.commit()
 
-    hold, done = 6.0, []
+    hold = 6.0
 
     def holder() -> None:
         with Store(tmp_path) as store:
