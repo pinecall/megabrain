@@ -58,7 +58,7 @@ def named_definitions(store: Store, surface: str) -> str:
     """Citations for the definition of every helper the prose names."""
     cited = [(path.strip(), int(lo), int(hi))
              for path, lo, hi in CITATION.findall(surface)]
-    found: list[str] = []
+    found: list[tuple[str, int, int]] = []
     for name in dict.fromkeys(NAMED.findall(surface)):
         span = _definition_of(store, name, cited)
         if span and span not in found:

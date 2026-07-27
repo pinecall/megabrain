@@ -7,7 +7,13 @@ version for the CLI and MCP — two lists of paths, no model call, no symbols.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:                        # a contract must not import storage:
+    from ..storage.rows import SymbolRow  # the package __init__ pulls in numpy,
+    # and `import megabrain` staying cheap is pinned by a test. The annotation
+    # is a string under `from __future__ import annotations`, so the name is
+    # only ever needed by a type checker.
 
 __all__ = ["NodeEdge", "SemanticTie", "NodeView", "Neighbourhood"]
 
@@ -34,7 +40,7 @@ class NodeView(TypedDict):
     imports: list[NodeEdge]
     imported_by: list[NodeEdge]
     semantic: list[SemanticTie]
-    symbols: list[dict[str, object]]
+    symbols: list[SymbolRow]
     ms: int
 
 

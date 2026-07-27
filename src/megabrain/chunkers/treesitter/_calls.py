@@ -78,5 +78,5 @@ def _label(children: list[Any]) -> str:
     """
     if children[0].type not in _STRINGS:
         return ""
-    text = children[0].text.decode(errors="replace").strip("'\"`")
+    text = str(children[0].text.decode(errors="replace")).strip("'\"`")
     return text if len(text) <= MAX_LABEL else text[:MAX_LABEL - 1] + "…"

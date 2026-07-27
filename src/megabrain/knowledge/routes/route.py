@@ -29,7 +29,7 @@ def graph_path(start: Path | str, source: str, target: str,
     with Store(root) as store:
         one = resolve_node(store, graph.files, source, embedder)
         two = resolve_node(store, graph.files, target, embedder)
-        hops: list[Hop] = shortest_path(graph, one, two) if one and two else []  # type: ignore[arg-type]
+        hops: list[Hop] = shortest_path(graph, one, two) if one and two else []
         told = tell(store, root, hops)
     walked: list[Hop] = told["hops"]  # type: ignore[assignment]
     return GraphPath(

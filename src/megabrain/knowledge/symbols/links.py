@@ -13,6 +13,7 @@ import ast
 from pathlib import Path
 
 from ...storage import Store
+from ...storage.rows import SymbolRow
 from ..graph.aliases import alias_files
 from .locals import constructors
 from .source import file_source
@@ -56,7 +57,7 @@ class _Finder:
         self.aliases = aliases
         self.traced = traced
         self.paths = store.files.all_paths()
-        self.symbols: dict[str, list[dict[str, object]]] = {}
+        self.symbols: dict[str, list[SymbolRow]] = {}
         self.own = {str(entry["name"]).rsplit(".", 1)[-1]: entry
                     for entry in self._symbols_of(relpath)}
 
@@ -93,7 +94,7 @@ class _Finder:
                     return {"file": relpath, "line": entry["line"]}
         return None
 
-    def _symbols_of(self, relpath: str) -> list[dict[str, object]]:
+    def _symbols_of(self, relpath: str) -> list[SymbolRow]:
         if relpath not in self.symbols:
             self.symbols[relpath] = self.store.symbols.read_for(relpath)
         return self.symbols[relpath]

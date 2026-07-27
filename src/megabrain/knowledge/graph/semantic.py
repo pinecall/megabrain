@@ -49,7 +49,7 @@ def _cosines(vectors: Matrix, rows: dict[str, int], order: list[str]) -> Matrix:
     kept = vectors[[rows[path] for path in order]]
     norms = np.linalg.norm(kept, axis=1, keepdims=True)  # pyright: ignore[reportUnknownMemberType]
     unit = kept / np.where(norms == 0, 1, norms)
-    sims = unit @ unit.T
+    sims = (unit @ unit.T).astype(np.float32)
     # A file is its own nearest neighbour at 1.0, which would fill every top-k
     # slot with self-edges and leave the lane empty.
     np.fill_diagonal(sims, -1.0)

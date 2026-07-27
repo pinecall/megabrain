@@ -11,8 +11,10 @@ import sqlite3
 from typing import Sequence
 
 from ..chunkers.model import Symbol
+from .rows import FoundSymbol, SymbolRow
 
 __all__ = ["SymbolTable"]
+
 
 _COLS = "file,name,kind,line,end_line,signature,decorators,doc"
 _READ = "name,kind,line,end_line,signature,decorators,doc"
@@ -52,14 +54,14 @@ class SymbolTable:
         self.db.execute("DELETE FROM symbols WHERE file=?", (path,))
         self.insert(symbols)
 
-    def read_for(self, path: str) -> list[dict[str, object]]:
+    def read_for(self, path: str) -> list[SymbolRow]:
         rows = self.db.execute(
             f"SELECT {_READ} FROM symbols WHERE file=? ORDER BY line", (path,)).fetchall()
         return [{"name": r[0], "kind": r[1], "line": r[2], "end_line": r[3],
                  "signature": r[4], "decorators": json.loads(r[5] or "[]"), "doc": r[6]}
                 for r in rows]
 
-    def find(self, name: str) -> list[dict[str, object]]:
+    def find(self, name: str) -> list[FoundSymbol]:
         """Definitions of a bare name repo-wide — go-to-definition.
 
         Matches the exact name or the last segment of a qualified

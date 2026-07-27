@@ -21,6 +21,7 @@ import re
 
 from ...retrieval.paths import is_test
 from ...storage import Store
+from ...storage.rows import SymbolRow
 from .idents import identifiers, outermost
 from .spans import site_at
 from .spread import MAX_ROWS, MAX_SPREAD, merged
@@ -47,12 +48,12 @@ def mentioned_sites(store: Store, task: str) -> list[Site]:
         return []
     texts = [(meta.file, meta.text or "", meta.start_line)
              for meta in store.chunks.read_metas()]
-    declared: dict[str, list[dict[str, object]]] = {}
+    declared: dict[str, list[SymbolRow]] = {}
     return merged({name: _for_one(store, name, texts, declared) for name in wanted})
 
 
 def _for_one(store: Store, name: str, texts: list[tuple[str, str, int]],
-             declared: dict[str, list[dict[str, object]]]
+             declared: dict[str, list[SymbolRow]]
              ) -> list[tuple[Site, bool]]:
     """The sites of a SINGLE identifier, read from the chunk text.
 

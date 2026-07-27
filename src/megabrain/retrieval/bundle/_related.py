@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from ...contracts import Tier2File
 from ...storage.model import ChunkMeta
+from ...storage.rows import SymbolRow
 from ..params import RetrievalParams
 from ..state import SearchState
 from ._convert import OUTLINE_KINDS, to_outline, to_ref
@@ -57,7 +58,7 @@ def related_entry(state: SearchState, relpath: str, ranking: Ranking,
     )
 
 
-def _first_doc(symbols: list[dict[str, object]]) -> str | None:
+def _first_doc(symbols: list[SymbolRow]) -> str | None:
     """The file's first docstring line — a one-line answer to "what is this",
     which is most of what a map entry is for."""
     return next((s["doc"] for s in symbols

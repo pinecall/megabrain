@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 
 from ...storage import Store
+from ...storage.rows import SymbolRow
 
 __all__ = ["span_of", "jumpable", "site_at", "MAX_SPAN"]
 
@@ -58,20 +59,18 @@ _HEADING = re.compile(r"^(h\d+|section)$")
 declares one per release, each spanning to the end of the file."""
 
 
-def jumpable(entry: dict[str, object]) -> bool:
+def jumpable(entry: SymbolRow) -> bool:
     """Whether this symbol is somewhere a reader can be SENT.
 
     Shared with `_mentions`, which was asking the same question with its own copy
     of the size rule. Both lanes owe the reader the same thing — a range short
     enough to be a destination — so there is one answer and not two that drift.
     """
-    low, high = entry.get("line"), entry.get("end_line")
-    if not (isinstance(low, int) and isinstance(high, int)):
-        return False
+    low, high = entry["line"], entry["end_line"]
     return high - low < MAX_SPAN and not _HEADING.match(str(entry.get("kind") or ""))
 
 
-def site_at(entry: dict[str, object],
+def site_at(entry: SymbolRow,
             touched: set[int]) -> tuple[str, int, int] | None:
     """The symbol as a row, if it is jumpable AND holds one of `touched`.
 

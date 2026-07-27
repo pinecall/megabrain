@@ -87,7 +87,9 @@ def _meeting(hops: list[Hop]) -> tuple[str | None, str | None]:
 def _direction(hop: Hop) -> str | None:
     """"fwd" when this hop's file DEFINES the carrier, "back" when it uses it,
     None when the hop has no evidence to read a direction from."""
-    code = hop.get("code") or {}
+    code = hop.get("code")
+    if code is None:
+        return None
     use, definition = code.get("use"), code.get("definition")
     if not use or not definition:
         return None

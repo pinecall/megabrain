@@ -21,11 +21,22 @@ __all__ = ["send_batch"]
 
 
 class Wire(Protocol):
-    """What sending needs from a configuration — nothing about caching."""
+    """What sending needs from a configuration — nothing about caching.
 
-    endpoint: str
-    model: str
-    timeout: float
+    Every member is READ-ONLY. Declared as bare attributes, a Protocol demands
+    a settable one, and `EmbedConfig` is a frozen dataclass whose `endpoint` is
+    a property — so the only implementation this protocol has never satisfied
+    it. Reading is also all this module does with them.
+    """
+
+    @property
+    def model(self) -> str: ...
+
+    @property
+    def timeout(self) -> float: ...
+
+    @property
+    def endpoint(self) -> str: ...
 
     def headers(self) -> dict[str, str]: ...
 

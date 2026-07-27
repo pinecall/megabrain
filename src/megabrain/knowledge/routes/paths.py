@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import heapq
 
+from ...contracts import Hop
 from ..build import RepoGraph
 from .tolls import tolls_of
 
@@ -27,7 +28,7 @@ STRUCT_COST = 2   # a fact about execution
 SEM_COST = 3      # an opinion about wording — same hop, more expensive
 
 
-def shortest_path(graph: RepoGraph, source: str, target: str) -> list[dict[str, str]]:
+def shortest_path(graph: RepoGraph, source: str, target: str) -> list[Hop]:
     """The cheapest route from `source` to `target`, or [] if unconnected.
 
     Undirected: "how are these two connected" is not a question about
@@ -86,8 +87,8 @@ def _edges(graph: RepoGraph, relpath: str) -> list[tuple[str, str, int]]:
 
 
 def _walk_back(came_from: dict[str, tuple[str, str]], source: str,
-               target: str) -> list[dict[str, str]]:
-    hops: list[dict[str, str]] = []
+               target: str) -> list[Hop]:
+    hops: list[Hop] = []
     current = target
     while current != source:
         previous, via = came_from[current]

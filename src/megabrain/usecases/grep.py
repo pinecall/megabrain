@@ -34,6 +34,7 @@ from ..ask.prompt._candidates import candidates_of
 from ..ask.prompt._chunkblocks import chunk_blocks
 from ..ask.sites.sites import sites_from
 from ..ask.sites.words import GREP_PROMPT
+from ..contracts import Bundle
 from ..storage import Store
 from ..storage.locate import resolve_root
 from .search import search
@@ -68,7 +69,7 @@ def grep(start: Path | str, task: str, *, path_filter: str | None = None,
     return rendered
 
 
-def _judged(root: Path, bundle: dict, task: str, emit: Emit) -> str:
+def _judged(root: Path, bundle: Bundle, task: str, emit: Emit) -> str:
     """One model pass naming the sites and why — the opt-in half.
 
     Given the SAME context the walkthrough gets: the best bodies with their code,
@@ -86,6 +87,6 @@ def _judged(root: Path, bundle: dict, task: str, emit: Emit) -> str:
     if provider is None:
         emit({"type": "unjudged", "reason": "no chat credential"})
         return ""
-    blocks = chunk_blocks(candidates_of({**bundle, "flows": []}))
+    blocks = chunk_blocks(candidates_of({**bundle, "flows": []}))  # type: ignore[typeddict-item]
     prompt = GREP_PROMPT.replace("{task}", task).replace("{map}", blocks)
     return answered(provider, prompt, root, emit=emit).text

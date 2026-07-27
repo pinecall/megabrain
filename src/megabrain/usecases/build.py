@@ -55,7 +55,7 @@ def _refuse_if_empty(root: Path, report: dict[str, object]) -> None:
     Checked against the index TOTAL rather than this pass's delta: a re-index
     that changed nothing is success, and the two produce identical zeros.
     """
-    if int(report.get("total_files", 0) or 0):
+    if int(str(report.get("total_files", 0) or 0)):
         return
     from ..indexing.builtin import default_registry
     from ..indexing.unsupported import unsupported_sources

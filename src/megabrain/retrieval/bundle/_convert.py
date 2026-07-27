@@ -11,10 +11,9 @@ modules called render would be one word covering both.
 
 from __future__ import annotations
 
-from typing import Any
-
 from ...contracts import ChunkHit, ChunkRef, SymbolRef
 from ...storage.model import ChunkMeta
+from ...storage.rows import SymbolRow
 
 __all__ = ["to_ref", "to_hit", "to_outline", "OUTLINE_KINDS"]
 
@@ -37,7 +36,7 @@ def to_hit(meta: ChunkMeta, score: float) -> ChunkHit:
     return ChunkHit(**to_ref(meta), score=score)
 
 
-def to_outline(symbol: dict[str, Any]) -> SymbolRef:
+def to_outline(symbol: SymbolRow) -> SymbolRef:
     """A storage row -> the wire contract.
 
     The boundary where an untyped database row becomes a shape the studio and

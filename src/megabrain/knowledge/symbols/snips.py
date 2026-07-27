@@ -14,6 +14,7 @@ from typing import Sequence
 
 from ...contracts import CodeSnip
 from ...storage.model import ChunkMeta
+from ...storage.rows import SymbolRow
 
 __all__ = ["snip_at", "enclosing_symbol", "SNIP_LINES"]
 
@@ -52,13 +53,13 @@ def _row_in(chunk: ChunkMeta, lines: list[str], anchor: int | None,
                 None)
 
 
-def enclosing_symbol(symbols: Sequence[dict[str, object]], line: int) -> str | None:
+def enclosing_symbol(symbols: Sequence[SymbolRow], line: int) -> str | None:
     """The innermost def or class containing `line`.
 
     The story's connective tissue: a call site means nothing without knowing
     whose body it is in. Innermost, so a method wins over its class.
     """
-    best: dict[str, object] | None = None
+    best: SymbolRow | None = None
     for entry in symbols:
         start = int(entry["line"] or 0)
         end = int(entry["end_line"] or start)  # type: ignore[arg-type]
