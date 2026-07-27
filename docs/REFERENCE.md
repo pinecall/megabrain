@@ -113,7 +113,7 @@ accepts an optional `?repo=` / `"repo"` — absent means the boot repo.
 | `GET /symbols?file=` | that file's outline alone — what a file tree draws |
 | `GET /graph?mode=&node=&source=&target=` | the knowledge graph (`map` · `node` · `path`) |
 | `POST /search {query, repo?, path_filter?, content?, rerank?, expand?}` | the CORE/RELATED `Bundle` |
-| `POST /ask/stream` | the narrated answer as SSE |
+| `POST /ask/stream {question, repo?, content?}` | the narrated answer as SSE. ⚠️ the field is **`question`**, not `query` — `search` takes `query`, and posting the wrong one answers `400 bad_request` |
 | `POST /index/stream {path, force?}` | (re)index with per-file SSE progress |
 
 `--readonly` refuses the mutating routes with a 403. `--token` exempts only `/health`,
