@@ -8,6 +8,7 @@ something other than what the metas beside them say.
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import numpy as np
@@ -81,10 +82,15 @@ def test_a_real_alter_failure_is_not_swallowed_as_already_present() -> None:
     """The migration's `except OperationalError` must mean "column exists",
     not "any SQL problem at all" — a locked or corrupt database has to
     surface, not be mistaken for an up-to-date schema."""
-    db = sqlite3.connect(":memory:")
-    schema.apply(db)
-    db.execute("DROP TABLE flows")          # stands in for any real ALTER failure
+    # `closing`, because 3.13 reports a connection that is never closed
+    # explicitly — and it reports it whenever the GC gets to it, which lands the
+    # complaint on whatever test happens to be starting. That is what this one
+    # did: a different unrelated test errored on each run, and the traceback was
+    # pytest's own unraisable machinery rather than anything in the engine.
+    with closing(sqlite3.connect(":memory:")) as db:
+        schema.apply(db)
+        db.execute("DROP TABLE flows")      # stands in for any real ALTER failure
 
-    with pytest.raises(sqlite3.OperationalError):
-        for table, column in schema._LATE_COLUMNS:
-            schema._add_column(db, table, column)
+        with pytest.raises(sqlite3.OperationalError):
+            for table, column in schema._LATE_COLUMNS:
+                schema._add_column(db, table, column)
