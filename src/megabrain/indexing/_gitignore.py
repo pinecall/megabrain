@@ -45,9 +45,14 @@ def git_ignored(root: Path, relpaths: Sequence[str]) -> frozenset[str]:
     if not relpaths or not (root / ".git").exists():
         return frozenset()
     try:
+        # BYTES, not `text=True`. On Windows a text-mode stdin translates each
+        # "\n" into "\r\n", so git receives `bin/app.py\r` — a path that matches
+        # no rule, and check-ignore answers with nothing. The filter then
+        # silently excluded NOTHING on Windows while passing everywhere else,
+        # which is what the CI matrix caught and a Mac never would.
         done = subprocess.run(
             ["git", "check-ignore", "--stdin"], cwd=root,
-            input="\n".join(relpaths), capture_output=True, text=True,
+            input="\n".join(relpaths).encode("utf-8"), capture_output=True,
             timeout=TIMEOUT, check=False)
     except (OSError, subprocess.SubprocessError):
         return frozenset()
@@ -56,4 +61,8 @@ def git_ignored(root: Path, relpaths: Sequence[str]) -> frozenset[str]:
     # is a failure whose stdout must not be read as a list of files to drop.
     if done.returncode not in (0, 1):
         return frozenset()
-    return frozenset(line.strip() for line in done.stdout.splitlines() if line.strip())
+    # `strip` also drops the "\r" a Windows git leaves on each line, and git
+    # always answers with forward slashes, so these compare against the POSIX
+    # relpaths `discover` builds without any further translation.
+    return frozenset(line.strip() for line in
+                     done.stdout.decode("utf-8", "replace").splitlines() if line.strip())

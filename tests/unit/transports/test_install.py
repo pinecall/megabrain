@@ -22,7 +22,22 @@ from megabrain.transports.install.platforms import PLATFORMS, entry
 
 @pytest.fixture
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    """Point `Path.home()` at a temp directory through the ENVIRONMENT.
+
+    It used to patch the attribute on the `Path` CLASS itself, which reaches
+    every path object in the process rather than this test's. On 3.13 — where
+    pathlib was rewritten around `_local` and a lazily-populated `_str` — the
+    suite then failed with `'PosixPath' object has no attribute '_str'` at the
+    SETUP of an unrelated test, and a different one on each run, which is what
+    a leak across tests looks like from the outside.
+
+    `Path.home()` reads HOME (USERPROFILE on Windows), so setting those gets the
+    same redirection without touching the class. Both are set because the test
+    has to hold on either platform.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    assert Path.home() == tmp_path, "the environment did not redirect Path.home()"
     return tmp_path
 
 
