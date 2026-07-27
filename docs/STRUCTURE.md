@@ -5,13 +5,13 @@
 > `knowledge/` + `chunkers/`. Zero behaviour change — `git mv` plus re-imports.
 > The result, and the three places the code disagreed with this plan, are in §11.
 
-282 files, 16 940 lines, and **every single module is at or under 100 lines** —
+300 files, ~17 300 lines, and **every single module is at or under 100 lines** —
 verified, because it is enforced (`tests/architecture/test_invariants.py`:
 `MAX_FILE_LINES = 100`, `MAX_FUNC_LINES = 30`; the longest file in the engine is
 exactly 100).
 
 **So the file count is not the problem, and lowering it is not the goal.** A
-16 940-line engine under a 100-line budget is ~200 files by arithmetic. The budget
+17 000-line engine under a 100-line budget is ~200 files by arithmetic. The budget
 is what keeps every file readable in one screen, and it stays.
 
 The problem is that five packages drop 16–44 files at **one flat level**, and the
@@ -329,6 +329,22 @@ any check would have been about the wrong directory. Verified to bite: adding
 package root) — a folder whose name repeats its parent's tells the reader
 nothing, and `graph.graph.weights` is a worse import than `graph.weights`.
 
-What DOMAINS proposed and this did not do: `usecases/` still holds a verb per
-file away from its logic, and `core/` does not exist. That is the part the full
-split fixes, and it stays proposed rather than done.
+Then the verbs followed their logic: `usecases/{search,grep,ask,build}.py` moved into
+`search/`, `grep/`, `ask/` and `indexing/`, and `usecases/` kept only what belongs to no
+single feature (`get` · `scan` · `repos` · `freshness` · `starters`) plus a re-export, so
+a transport still has one import to reach any verb. That move also surfaced a real
+defect the folders had hidden: there were **two** functions called `search` — the public
+`megabrain.search` primitive and the `usecases.search` the CLI and MCP called, which
+resolved the repo root and composed the judge. Same name, different behaviour depending
+on which you imported. The verb was a strict superset, so the primitive was deleted
+rather than kept as a trap.
+
+The architecture invariants had to NARROW to match: with the verb inside `search/` and
+`grep/`, those packages now contain the opt-in model lanes (`rerank`/`expand`, `why`), so
+the fence moved onto the LANES with the two verb modules exempt by name — and that is the
+honest line, because the lanes are where the milliseconds live and what answers when
+nobody opts in.
+
+What DOMAINS proposed and this still did not do: `core/` does not exist and the
+packages remain named per layer at the top level. That is the full split, and it stays
+proposed rather than done.

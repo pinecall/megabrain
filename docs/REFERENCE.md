@@ -3,9 +3,7 @@
 Lookup tables. Learning megabrain? → **[Guide](GUIDE.md)**. Trying to do a specific
 thing? → **[Recipes](RECIPES.md)**.
 
-> ⚠️ **The CLI, MCP, HTTP, env-var and config tables below are v3-accurate** (verified
-> against `src/megabrain/`). The **Graph** and **Python API** sections still describe
-> **v2** — several names there have moved or do not exist yet.
+Every table here was verified against `src/megabrain/`.
 
 - [CLI](#cli) · [MCP tools](#mcp-tools) · [HTTP API](#http-api)
 - [Environment variables](#environment-variables) · [Config files](#config-files)
@@ -26,9 +24,10 @@ index yet is the whole point.
 | `megabrain scan [path]` | census only: what WOULD index + every skip with its reason |
 | `megabrain search <query> [path]` | retrieval, no LLM: CORE code + RELATED map |
 | `megabrain ask <question> [path]` | narrated walkthrough with the real code spliced in |
+| `megabrain grep <task> [path]` | where to edit: files, symbols, exact line ranges — no model |
 | `megabrain get <file> [path]` | print one file (or one symbol) |
 | `megabrain graph [path]` | the repo as a knowledge graph |
-| `megabrain studio` | the web UI + JSON API |
+| `megabrain studio` | the web UI + JSON API on one port |
 | `megabrain install` | register the MCP server with every assistant detected on this machine |
 
 ### Flags
@@ -47,7 +46,10 @@ index yet is the whole point.
 | | `--json` | the `Bundle` contract |
 | `ask` | `--path-filter PREFIX` | only files under PREFIX |
 | | `--docs` | explain markdown instead of code |
-| | `--quiet` | suppress the progress trace |
+| | `--quiet` | suppress the progress trace (it goes to stderr; the answer goes to stdout) |
+| `grep` | `--path-filter PREFIX` | only files under PREFIX |
+| | `--why` | one model call: a note per site, plus the site no literal search can reach (measured: 0.05 s → 1.3 s) |
+| | `--quiet` | the rows only, no retrieval trace |
 | `get` | `--symbol NAME` | just that symbol |
 | | `--outline` | the file's symbols only, no code |
 | | `--json` | machine-readable |
@@ -56,7 +58,7 @@ index yet is the whole point.
 | | `--code` | with `--from/--to`: the real code at each hop |
 | | `--no-labels` | skip the cached model call that names the clusters |
 | | `--json` | machine-readable |
-| `studio` | `--host H` · `--port N` | default loopback-only · `2134` |
+| `studio` | `--host H` · `--port N` | default loopback-only (`127.0.0.1`) · `2137` |
 | | `--token T` | require `Authorization: Bearer T` (default `$MEGABRAIN_API_TOKEN`) |
 | | `--readonly` | serve queries but refuse to index, so a public box cannot be billed by a visitor |
 | | `--rate-limit N` | at most N requests per minute per caller |
@@ -73,7 +75,7 @@ megabrain install                                              # every assistant
 claude mcp add megabrain -- python3 -m megabrain.transports.mcp # or by hand
 ```
 
-**Two tools, and the smallness is deliberate.** Every tool costs the calling agent
+**Four tools, and the smallness is deliberate.** Every tool costs the calling agent
 context and a routing decision, and the host already has Read, Grep and an editor — so the
 surface carries only what megabrain alone can do. Each `inputSchema` is **generated** from
 `contracts/tools.py`, so a parameter cannot exist on the wire without existing in the
@@ -83,17 +85,22 @@ Every tool takes `repo_path` (any sub-path works — the root is auto-detected).
 
 | tool | returns | parameters |
 |---|---|---|
+| **`megabrain_grep`** | WHERE TO LOOK for a change: the files to open, the symbols in them worth opening, and each one's **exact line range** from the index. **No model by default** (~50 ms) — and it quotes no code, because your editor opens the file anyway. Name the identifiers you already know. | `task` *(req)* · `scope_path` · `why` *(default `false`)* |
 | **`megabrain_ask`** | The whole flow behind a question — or behind a change you are about to make — narrated with the REAL code spliced in verbatim. The narrator **opens whatever the retrieved chunks left unexplained** and keeps reading until the answer is complete; the definition of every helper the prose names and the tests that PIN what it describes are then cited with no model call. The prose is narration, so check it against the code it quotes. | `query` *(req)* · `scope_path` · `content` |
-| **`megabrain_index`** | Build or refresh the index. Incremental by content hash, so a warm re-index costs seconds. | `force` *(default `false`)* |
 | **`megabrain_search`** | The task's whole edit surface as a MAP: the files that answer it ranked, each with its best span (true line numbers) and the symbols it declares, plus the anchors a change must touch and the tests that pin the behaviour. ~2 700 tokens against ~8 100 with bodies. | `task` *(req)* · `scope_path` · `content` · `bodies` *(default `false`)* · `rerank` *(default `false`)* · `expand` *(default `false`)* |
+| **`megabrain_index`** | Build or refresh the index. Incremental by content hash, so a warm re-index costs seconds. | `force` *(default `false`)* |
+
+It was briefly five. `megabrain_code` and `megabrain_replace` were measured across five
+tasks in three languages and **removed**: what carried the value was the narrator opening
+files until it had the whole flow, and that now belongs to `ask` itself; the edit machinery
+kept being thrown away by the readers it was built for.
 
 ---
 
 ## HTTP API
 
-Served by both `megabrain studio` (with the UI at `/`) and `megabrain serve-api`
-(headless). Every route accepts an optional `?repo=` / `"repo"` — absent means the boot
-repo.
+Served by `megabrain studio` — the UI at `/` and the JSON API on the same port. Every route
+accepts an optional `?repo=` / `"repo"` — absent means the boot repo.
 
 | route | returns |
 |---|---|
@@ -112,11 +119,11 @@ repo.
 `--readonly` refuses the mutating routes with a 403. `--token` exempts only `/health`,
 `/config` and the UI.
 
-**SSE events** (`/ask/stream`): `search` · `cached` · `classified` · `planning` ·
-`plan` · `agent_start` · `agent_delta` · `agent_tool` · `agent_done` · `agent_error` ·
-`synthesis_start` · `synthesis_delta` · `length` · `bundle` · `error` · **`done`**.
-`done` terminates the stream on **every** path — a sink never has to know which branch
-answered to know the answer ended.
+**SSE events** (`/ask/stream`), the same typed set the CLI renders: `retrieval` ·
+`planning` · `plan` · `agent` · `narrating` · `delta` · `narrated` · `error` · **`done`**.
+`retrieval` arrives **before any model has run** — a sink that stops there already has the
+deterministic answer — and `done` terminates the stream on **every** path, so a caller
+never has to know which branch answered to know the answer ended.
 
 ---
 
@@ -227,24 +234,33 @@ carries it — AST-verified, receiver-checked — with the call site and the def
 ## Python API
 
 ```python
-from megabrain import index_repo, load_state, search_with_state, prune_search
-from megabrain.ask import ask, render_ask
+from megabrain import index_repo, search, load_state, search_with_state
+from megabrain.usecases import ask, grep, get_code, scan
 ```
+
+**`megabrain`** — the public surface. Every name is lazy: `import megabrain` loads no numpy
+and no tree_sitter, because the module resolves on first attribute access.
 
 | name | purpose |
 |---|---|
-| `index_repo(root, *, force, exclude, strategies, scan_filters)` | build/update an index, returns stats |
-| `load_state(root)` → `SearchState` | load the matrices once, query many times |
-| `search_with_state(state, query, *, path_filter)` | the bundle, warm |
-| `search(root, query)` | one-shot bundle |
-| `prune_search(state, query, *, with_text, include_pruned, only_docs, exclude_docs)` | flat ranked signal chunks |
-| `prune_search_root(root, query, …)` | one-shot prune |
-| `render(res)` · `render_pruned(res)` | bundle → markdown |
-| `get_code(root, relpath, symbol=None)` | one file or symbol (path-traversal hardened) |
-| `ask(root, question, …)` · `render_ask(out)` | narrate + splice |
-| `Store` · `ChunkMeta` | the storage layer and the read-side chunk record |
-| `ChunkStrategy` · `Chunk` · `Symbol` · `FileResult` · `validate_partition` | the custom-chunker contract |
-| `MegabrainError` · `IndexNotFound` · `EmptyIndex` · `MissingAPIKey` · `ProviderError` | the error taxonomy |
+| `index_repo(root, *, embedder, force, exclude, strategies, on_progress)` | build/update an index, returns stats |
+| `discover(root, extensions, *, exclude)` | the walk alone: indexable files + every skip with its reason |
+| `search(root, query, *, path_filter, content, rerank, expand)` | one-shot `Bundle` — no LLM unless you ask for a lane |
+| `load_state(root)` → `SearchState` | load the matrices once, query many times (use it as a context manager) |
+| `search_with_state(state, query, *, path_filter, content)` | the bundle, warm |
+| `score_chunks(state, query, …)` | the scoring pipeline alone, below the bundle |
+| `Store` · `ChunkMeta` | the storage layer and the read-side chunk record — **the only place SQL lives** |
+| `Strategy` · `Registry` · `Chunk` · `Symbol` · `FileResult` · `validate_partition` | the custom content-type contract |
+| `MegabrainError` · `IndexNotFound` · `EmptyIndex` · `ModelMismatch` · `MissingCredential` · `MissingAPIKey` · `ProviderError` | the error taxonomy |
 
-Imports are lazy and the package is `py.typed`. A custom chunker only has to satisfy one
-hard rule: its chunks must form an **exact line partition** of the file.
+**`megabrain.usecases`** — the verbs the CLI, MCP and HTTP all call, so a behaviour is
+implemented once and three surfaces cannot drift: `ask` · `grep` · `search` ·
+`build_index` · `get_code` · `scan` · `freshness` · `starters_for` · `known` · `remember` ·
+`resolve_root`. Sync all the way down; the HTTP edge is the only async thing and it calls
+into here from a threadpool.
+
+Errors carry a machine `code` **and** keep a familiar base class, so old callers keep
+working — `IndexNotFound(MegabrainError, ValueError)`. The package is `py.typed`, checked
+under both mypy strict and pyright strict. A custom content type has one hard requirement:
+its chunks must form an **exact line partition** of the file, and it is checked, not
+trusted.

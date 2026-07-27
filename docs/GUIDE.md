@@ -13,41 +13,41 @@ Looking for a specific flag? → **[Reference](REFERENCE.md)**. A specific goal?
 7. [Teach it your file types](#7-teach-it-your-file-types)
 8. [Tuning](#8-tuning)
 
+Every verb reads **`<query> [path]`** — the question first, the path second, and the path
+defaults to `.`. It may be any sub-path inside an indexed repo; megabrain finds the root
+from `.megabrain/` upward and scopes retrieval to files under it.
+
 ---
 
 ## 1. Install and your first answer
 
 ```bash
 pip install megabrain                 # core: Python · JS/TS · Markdown
-pip install 'megabrain[languages]'    # + Ruby · Go · Rust · PHP (tree-sitter)
-pip install 'megabrain[claude]'       # + narrate on Claude Code credits
+pip install 'megabrain[languages]'    # + Ruby · Go · Rust · PHP · C · C++ · Java · C#
 ```
 
 megabrain needs **embeddings** (always) and, for `ask`, a **chat model**. They are
 independent knobs — you can mix cloud embeddings with a local narrator, or the reverse.
-
-> **Using the `claude` extra to narrate on your plan? `unset ANTHROPIC_API_KEY` first.**
-> The Agent SDK drives the Claude Code CLI, and the CLI takes an API key over your login:
-> with that variable exported, every `ask` bills the Anthropic API per token instead of the
-> subscription — silently, with identical answers. `unset` lasts for the current shell, so
-> remove it from your shell rc if that's where it comes from.
+Both talk plain **OpenAI-compatible HTTP** over urllib; there is no SDK in the dependency
+list, and a loopback URL needs no key at all.
 
 ### The recommended setup
 
-**One OpenRouter key.** The defaults are the measured-best pair, so there is nothing to
+**One OpenRouter key.** The defaults are the measured-best set, so there is nothing to
 configure:
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 
 megabrain index ~/repo                          # once; incremental after
-megabrain ask   ~/repo "how does auth work"
+megabrain ask   "how does auth work" ~/repo
 ```
 
 | | model | why it's the default |
 |---|---|---|
 | **embeddings** | `perplexity/pplx-embed-v1-0.6b` | **the best measured for code recall.** A head-to-head bakeoff beat pplx-4b, codestral-embed, openai-3-large and bge-m3 — R@1 **0.864**, bundle_full **0.955**. Perplexity-direct and via-OpenRouter score identically, so the proxy costs nothing. |
 | **narration** | `google/gemini-3.1-flash-lite` | **the fastest and cheapest tier** at the quality of models several times its price. `ask` is output-bound, so this is the knob that decides how long you wait. |
+| **the judge** | `google/gemini-3.5-flash-lite` | a separate constant, because the job is not the same — see [Providers and models](#providers-and-models). |
 
 That combination is the one to beat: best retrieval quality, fastest narration, ~$0.002 to
 index a repo and fractions of a cent per ask. Everything below is a deliberate trade-off
@@ -57,14 +57,16 @@ away from it.
 
 | instead of… | do this | trade-off |
 |---|---|---|
-| paying per ask | `pip install 'megabrain[claude]'`, be logged into Claude Code, and `unset ANTHROPIC_API_KEY` | narration runs on your plan (`haiku` by default); embeddings still need a key or a local endpoint |
 | the cloud entirely | [run fully local](RECIPES.md#run-fully-local--no-keys-no-cloud) | $0, nothing leaves your machine; the best local embedder ties the cloud on completeness and ranks the #1 slot lower (R@1 0.773 vs 0.864) |
 | the default price | `export MEGABRAIN_ASK_MODEL=qwen/qwen3-coder` | ~half the cost, ~2× slower, open weights |
+| a per-shell setting | commit a [`megabrain.json`](REFERENCE.md#config-files) | the whole team narrates with the same model, because the config travels with the repo |
 
-The index is one SQLite file at `~/repo/.megabrain/db.sqlite`, and `ask`/`search`
-auto-refresh it when files change (60 s TTL) — there is no manual re-index step. Changing
-the embed model triggers a full re-embed on the next `index`, so vectors can never
-silently mismatch.
+The index is one SQLite file at `~/repo/.megabrain/db.sqlite`. It is **incremental by
+sha256**, so a re-index costs seconds and re-embeds only what changed — and changing the
+embed model forces a full re-embed on the next `index`, so vectors can never silently
+mismatch. There is no background refresh: `megabrain index` is the one step that reads
+disk, and a file it has not seen since you edited it is served with a **stale** marker
+rather than pretended to be current.
 
 Full bakeoff numbers: [Architecture §8](../ARCHITECTURE.md#8-evidence-where-the-numbers-live).
 
@@ -81,8 +83,7 @@ same index. All three in one picture:
 
 <p align="center">
   <sub><b>search</b> ranks the signal, then the rerank drops the vocabulary-only look-alikes
-  <b>and reorders what survives</b> — <code>app.py · prune</code> climbs past two
-  higher-scoring chunks because it's the function that actually does the dropping.
+  <b>and reorders what survives</b>.
   <b>ask</b> fans a broad question into parallel sub-agents and splices verbatim code into
   the synthesis. <b>graph</b> reports that two files never call each other and names the
   one that bridges them.</sub>
@@ -91,44 +92,46 @@ same index. All three in one picture:
 ### `search` — the code, no LLM
 
 ```bash
-megabrain search ~/repo "retry logic"            # the full bundle: CORE code + RELATED map
-megabrain search ~/repo "retry logic" --prune    # flat, ranked signal chunks — noise dropped
-megabrain search ~/repo "retry logic" --rerank   # + one cheap LLM pass (implies --prune)
-megabrain search ~/repo "how to deploy" --docs   # the indexed markdown instead of the code
+megabrain search "retry logic" ~/repo             # the MAP: CORE + RELATED, no code bodies
+megabrain search "retry logic" ~/repo --full      # …with the code inline
+megabrain search "retry logic" ~/repo --rerank    # + one cheap judge call, reorders only
+megabrain search "retry logic" ~/repo --expand    # + one call that widens the pool
+megabrain search "how to deploy" ~/repo --docs    # the indexed markdown instead of the code
 ```
 
-**`search` is code OR docs, never a blend** — like `ask`, it drops markdown from the
-ranking before scoring, and `--docs` flips the whole bundle to the docs. Blending them
-sounds harmless and isn't: with both in one index, a large README wins prose-shaped
-questions and buries the implementation it describes (on sinatra, `README.md` took the
-top slot from `lib/sinatra/base.rb` for *"how are routes defined and dispatched?"*).
-Nothing blends them: `ask --with-docs` used to claim it did, but left both filters
-off — so the prose won the ranking and the "code and docs" answer came back with no
-code. It was removed in 0.17.1.
+Pure retrieval: your question is embedded and matched by vector similarity — one HTTP
+round trip for the query vector, then milliseconds of numpy. Free, and it never depends on
+a model being up.
+
+**The MAP is the default.** Measured on a real bundle, the map costs **2 660 tokens** where
+CORE-with-bodies costs **8 135**, and it carries what a reader needs to decide: the file,
+its best span with true line numbers, and the symbols it declares. The code is one `--full`
+away, or one `megabrain get` away for a single file.
+
+**`search` is code OR docs, never a blend** — `--code` and `--docs` each confine retrieval
+*before* scoring; omit both and they compete. Blending them sounds harmless and isn't: with
+both in one index, a large README wins prose-shaped questions and buries the implementation
+it describes (on sinatra, `README.md` took the top slot from `lib/sinatra/base.rb` for
+*"how are routes defined and dispatched?"*).
 
 **Which one you want depends on which side of the API you're standing on.** `--docs` is
 for *consuming* something: you're building an app on a framework and need its documented
-usage now — what to call, in what order, with which options, the way its authors wrote it
-down. The default is for *working on* something: contributing to Rails, or any internal
-repo where the docs are thin, stale, or were never written and the source is the only
-truth. That second case is most of them, which is why code is the default and the docs are
-the flag.
+usage now — what to call, in what order, the way its authors wrote it down. The default is
+for *working on* something: contributing to Rails, or any internal repo where the docs are
+thin, stale, or were never written and the source is the only truth. That second case is
+most of them.
 
 The distinction also tells you which one to distrust. Docs describe intent and go out of
 date silently; code is what actually runs. When an answer from `--docs` contradicts one
 from the default, the default is right and you have just found a stale doc.
 
-Pure retrieval: your question is embedded and matched by vector similarity, ~200 ms, free.
-`--prune` keeps only the **signal** chunks — every related file still appears (each
-contributes its best chunk); only the noisy chunks *inside* files are cut.
-
-**`--rerank`** adds one buffered LLM call on top. The deterministic prune is recall-safe by
-design, so files that merely *share vocabulary* with your query (tests, eval scripts)
-survive as "signal" — cosine can't tell "implements scoring" from "tests scoring". The
-rerank sees a compact view (ids, spans, names, no bodies) and returns the relevant ids,
-ordered; the engine then reorders its **own verbatim chunks**. The model selects, it never
-writes. Fail-open in every branch — no key, timeout or junk reply returns the
-deterministic list untouched. *(On this repo's scoring query: 21 signal chunks → 6.)*
+**`--rerank`** adds one buffered model call on top. Retrieval is recall-safe by design, so
+files that merely *share vocabulary* with your query (tests, eval scripts) survive — cosine
+can't tell "implements scoring" from "tests scoring". The judge sees a compact view (ids,
+spans, names, no bodies) and returns the relevant ids, ordered; the engine then reorders
+its **own verbatim chunks**. The model selects, it never writes, and **it never drops a
+file**. Fail-open in every branch — no key, timeout or junk reply returns the deterministic
+bundle untouched.
 
 **`--expand`** buys RECALL where `--rerank` buys ORDER. The judge can only reorder what
 cosine found; when the answer never enters the pool, no reordering rescues it. So one call
@@ -143,66 +146,66 @@ arrangement: query+terms returned `CHANGELOG.md` and two rack-protection middlew
 alone returned five more of the same, one-search-per-term returned 25 files and none of the
 answer. A bare identifier is a terrible sentence, and a sentence is what an embedding space
 places. `symbols.find("halt")` answers with one hit and the line it is defined on. A name
-the table cannot resolve is therefore **dropped, not guessed at** — the arms above are what
-guessing looks like.
+the table cannot resolve is therefore **dropped, not guessed at**.
 
 > **Measured safe, not yet measured useful.** Across 15 hand-verified sinatra questions ×3
 > runs each, expansion never lost a case — and never rescued one either, because the
 > deterministic baseline already held the ground-truth file in **15/15**. That is a finding
-> about the test set as much as the lane: sinatra's `base.rb` answers nearly everything, and
-> the contrib/rack-protection questions were found without help. Recall was not the
-> bottleneck there. Reach for `--expand` when the answer plainly is not in the list; it is
-> off by default because an unproven optimisation should cost nobody a model call.
+> about the test set as much as the lane. Reach for `--expand` when the answer plainly is
+> not in the list; it is off by default because an unproven optimisation should cost nobody
+> a model call.
 
 ### `ask` — the repo, explained
 
 ```bash
-megabrain ask ~/repo "how does auth work end to end"
-megabrain ask ~/repo "how do the docs describe setup" --docs   # markdown instead of code
-megabrain ask ~/repo "how does X work" --no-agents             # never fan out
+megabrain ask "how does auth work end to end" ~/repo
+megabrain ask "how do the docs describe setup" ~/repo --docs   # markdown instead of code
+megabrain ask "how does X work" ~/repo --quiet                 # the answer only, no trace
 ```
 
-One LLM call narrates the answer and cites code as `[[k]]`; **the engine replaces each
-citation with the verbatim block from disk**. The model can only *point* — which is why
-`ask` cannot hallucinate a line of code. The **prose around the code is still narration**:
-when it matters (root-cause hunts), check its claims against the spliced code, which is
-the ground truth.
+One model call narrates the answer and cites code as `[[k]]` or `[[k:705-731]]`; **the
+engine replaces each citation with the verbatim block from disk**. The model can only
+*point* — which is why `ask` cannot hallucinate a line of code. The **prose around the code
+is still narration**: when it matters (root-cause hunts), check its claims against the
+spliced code, which is the ground truth.
+
+The narrator can also **open files** the retrieved chunks left unexplained — the definition
+a call lands on, the caller a function assumes, the test that pins the behaviour — and keeps
+reading until the answer is complete. That is the loop that replaces a grep/Read chain:
+measured at 19 tool calls by hand against 6 through `ask`, on a 1 220-file repository.
 
 **Asking about a bug? Name the state to track, not just the symptom.** Measured on a real
 Rails bug (a value wiped by an `ensure` racing a deferred block): every narrator model,
 weak or strong, invented a wrong mechanism for *"why is the retry enqueued immediately?"* —
 while *"where along that path could `scheduled_at` be lost?"* got the correct trace. The
-symptom tells the model what to explain; the named state tells it what to follow. Follow
-the symptom with the variable, and you get the trace instead of a theory.
+symptom tells the model what to explain; the named state tells it what to follow.
 
 On a **broad** question `ask` becomes its own multi-agent system. A no-LLM classifier reads
 the *shape* of the retrieved bundle — several core files? candidates spread across
-subsystems? an issue-length query? — and if it's broad, a planner splits the bundle into up
-to four scoped slices. Parallel sub-agents explain their slice, each able to call retrieval
-tools on demand, and a synthesizer merges them into one walkthrough with the same global
-citations. Every stage fails open to the single-agent path.
+subsystems? — and if it's broad, a planner splits the bundle into scoped slices (up to
+`MEGABRAIN_MAX_AGENTS`, default 4). Parallel sub-agents explain their slice, each able to
+call retrieval tools on demand, and a synthesizer merges them into one walkthrough with the
+same global citations. Every stage fails open to the single-agent path.
+
+Retrieval is emitted as an event **before any model runs**, so a caller that reads the file
+list and stops has lost nothing. On the CLI that trace goes to stderr and the walkthrough
+to stdout — `megabrain ask … > answer.md` keeps the file clean.
 
 ### Which one?
 
 | your question | use | why |
 |---|---|---|
-| "**how/why** does X work" — a flow, cross-file behavior | **`ask`** | you want the connected story; retrieval gives you the pieces, ask assembles them |
-| "**this is broken, find the cause**" — a bug you can already reproduce | **`search --prune --rerank`** | you need the colliding spans on one screen, not a theory about them; see below |
-| "give me the **code worth reading**" — you'll reason over it yourself | **`search --prune`** | flat, ranked, *with the code*, **zero LLM cost** |
+| "**how/why** does X work" — a flow, cross-file behaviour | **`ask`** | you want the connected story; retrieval gives you the pieces, ask assembles them |
+| "**this is broken, find the cause**" — a bug you can already reproduce | **`search --rerank`** | you need the colliding spans on one screen, not a theory about them; see below |
+| "give me the **code worth reading**" — you'll reason over it yourself | **`search --full`** | ranked, *with the code*, **zero LLM cost** |
 | "**where** is Y" — locate a symbol or handler | **`search`** | free and instant |
+| "I am about to **change** this" | **`grep`** | files, symbols and exact line ranges — [see the README](../README.md#why-grep-quotes-no-code-on-purpose) |
 
-**Debugging a reproducible bug? Reach for `search --prune --rerank`, not `ask`.** Measured
-on rails/rails#57197: rerank cut 33 chunks to the exact 3 files the fix touched, in ~760ms
-and one cheap LLM call — versus ~9.5s and a fan-out for `ask`. Both found the right code;
-only `ask` wrapped it in prose, and prose is the one surface that can be wrong. When two
-spans collide, putting them side by side *is* the explanation. Save `ask` for when the
-answer genuinely needs synthesis across subsystems.
-
-⚠️ **The two surfaces differ on defaults.** Over MCP, `megabrain_search` is always pruned
-and reranks by default — an agent gets the good behavior for free. On the CLI both are
-opt-in flags, deliberately: plain `megabrain search` is the zero-LLM, zero-cost, instant
-path this guide promises, and turning rerank on by default would silently bill every
-search. Type the flags when you want the LLM pass.
+**Debugging a reproducible bug? Reach for `search --rerank`, not `ask`.** Measured on
+rails/rails#57197: the judge cut 33 chunks to the exact 3 files the fix touched, in ~760 ms
+and one cheap call — versus ~9.5 s and a fan-out for `ask`. Both found the right code; only
+`ask` wrapped it in prose, and prose is the one surface that can be wrong. When two spans
+collide, putting them side by side *is* the explanation.
 
 Never chain `search` + your own summarization to imitate `ask`: ask's splice guarantees the
 code shown is verbatim, a summary doesn't.
@@ -212,56 +215,44 @@ code shown is verbatim, a summary doesn't.
 ## 3. The studio
 
 ```bash
-megabrain studio               # every repo you've indexed → http://localhost:2134
-megabrain studio ~/repo        # …or boot straight into one
-megabrain serve-api ~/repo     # the same JSON API, headless (no UI)
+megabrain studio                    # every repo you've indexed → http://127.0.0.1:2137
+megabrain studio --port 8080        # …anywhere else
 ```
 
 *(Screenshot on the [README](../README.md) — this section is the tour behind it.)*
 
-Vanilla JS, no build step, no CDN, mobile-friendly. One stdlib server: `studio` mounts the
-UI on top of the JSON API, `serve-api` runs the same API headless. Four tabs:
+TypeScript built with esbuild into the package, so an install serves the UI with no node
+toolchain; one stdlib HTTP server hosts the UI and the JSON API on the same port, and
+loopback-only by default. **Three tabs:**
 
-- **Ask** — watch a broad question fan out into per-agent cards, then a synthesis with the
-  real code spliced in as it types. A repeat of a cached question shows a **⚡ served from
-  flow cache** banner; a *related* one shows the **known flows** it pulled in as context.
-  **Starter chips** sit under the bar — [every repo gets them](#starter-questions).
-- **Search** — `SIGNAL · KEPT` and `NOISE · PRUNED` **side by side**, so you see what the
-  engine read *and* what it threw away. Toggle the LLM rerank and the header names the
-  model, how many chunks it dropped, and what it cost.
-  **`grep`** sits on the same bar, next to the rerank toggle: it switches the box from
-  "rank what's relevant" to `megabrain grep` — the exact string, with every match grouped
-  by role (**DEFINES**, **READS** ranked by graph centrality with the files that reach
-  them, **CONFIG/DATA**, **TESTS**, **DOCS**). `.*` opts into regex, `Aa` into
-  case-insensitive; both are sticky and re-run instantly (no LLM, no vectors, ~50ms).
-  Every hit opens in the code navigator at its line, and **0 matches is rendered as
-  evidence** — verified absence over the index, with the files the index skips named.
-
-**Docs only** sits on both the Ask and the Search bar. It confines retrieval to the
-indexed markdown *before* scoring, so the answer comes from the docs rather than from
-code that merely mentions them — the studio's face of `ask --docs` / `search --docs`, and
-the same rule of thumb applies: reach for it when you're *consuming* a project, leave it
-off when you're *working on* one. It's sticky, and flipping it re-runs Search (free) but
-never re-runs Ask on its own (that would spend an LLM call).
-- **Flows** — [the ask cache](#5-it-remembers--the-flow-cache), listed newest-first, with
-  the stored answer viewable and its cited files openable. `stale` marks flows whose
-  sources changed on disk.
+- **Ask** — the retrieval bar appears *before* the model has said anything, then the
+  walkthrough streams in with the real code spliced as it lands. A repeat of a cached
+  question is served from the [flow cache](#5-it-remembers--the-flow-cache) with no model
+  call; a *related* one is attached as context. **Starter chips** sit under the bar —
+  [every repo gets them](#starter-questions).
+- **Search** — **CORE** as expandable file cards, **RELATED** as a compact map. The card is
+  closed by default, which is the design's answer to the same measurement the renderer
+  makes: RELATED holds 45% of the gold files but ~95% of its volume is code nobody asked
+  for, so the code is one click away rather than on screen. A **judge toggle** turns the
+  rerank on per query.
 - **Graph** — [the knowledge graph](#4-map-the-repo-with-the-graph) on a live canvas:
-  community bubbles, one community expanded, a search subgraph, or a path between two
-  concepts with **`▶ Run the connection`** — a step-through of the call→definition chain.
+  community bubbles, one community expanded, and a route between two files with a
+  step-through of the call→definition chain.
 
-**The code navigator** opens over any view. Click any file — a search chunk, an agent's
-file pill, a graph node — and the whole file opens: real bytes, syntax-highlighted,
-scrolled to the exact line. **Every identifier with a resolvable definition is a link**
-(receiver-aware and import-anchored: `Path(x).resolve()` links to nothing because it's
-stdlib, while `store.stats()` jumps to store.py).
+**Code or docs** sits on both the Ask and the Search bar as a scope picker. It confines
+retrieval before scoring — the studio's face of `--code` / `--docs`. Search defaults to
+letting them compete; Ask defaults to code, because a walkthrough diluted with prose
+explains the documentation instead of the mechanism.
+
+**The code navigator** opens over any view. Click any file — a search card, a graph node —
+and the whole file opens: real bytes, syntax-highlighted, scrolled to the exact line.
+**Every identifier with a resolvable definition is a link** (receiver-aware and
+import-anchored: `Path(x).resolve()` links to nothing because it's stdlib, while
+`store.stats()` jumps to store.py).
 
 **Adding a repo censuses it first** — you see exactly what will index and what's skipped
-and *why* (`.gitignore` · vendored · generated · too-big), refine it in a tri-state file
-tree, then watch a live progress bar index it file by file.
-
-**Providers are live** — Claude SDK · OpenRouter · Ollama, auto-detected. Switch the
-narrator without leaving the page, or start `ollama serve` in one click.
+and *why* (excluded · gitignored · too-big · unreadable), plus the file types this build
+cannot read at all, then watch a live progress bar index it file by file.
 
 ### Starter questions
 
@@ -270,13 +261,12 @@ source it has and labels the row honestly:
 
 | source | where it comes from |
 |---|---|
-| `file` | the repo committed a **`.megabrainqueries`** at its root — authored intent wins |
-| `flows` | questions already in the flow cache — their answers are **cached, so the chip serves instantly** |
-| `derived` | deterministic, no-LLM questions over the repo's central files — always something |
+| `file` | the repo committed **`queries`** in its [`megabrain.json`](REFERENCE.md#config-files) — authored intent wins |
+| `derived` | deterministic, no-LLM questions over the repo's most depended-on files and the names they declare |
+| `none` | an index with nothing prominent enough to ask about |
 
-Committing a `.megabrainqueries` pays twice: it drives the chips **and** seeds
-`megabrain flows --warm`, which then caches exactly those answers instead of paying a
-planner to guess the questions.
+Click through them once and every one of those answers is [cached](#5-it-remembers--the-flow-cache),
+so the chips then serve instantly with no model call.
 
 → **[Server flags and the JSON API](REFERENCE.md#http-api)** ·
 **[Run a public read-only demo](RECIPES.md#run-a-public-read-only-demo)**
@@ -286,70 +276,66 @@ planner to guess the questions.
 ## 4. Map the repo with the graph
 
 ```bash
-megabrain graph ~/repo                                # the map
-megabrain graph ~/repo --node "the scoring pipeline"  # one file — concepts resolve by embedding
-megabrain graph ~/repo --path auth billing            # how two things connect
+megabrain graph ~/repo                                    # the map
+megabrain graph ~/repo --node "the scoring pipeline"      # one file — concepts resolve by embedding
+megabrain graph ~/repo --from scoring.py --to narrator.py # how two files connect
+megabrain graph ~/repo --from a.py --to b.py --code       # …with the real code at each hop
 ```
 
-Every dot is a file. **Color** = its community (files that import/call each other or talk
+Every dot is a file. **Colour** = its community (files that import/call each other or talk
 about the same thing). **Glow** = a god node, one of the most-connected files. A **solid
 line** is a real import/call edge from the AST; a **dashed line** is a *semantic* edge —
 two files talking about the same thing with no code link between them.
 
 None of this costs extra at index time; it's derived from what indexing already stored, in
-milliseconds. The **only** LLM touch is one cached call that *names* the communities
+milliseconds. The **only** model touch is one cached call that *names* the communities
 (`--no-labels` skips it, fully offline).
 
-### Real output — this repo, 122 files, 8 ms
+`--node` takes a path, a filename tail, or **a concept** — the ladder goes from certain to
+inferred (exact path → filename → meaning against the skeleton vectors retrieval already
+built) and stops at the first rung that answers.
+
+A route names the **symbols that carry each hop**, not just which files connect — and it
+tells you when the two files are not a chain at all:
 
 ```
-[0] Search & API          81 files   the engine core: retrieval, providers, server, ask
-[1] Code Chunking          7 files   chunkers/ (cAST, tree-sitter, markdown, php)
-[2] Golden Query Tests     4 files   the render goldens
+$ megabrain graph . --from search/scoring/pipeline.py --to ask/narrator.py
+search/scoring/pipeline.py
+└→ search/bundle/assemble.py  [call]  · score_chunks, search_with_state
+  └→ ask/narrator.py          [call]  · narrate
+
+! not a call chain: the two files MEET at ask/ask.py — both ends call into it
 ```
 
-God nodes — the files everything leans on, which *is* the reading order for a newcomer:
-
-```
-providers/__init__.py   deg 37    every LLM/embedding call goes through here
-search/bundle.py     deg 32    the retrieval assembly
-indexing/indexer.py     deg 29    the index pipeline
-```
-
-And a path names the **functions that carry each hop**, not just which files connect:
-
-```
-$ megabrain graph . --path scoring.py narrator.py
-search/scoring.py
-└─ call → search/bundle.py    · via score_chunks, chunks_for_file, search_with_state
-└─ call → ask/narrator.py        · via ask, search
-```
+That footer exists because an indented arrow diagram reads like a flow that does not exist.
+`scoring → ask ← narrator` is a *meeting*, not a path, and saying so is the difference
+between a map and a guess.
 
 ### What it's actually good for
 
 1. **Landing on an unfamiliar repo** — communities tell you the subsystems, god nodes tell
    you the reading order, sizes tell you where the mass is.
 2. **Impact estimation** — about to touch a god node? Its degree is the blast radius, and
-   `--node` lists exactly who depends on it.
-3. **Finding duplication** — "surprises" (≥0.85 similar, different communities, *no* code
-   link) is a free near-duplicate detector. On graphify it surfaced every generated skill
-   file paired with its golden twin: content maintained in two places, found automatically.
-4. **"How do these two even relate?"** — `--path` answers with the real chain, or with a
-   semantic hop when there is no code path, which usually means a missing abstraction.
-5. **Feeding an agent** — `megabrain_graph mode=map` hands a coding agent the whole repo
-   topology in one call: better planning input than any directory listing.
+   `--node` lists exactly who depends on it, both directions.
+3. **Finding duplication** — "twins that never met" (≥0.85 similar, different communities,
+   *no* code link) is a free near-duplicate detector. On graphify it surfaced every
+   generated skill file paired with its golden twin: content maintained in two places,
+   found automatically.
+4. **"How do these two even relate?"** — `--from/--to` answers with the real chain, with a
+   semantic hop when there is no code path, or with the honest "they only meet".
 
-Coverage: Python · TS/JS · Ruby · Go · PHP have structural edges. Rust indexes without a
-graph for now. → **[Thresholds and knobs](REFERENCE.md#graph)**
+Coverage: Python · TS/JS have structural edges from their own extractors; the other
+languages index and chunk without a dependency graph for now.
+→ **[Thresholds and knobs](REFERENCE.md#graph)**
 
 ---
 
 ## 5. It remembers — the flow cache
 
-**On by default.** Every `ask` synthesizes a cross-file workflow ("VAD detects speech →
-`TurnController.on_vad_start` → cancel TTS"). That used to be thrown away. Now it's stored
-in the same SQLite file, and the next related question — even worded completely
-differently — retrieves the whole workflow at once.
+**On by default, and it needs no commands.** Every `ask` synthesizes a cross-file workflow
+("VAD detects speech → `TurnController.on_vad_start` → cancel TTS"). That used to be thrown
+away. Now it's stored in the same SQLite file, and the next related question — even worded
+completely differently — retrieves the whole workflow at once.
 
 | ask | time | LLM |
 |---|---|---|
@@ -358,15 +344,7 @@ differently — retrieves the whole workflow at once.
 | that question **plus another** | full narrate | the cache doesn't *cover* it — attaches as context, answers both |
 | after a cited file changed | 21.9 s | sha recheck refuses the stale answer, narrates fresh |
 
-```bash
-megabrain flows ~/repo                     # list what's cached
-megabrain index ~/repo --warm-flows 12     # pre-fill: discover the 12 top workflows now
-megabrain flows ~/repo --refresh           # re-ask stale flows against the current code
-megabrain flows ~/repo --disable           # opt this repo out
-export MEGABRAIN_FLOW_CACHE=0              # kill switch, everywhere
-```
-
-**Two guards, because a cache that lies is worse than no cache:**
+**Three guards, because a cache that lies is worse than no cache:**
 
 - **It can never describe changed code.** A flow records the sha256 of every file it cites,
   and serving re-checks each one **byte-for-byte at that instant**.
@@ -377,11 +355,15 @@ export MEGABRAIN_FLOW_CACHE=0              # kill switch, everywhere
   separately, and the naive answer is the filters walkthrough alone with the routing half
   silently dropped. So serving also requires that nearly every content word of your
   question already appear in the cached one.
+- **A near-match is context, not the answer.** Below the serve threshold a flow is attached
+  to the bundle as **non-citable** context and the narrator writes fresh, splicing real
+  code from disk regardless.
 
-The rules hold: the LLM and the embed happen at *ask* time (the write path); the read path
-is pure cosine. Flows only *add* their source files to the bundle when missing — they never
-displace real files — and the narrator gets a cached flow as **non-citable** context, so it
-still splices real code from disk regardless.
+The hard rule holds: the model and the embed happen at *ask* time (the write path); the
+read path is pure cosine and file hashes, so nothing under retrieval ever calls a model.
+Flows only *add* their source files to the bundle when missing — they never displace real
+files. Everything lives in the repo's own `.megabrain/db.sqlite`: commit it and the team
+inherits the cache, or leave it gitignored and let each machine build its own.
 
 → **[Turn a repo into a team knowledge base](RECIPES.md#turn-a-repo-into-a-team-knowledge-base)**
 
@@ -418,13 +400,15 @@ claude mcp add megabrain -- python3 -m megabrain.transports.mcp
                                  "args": ["-m", "megabrain.transports.mcp"] } } }
 ```
 
-Your agent gets **three** tools, and the smallness is the point: every tool costs it
-context and a routing decision, and pulling a single file is the host's own Read/Grep job.
+Your agent gets **four** tools, and the smallness is the point: every tool costs it context
+and a routing decision, and reading one span is the host's own Read job.
 
 | tool | when the agent reaches for it |
 |---|---|
-| **`megabrain_ask`** | **the default** — any "how/where/why does X work" |
-| `megabrain_search` | it wants the code to read and will reason over it itself |
+| **`megabrain_grep`** | **it is about to change code** — files, symbols, exact line ranges; the lanes run no model |
+| **`megabrain_ask`** | any "how/why does X work", or a pattern to copy out of another repo |
+| `megabrain_search` | the map, or a repo's docs (`content: "docs"`) |
+| `megabrain_index` | make a repo answerable, or refresh it |
 
 → **[Every parameter](REFERENCE.md#mcp-tools)** ·
 **[The one rule that makes it pay off](RECIPES.md#give-your-coding-agent-the-whole-repo)**
@@ -434,29 +418,30 @@ context and a routing decision, and pulling a single file is the host's own Read
 ## 7. Teach it your file types
 
 `.toml`, `.astro`, `.proto`, a private DSL — anything outside the built-in languages is
-invisible to retrieval. `forge` fixes that per repo:
+invisible to retrieval. The extension point is a **Protocol**, not a fork: write an object
+of the right shape and pass it in.
 
-```bash
-megabrain forge ~/repo --list        # census: which text file types aren't indexed (free)
-megabrain forge ~/repo               # an LLM writes a chunker per type, validated, installed
-megabrain forge ~/repo --dry-run     # show the generated code without installing
+```python
+from megabrain import index_repo
+
+class TomlStrategy:
+    exts = (".toml",)
+
+    def parse(self, relpath: str, source: str): ...        # -> Parsed
+    def edge_context(self, sources: dict[str, str]): return None
+    def edges(self, relpath, source, context): return None  # no dependency graph
+
+index_repo("~/repo", strategies=[TomlStrategy()])
 ```
 
-The one hard gate: a candidate installs **only** after it chunks every matching file in the
-repo into an exact line partition — a machine-checkable oracle, so a broken chunker can't
-corrupt the index. Failures feed a repair loop. The vetted module lands in
-`.megabrain/strategies/<ext>.py`, sha-recorded in a user-level trust store, and loads on
-every index from then on. Hand-written strategies work the same way (`megabrain trust`).
+Injected strategies are consulted **before** the built-ins, so a caller can also override a
+shipped extension and not just claim an unhandled one. The one hard requirement is checked
+rather than trusted: your chunks must form an **exact line partition** of the file — no
+gaps, no overlaps, full coverage — and `validate_partition` reports any file where they do
+not, per index run.
 
-*Real run on [pallets/click](https://github.com/pallets/click): forge detected `.toml`
-(11 files) and `.yaml` (8 workflows), generated both on the first attempt (~28 s), and
-"which workflow runs the test suite?" went from missing entirely to ranking #1.*
-
-> Chunking an **already-covered** type better is a different job. `--specialize` censuses
-> the poorly-chunked files, you write the strategy by hand, and `gate_strategy` installs it
-> only on a **measured** win. We removed the LLM from that path: across four repos the
-> generated chunkers lost to a five-line deterministic recipe. Read
-> [the chunk budget](#the-chunk-budget) before reaching for it.
+> **Chunking an already-covered type "better" is a different job, and it loses.** Six
+> attempts, six losses — read [the chunk budget](#the-chunk-budget) before reaching for it.
 
 ---
 
@@ -464,30 +449,42 @@ every index from then on. Hand-written strategies work the same way (`megabrain 
 
 ### Providers and models
 
-Chat routing is automatic — **Claude** when its SDK is importable, otherwise OpenRouter.
-Embeddings never use that switch (Anthropic has no embeddings API), so they always go to
-OpenRouter or a local endpoint.
+One adapter, `providers/chat/openai_compat.py`, urllib only: OpenRouter, a provider's
+native API, or a local runtime all speak the same shape. `MEGABRAIN_CHAT_BASE_URL` points
+it anywhere; a loopback URL needs no key.
 
 ```bash
-export MEGABRAIN_ASK_MODEL=qwen/qwen3-coder      # any OpenRouter slug, or a Claude alias
-export MEGABRAIN_RERANK_MODEL=…                  # defaults to the ask model
+export MEGABRAIN_ASK_MODEL=qwen/qwen3-coder       # the narrator
+export MEGABRAIN_RERANK_MODEL=…                   # the judge, independently
+```
+
+Better than either: commit them, so the whole team gets the same walkthroughs.
+
+```json
+{ "models": { "narrator": "google/gemini-3.1-flash-lite",
+              "rerank":   "google/gemini-3.5-flash-lite" } }
 ```
 
 | ask model | one ask | ≈ cost | notes |
 |---|---|---|---|
-| `google/gemini-3.1-flash-lite` *(default)* | fastest | ~$0.007 | stable slug (was `-preview` until 0.18.7) |
-| `google/gemini-3.5-flash-lite` | fastest | ~$0.011 | **newer is not better here** — measured below |
+| `google/gemini-3.1-flash-lite` *(default)* | fastest | ~$0.007 | the narration default |
+| `google/gemini-3.5-flash-lite` | fastest | ~$0.011 | the **judge** default — see below |
 | `qwen/qwen3-coder` | ~14 s | **~$0.0035** | cheapest, broader citations, open weights |
-| `haiku` / `sonnet` / `opus` | ~7 s | on your plan | with `megabrain[claude]` — Claude aliases only, never an OpenRouter slug |
 
-**Why the default is still 3.1 after 3.5 shipped.** The same model does two jobs here:
-it narrates `ask`, and it is the rerank's fast lane. On the rerank — the job where
-completeness is the whole point — 3.1 returned all three files a real fix touched in
-**3 of 3** runs; 3.5 returned two of three in **2 of 3**. Narration quality was a tie
-(both get a hard state-race bug wrong; that's a model-tier limit, not a version one),
-3.5 is marginally faster, and it costs **67% more per output token**. Losing recall to
-pay more is not a trade, so the default stayed. Re-measure when a new tier lands rather
-than assuming the higher number wins.
+**Why two constants and not one.** Narration reasons about a flow in prose; the judge emits
+a short id array. Measured over 20 mined cases × 3 repetitions on identical candidate
+lists:
+
+```
+3.5-flash-lite   recall 19/20/19 · rank1 19/19/19 · kept 2,2,2 · ~1.13s
+3.1-flash-lite   recall 19/19/19 · rank1 19/19/19 · kept 3,2,3 · ~1.28s
+```
+
+Equal recall and ordering; 3.5-lite prunes one file tighter, every repetition. And **bigger
+is worse**, also measured: reasoning models return empty (thinking eats the 300-token cap),
+some truncate the JSON, and plain `gemini-3.5-flash` — five times the price — failed open at
+5.6 s. The judge wants an obedient fast model, not a smart one. Sharing one model between
+the two jobs is what made an earlier judge take sixteen seconds.
 
 → **[Cut the cost, or make it faster](RECIPES.md#make-ask-cheaper-or-faster)** ·
 **[Run fully local](RECIPES.md#run-fully-local--no-keys-no-cloud)**
@@ -503,11 +500,6 @@ On the only human-verified query set, 4000 wins — R@1 **4000 = 0.86**, 2000 = 
 4000 merge concentrates a file's evidence and that is what wins the ranking. Five
 "smarter" alternatives were measured and all lost.
 
-The exception is a genuinely pathological file — a giant lookup table that becomes one
-blob, or a class of many tiny methods that all merge together. There, `--specialize` lets
-you write a tighter chunker for *those files only*, and it installs only if the
-measurement agrees.
-
 **It looks broken by language, and it is not.** Count the share of chunks that are a
 function or a method and the spread is alarming — Python **49%**, TypeScript **14 / 11 /
 2%**, Ruby **0%** (147 sinatra files, not one method chunk). The cause is real and simple:
@@ -521,19 +513,20 @@ That reads like a bug, so it was measured rather than fixed: sinatra re-indexed 
 declared member opened (285 → **1 342** chunks, leading comments attached to their method,
 partition still exact), scored on 16 hand-verified questions. **Better on 2, worse on 5,
 one truth file lost entirely.** Same repo, same queries, same retrieval code. The sixth
-"smarter chunking" attempt, and the sixth to lose, for the reason the paragraph above
-gives: the ranking fuses a file's chunks, so one rich vector per small file *is* the
-signal, and twelve thin ones dilute it. **Zero method chunks in Ruby is not costing you
-recall — it is what buys it.**
+"smarter chunking" attempt, and the sixth to lose, for the reason above: the ranking fuses
+a file's chunks, so one rich vector per small file *is* the signal, and twelve thin ones
+dilute it. **Zero method chunks in Ruby is not costing you recall — it is what buys it.**
 
-### Scoping and multi-repo
+### Scoping
 
 ```bash
-megabrain ask ~/repo/src/auth "how does login work"    # scope to a sub-folder
-megabrain search ~/api,~/web "how do they share auth"  # several repos at once
+megabrain ask "how does login work" ~/repo/src/auth      # scope to a sub-folder
+megabrain search "retry logic" ~/repo --path-filter src/ # …or filter explicitly
 ```
 
 Any path inside an indexed repo works — megabrain finds the root and scopes retrieval to
-files under your path.
+files under your path. Over MCP, pass `scope_path`. Scoping **excludes** everything
+outside it, so scope to a package *root*, never to its `src/` or `lib/` subfolder, or you
+cut away the package's tests — usually the spec of what you asked about.
 
 → **[Every environment variable](REFERENCE.md#environment-variables)**

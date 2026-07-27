@@ -16,14 +16,17 @@ model bakeoffs — see §8). The five hard rules:
 1. **No LLM in the retrieval path** — LLM pruning was tested four ways and every
    variant cost completeness or added 1–2 s for no recall gain. Query-time LLM calls
    live *above* retrieval and all fail open: `ask` (the post-retrieval narrator) and
-   the optional judge lane (`enrich/rerank.py`). Two passes run an LLM at **index**
-   time instead, each gated by a deterministic oracle that decides whether the output
-   `clusters/labels.py` names the graph's communities at index time, cached by a
-   fingerprint of the graph. It is the only LLM call outside a query, and it
-   cannot reach retrieval.
+   the optional `enrich/` lanes (`rerank.py` for order, `expand.py` for recall).
+   Exactly one model call happens outside a query — `graph/clusters/labels.py` names
+   the graph's communities, cached by a fingerprint of the graph — and it cannot reach
+   retrieval either. The rule is **enforced by a test that walks imports**: nothing
+   under `search/` or `grep/` may import `providers.chat` or `enrich/`. The two verb
+   modules (`search/search.py`, `grep/grep.py`) are exempt by name, because composing
+   an opt-in lane the caller asked for is their job — the LANES underneath, which are
+   where the milliseconds live and what answers when nobody opts in, are fenced.
 2. **Completeness beats ordering** — the bundle is tuned so golden `bundle_full`
    recall is **1.00**. A change that lowers it is not merged. Noise is handled by
-   *render structure* (§4.3), never by dropping files.
+   *render structure* (§3.3), never by dropping files.
 3. **The graph never ranks** — import/call edges supply candidates and map
    annotations only. PageRank-as-ranking was rejected (Acc@1 0.91 → 0.73).
 4. **Chunks are a line partition** — every file's chunks cover every line exactly
@@ -41,7 +44,7 @@ model bakeoffs — see §8). The five hard rules:
                      │                                        chunks · vectors · symbols
                      ├─ symbols (defs/classes/consts)         file skeletons · edges
                      ├─ file skeleton (signatures)            edges · pins
-                     └─ import/call graph edges (py)
+                     └─ import/call graph edges (py · ts/js)
 
                  QUERY TIME (per question — retrieval itself never calls a model)
   question ──► retrieve (no LLM, ~10–200 ms) ──┬─► [search] the bundle, as a map
@@ -81,8 +84,10 @@ giants → line windows). Every chunk carries a **breadcrumb**
 - `python.py` — stdlib `ast`.
 - `treesitter/` — the same algorithm parameterized by a **`LangSpec`** (grammar,
   def node types, name/body fields, export unwrap): TS/TSX/JS/JSX, Ruby, Go, Rust,
-  PHP. Adding a language = one LangSpec entry + `pip install tree_sitter_<lang>`
-  (auto-activates when the grammar is installed).
+  PHP, C, C++, Java, C#. Adding a language = one spec entry in
+  `treesitter/specs/` + a module in `chunkers/languages/` (13–18 lines) +
+  `pip install tree_sitter_<lang>` — it auto-activates when the grammar imports, so a
+  missing wheel costs that language and nothing else.
 - `php.py` — **shape-routed PHP**: modern (namespaced/PSR) files keep the generic
   chunker; legacy-2000s procedural/mixed-HTML files take a section chunker
   (standalone defs with their doc-banner attached, `//----` banners as headings,
@@ -93,8 +98,9 @@ giants → line windows). Every chunk carries a **breadcrumb**
   symbols; the outline is the skeleton.
 
 **Custom strategies (public extension point):** the registry contract is the
-`ChunkStrategy` protocol; `index_repo(root, strategies=[MyStrategy()])` injects
-caller strategies ahead of the built-ins — claim a new content type (`.sql`,
+`Strategy` **Protocol** — an object of the right shape, no import and no inheritance;
+`index_repo(root, strategies=[MyStrategy()])` injects caller strategies ahead of the
+built-ins — claim a new content type (`.sql`,
 `.proto`, `.ipynb`…) or override an existing one without forking. Partition is the
 only hard requirement. Runnable demo: the megabrain-examples repo.
 
@@ -153,8 +159,8 @@ indexing is deliberately deferred.
 
 ## 3. Query time — retrieval (no LLM)
 
-`search/` (scoring in `scoring/`, assembly in `bundle/`, exposed through
-`app.py`'s use-case layer). `load_state()` (in `state.py`) loads matrices once (servers keep it warm and reload on
+`search/` — scoring in `scoring/`, assembly in `bundle/`, and `search.py` as the verb
+that composes them and owns the content policy. `load_state()` (in `state.py`) loads matrices once (servers keep it warm and reload on
 db-mtime change); `search_with_state()` runs per query, all vectorized.
 
 ### 3.1 Scoring
@@ -171,7 +177,7 @@ file shouldn't outrank a decent chunk in the clearly-relevant file. For short
 developer queries (≤25 identifier tokens), small grid-tuned boosts reward exact
 filename/symbol token matches.
 
-### 3.3 Bundle assembly + the RELATED render policy
+### 3.2 Bundle assembly + the RELATED render policy
 
 Rank files by best chunk; take top candidates; pull **graph neighbors** of the top
 files as extras. **CORE** = files within 3% of the top score → matching chunks in
@@ -185,63 +191,60 @@ Measured on the golden set (22 queries, 40 verified gold files):
 | CORE + RELATED | **1.00** |
 
 **45% of gold files live in RELATED — it can never be dropped** (and LLM pruning
-stays rejected: every phase-5 variant lost gold files). But by *volume*, RELATED is
+stays rejected: every variant lost gold files). But by *volume*, RELATED is
 ~17 files/query at ~5% verified gold, and its inline code bodies were ~16K of a
-~22K-token render. So the fix is structural, in the **render only**: RELATED shows
-**file · best-match span pointer · symbols** by default (−65% tokens, 22K → 8K);
-`search --full` (MCP `full: true`) restores inline bodies; `--compact` strips all
-bodies. The bundle **data** always carries `best_chunk` — ask, serve-api and the
-webui consume it unchanged. Expansion is multi-turn: `megabrain get <file>
-[--symbol N]`.
+~22K-token render. So the fix is structural, in the **render only**: the default
+answer is a MAP — every file with its **best-match span pointer and symbols**, no
+bodies (measured on a real bundle: 2 660 tokens against 8 135 for CORE-with-bodies).
+`search --full` (MCP `bodies: true`) restores inline code. The bundle **data** always
+carries the best chunk either way, so `ask`, the HTTP API and the studio consume one
+shape. Expansion is multi-turn and explicit: `megabrain get <file> [--symbol N]`.
 
-**Noise pruning (`prune_search`, no LLM).** The bundle already marks which
-chunks are *signal* — a tier-1 chunk that survives the `CHUNK_KEEP_RATIO` cut, or a
-related file's best chunk. `prune_search` (CLI `search --prune`, and the ONLY shape
-`megabrain_search` returns over MCP) simply **projects that existing selection into a flat list
-ranked by relevance** — each `[id] file:Lstart-end · score` with its code, the noise
-chunks dropped. No new scoring, no LLM, no token cost: it reuses the same
-signal/noise call the full bundle makes, just rendering the signal alone (with
-`include_pruned` it also returns the dropped `noise` for a signal-vs-noise diff). It
-is the lean read-path answer for a coding agent that wants only the code worth
-reading, not a narration; a plain `search` still returns the full CORE+RELATED bundle.
-
-**Content policy — code OR docs, one place (`app.content_filters`).** Every search
-verb ranks code and drops markdown before scoring; `docs=true` flips the whole
-bundle to markdown. The retrieval primitives stay neutral (both filters default
-off) — `app.py` is the only thing that decides, so CLI, MCP, HTTP and the studio
-cannot drift apart. Blending is not neutral: once a repo indexes both, a large
+**Content policy — code OR docs, one place (`search/search.py`).** `content="code"`
+drops markdown before scoring, `content="docs"` flips the whole bundle to markdown,
+and `None` lets them compete — which is the honest default for a question whose shape
+nobody has inspected. The retrieval primitives stay neutral; the verb is the only
+thing that decides, so CLI, MCP, HTTP and the studio cannot drift apart. `ask`
+defaults to code instead, because a walkthrough diluted with prose explains the
+documentation rather than the mechanism. Blending is not neutral: once a repo indexes both, a large
 README wins prose-shaped questions and buries the code (measured on sinatra —
 `README.md` displaced `lib/sinatra/base.rb` from CORE for "how are routes defined
 and dispatched?"). There is no blend mode anywhere: `ask --with-docs` claimed to
 be one and wasn't — it left both filters off, so the same crowding applied and
 the prose simply won (CORE = `[README.md]`, no code). Removed in 0.17.1.
 
-**LLM rerank (`search/rerank.py`, the `llm_rerank` lane, layered ON the prune).**
-The deterministic prune is recall-safe by design — every bundle file contributes its
+**The judge lane (`enrich/rerank.py`, opt-in, `Bundle → Bundle`).**
+Retrieval is recall-safe by design — every candidate file contributes its
 best chunk — so files that merely *share vocabulary* with the query (tests, eval
-scripts, A/B gates) survive as "signal" and bloat the output; cosine can't tell
+scripts, A/B gates) survive and bloat the output; cosine can't tell
 "implements scoring" from "tests scoring". This optional lane fixes exactly that: one
-buffered LLM call sees a COMPACT view of the pruned candidates (ids + spans + names +
-a one-line hint, no bodies, ~2K tokens) and returns only the relevant ids, ordered.
-The engine then keeps/reorders its **own verbatim chunks** and moves the dropped ones
-to `noise` — the model *selects*, it never writes code (the same anti-hallucination
-stance as ask's splice). It does **not** touch the deterministic scoring or ranking
-(rule 1's core stays LLM-free); it is a post-retrieval selector, fail-open in every
-branch (no key, timeout, malformed reply, unknown ids → the deterministic result is
-returned untouched — the LLM is an optimization, never a dependency). Opt-in on the
-CLI (`search --rerank`, which implies `--prune`); **default-on over MCP**
-(`megabrain_search rerank: true`) and via `GET /prune?rerank=1`. Model:
-`MEGABRAIN_RERANK_MODEL`, falling back to `ask_model()`. Measured on this repo's
-scoring query: 21 signal chunks → 6.
+buffered call sees a COMPACT view of the RELATED tier (ids + spans + names + a one-line
+hint, no bodies, ~2K tokens) and returns the relevant ids, ordered. The engine then
+**reorders its own verbatim chunks** — the model *selects*, it never writes code (the
+same anti-hallucination stance as ask's splice).
 
-### 3.4 Flow cache — self-caching workflow retrieval (`flows/`, on by default)
+**It never drops a file.** Unpicked entries move behind the picked ones and stay in the
+bundle: the recall floors exist so a bundle can only gain files, a judge that deleted
+one would undo that from above, and the reader would never learn what was taken. What
+does travel is the verdict — `judge: {kept, of}` — because returning the bundle
+byte-identical made "judged and rejected everything" look exactly like "the lane never
+ran", and that is the one signal the evidence band cannot compute for itself.
 
-**ON by default (since 0.11)** — a repo opts out with `megabrain flows
---disable` (persisted in the index meta; meta absent = on, so existing indexes
-flip on without a re-index), and env `MEGABRAIN_FLOW_CACHE=0` is the global
-kill that beats even a per-repo enable. When off, `load_state` skips flows
-entirely and `search`/`ask` are byte-for-byte the prior behavior at zero cost.
-When on — the default:
+Fail-open in every branch (no provider, timeout, malformed reply, unknown ids → the
+deterministic bundle untouched) and **opt-in on every surface**: `search --rerank`,
+`megabrain_search rerank: true`, `POST /search {"rerank": true}`, the studio's judge
+toggle. The model is `models.rerank` / `MEGABRAIN_RERANK_MODEL` — its own constant, never
+the narrator's: three batches through the narration model took 16 s for a JSON array of
+integers (§4.1). Its sibling `enrich/expand.py` buys the other axis, RECALL, and only
+ever adds.
+
+### 3.3 Flow cache — self-caching workflow retrieval (`flows/`, on by default)
+
+**ON by default, and there is nothing to turn on.** The only opt-out is per call —
+`ask(..., cache=False)`, which exists so a measurement can see what the engine does
+cold, since the second run would otherwise answer from the first. No CLI subcommand
+manages it and no environment variable disables it: a cache whose correctness is
+guaranteed by sha rechecks (below) has nothing for a flag to protect against.
 
 Every successful `ask` synthesizes a cross-file WORKFLOW ("VAD detects speech →
 `TurnController.on_vad_start` → cancel TTS") that used to be thrown away. It is
@@ -289,34 +292,19 @@ fully re-worded paraphrase. The hard rules stay intact by construction:
   describes. And `ask` splices real code from disk regardless: a stale flow
   could only mis-prioritize, never fabricate (rule 5 untouched).
 
-**Warmup (explicit, costs LLM):** `megabrain index --warm-flows N` / `flows --warm N` — right
-after the first index, an index-time LLM planner reads the graph's hub files (top
-edge-degree) + their doclines and writes N research questions covering the main
-workflows, then runs one `ask` each, so the cache starts full on day one instead
-of building up lazily. Fail-open to deterministic template questions if the
-planner errors. CLI `megabrain flows <repo> [--enable|--disable|--warm N|--clear]`
-· kill switch `MEGABRAIN_FLOW_CACHE=0`. Related: Knowledge Compression via
-Question Generation (arxiv 2506.13778).
+**Warming it is just asking.** There is no planner command: the way a cache starts full
+is that somebody asks the repo's main workflows once. A repo declares those in
+`megabrain.json`'s `queries` (or the legacy `.megabrainqueries`), the studio renders them
+as one-click chips (`usecases/starters.py`, whose `source` travels with them: `file` when
+the repo declared them, `derived` when the index did, `none` when there is nothing),
+and clicking through them on day one leaves every answer cached for everyone. Related:
+Knowledge Compression via Question Generation (arxiv 2506.13778).
 
-**Inspection & onboarding:** the cache is listable everywhere — CLI
-`megabrain flows`, MCP `megabrain_flows` (`action=list|get|delete|warm|
-refresh|enable|disable`; `get` hands an agent a cached walkthrough for free —
-no LLM, no retrieval), HTTP `GET /flows` (list) / `GET /flow?id=` (the stored
-walkthrough) / `POST /flows/delete`, and the studio's **Flows tab** (list +
-viewer, cited files openable in the navigator, stale marked). All of them go
-through the same `app.flows_list/flow_get/flow_delete` use-cases, so no
-surface can drift. **Staleness is measured against DISK** (`files_current`,
-shared with the serve path), not the index's shas — the index may lag disk by
-the 60 s TTL, and a flow whose sources are untouched stays serveable through
-that window. `Store.stale_flows()` keeps the index comparison, which is the
-right question for the *pruning* path. The Ask
-surfaces show the cache working: a verbatim serve is bannered
-"⚡ served from flow cache"; attached flows show as "known flows" chips (the
-`search` stream event carries them). A repo can commit **starter queries**
-at `<root>/.megabrainqueries` (one per line, `#` comments; `GET /queries`):
-the studio renders them as one-click chips in Ask with an explicit **Warm
-all** button — the newcomer flow: open the repo, click through the starters,
-see the main workflows, and leave them cached for everyone.
+**Staleness is measured against DISK** (`flows/freshness.py:files_current`, shared with
+the serve path), not against the index's stored shas — the index is only as current as the
+last `megabrain index`, and a flow whose sources are untouched must stay serveable
+regardless. `Store` keeps the index-side comparison too, which is the right question for
+the *pruning* path at index time and reported as `stale_flows` in the index summary.
 
 ---
 
@@ -327,8 +315,8 @@ The LLM is a narrator that can only **point**, never paste:
 1. Retrieve (§3); flatten CORE chunks + RELATED best-chunks into a numbered
    candidate list. Two content modes: **code-only (default)** and `--docs`
    (docs-only) — they partition the bundle, no overlap and no blend. The mode is applied at RETRIEVAL,
-   not just to the candidate list (`scoring.filter_doc_chunks`, fail-open both
-   ways): code-only keeps a doc titled like the query from crowding the code
+   not just to the candidate list (the `content` filter in `scoring/pipeline.py`,
+   fail-open both ways): code-only keeps a doc titled like the query from crowding the code
    out, and docs-only keeps the code from taking the slots — post-filtering a
    mixed bundle capped a docs walkthrough at whatever markdown outranked the
    code. Candidates are capped at 200K chars — one call always fits.
@@ -342,29 +330,36 @@ The LLM is a narrator that can only **point**, never paste:
 4. **Fail-open**: no key, no citations, or an API error → the full unfiltered bundle.
    Non-cited candidates are always listed in a footer (the filter is never silent).
 
-### 4.1 Chat providers — Claude Code credits or OpenRouter
+### 4.1 Chat providers — one adapter, and one model constant per job
 
-Chat routing (`providers.chat_provider()`) is **auto**: `claude` when
-`claude_agent_sdk` is importable, else `openrouter`; pin with
-`MEGABRAIN_CHAT_PROVIDER`. The narrator model per provider via `MEGABRAIN_ASK_MODEL` (defaults: `haiku` on
-claude, `qwen/qwen3-coder` on
-OpenRouter — a bakeoff found qwen on par with Haiku on citation selection at ~5×
-lower cost, since retrieval already guarantees completeness).
+`providers/chat/openai_compat.py` (urllib only) speaks any OpenAI-compatible
+`/chat/completions`: OpenRouter, a provider's native API, or a local runtime.
+`MEGABRAIN_CHAT_BASE_URL` points it anywhere, and a loopback URL needs no key —
+`_local.is_local_url` is why, after a version that refused to run against Ollama for want
+of a credential. `router.resolve()` probes a registry in order rather than branching at
+call sites, so adding a backend is an adapter plus an entry; today the registry holds one.
+`stream_chat(with_tools=True)` accumulates fragmented `delta.tool_calls` for the
+function-calling loop in `ask/converse/` and `ask/agents/`.
 
-- **`claude`** — NOT PORTED to this branch. v2 drove the Claude Code CLI through
-  the Agent SDK, so a logged-in subscription narrated on Claude Code credits with
-  no key at all. `providers/chat/` here holds `openai_compat` and the router;
-  `MEGABRAIN_CHAT_PROVIDER=claude` has nothing to select. Tracked, not dropped —
-  the extra `megabrain[claude]` is still declared in pyproject.
+**Two model constants, not one** (`_models.py`), because the jobs are not the same:
+`NARRATOR_MODEL = google/gemini-3.1-flash-lite` reasons about a flow in prose,
+`RERANK_MODEL = google/gemini-3.5-flash-lite` emits a short id array. Measured over 20
+mined cases × 3 repetitions on identical candidate lists, 3.5-lite prunes one file tighter
+every repetition at equal recall and ordering; and bigger is *worse* — reasoning models
+return empty (thinking eats the 300-token cap) and plain `gemini-3.5-flash`, five times the
+price, failed open at 5.6 s. Sharing one model between the two jobs is what made the judge
+take 16 s. A repository overrides either in `megabrain.json`'s `models`, which beats
+`MEGABRAIN_ASK_MODEL` / `MEGABRAIN_RERANK_MODEL`, which beat the constants.
 
-- **`openrouter`** (`providers/chat/openai_compat.py`, urllib-only) — any OpenAI-compatible endpoint;
-  `MEGABRAIN_CHAT_BASE_URL` points it at native APIs or local servers. For ask v2,
-  `stream_chat(with_tools=True)` also accumulates fragmented `delta.tool_calls`
-  and the loop runs in `ask/agents/`.
+**Not ported from v2: the Claude Agent SDK provider.** v2 drove the Claude Code CLI, so a
+logged-in subscription narrated on Claude Code credits with no key at all. The
+`megabrain[claude]` extra is still declared in pyproject and nothing selects it. Tracked,
+not dropped.
 
-**Embeddings never use this switch** — Anthropic has no embeddings API, so
-index/query always need OpenRouter or a local embed endpoint. The two lanes are
-independent by design (hybrid local-embed + Claude-narrate works).
+**Embeddings never use this switch** — they have their own config and their own key vars,
+because the two routinely point at different places (embeddings at a hosted model, chat at
+whatever is cheap or local this week) and one shared block cannot express that. A hybrid of
+local embeddings and a cloud narrator, or the reverse, is an ordinary configuration.
 
 ## 5. Serving surfaces
 
@@ -390,7 +385,7 @@ being discarded by the readers it was built for: a prepared edit batch was wrong
 times it was measured, four readers found the proposed anchor mode misplaced for a guard,
 and applying an edit is work the host's own editor already does.
 
-`ask` therefore runs in the régime that made opening happen (§4.2): the best eight chunk
+`ask` therefore runs in the régime that made opening happen: the best eight chunk
 bodies plus a MAP of the rest, an instruction to open at the TOP of the prompt, and the
 `open_file` loop in `_converse`. Served all thirty bodies instead, the same narrator
 opened nothing on four questions — including one that said "open this file". Two
@@ -416,40 +411,44 @@ Two properties worth knowing:
   `usecases/`, so this layer only maps a name to a use case and picks a renderer —
   which is the whole reason the CLI, MCP and HTTP surfaces cannot drift apart.
 
-- **MCP** (`transports/mcp/`, stdio, no deps): `megabrain_ask` (`question`,
-  `scope_path`, `content=code|docs` — MCP is request/response, so it runs buffered:
-  the consuming agent reads the final text only, and events would be written to
-  nobody), `megabrain_search` (`task`,
-  `scope_path`, `content`, `bodies`, `rerank` default **false** — the deterministic
-  answer is complete on its own, and a caller that wants the judge lane asks for it
-  and accepts the call), `megabrain_index` (`force`). Nothing else: single-file and
-  single-symbol fetches are the host's own Read/Grep job. Registered by `megabrain install`
-  (`transports/install/`: a table of six assistants, one module per config format,
-  only ever writing the `megabrain` key and pinning `sys.executable`) or by hand with
-  `claude mcp add megabrain -- python3 -m megabrain.transports.mcp`; a stale index is
-  not auto-refreshed at query time, unlike v2.
-- **HTTP** (`transports/http/`, stdlib `http.server`, warm state, db-mtime auto-reload):
-  `/search` `/docsearch` `/chunks` `/ask` `/ask/stream` (SSE: the ask v2 event
-  stream — plan, per-agent deltas/tools, spliced synthesis) `/prune` (`?rerank=1` runs
-  the §3.3 LLM rerank over the signal chunks; `?docs=1` the docs-only lane) `/graph` (`?mode=&node=&source=&target=` —
-  the §6 knowledge graph) `/get` `/index` (`/index/stream` SSE per-file progress)
-  `/repos` (this server's warm repos **merged with the machine-global registry** —
-  registered-elsewhere repos come back `loaded: false` so the studio can load them on
-  click) `/providers` `/health`. Optional Bearer auth (`--token` / `MEGABRAIN_API_TOKEN`)
-  on everything but `/health`; `get_code` enforces repo-root containment (path-traversal
-  hardened). `/docsearch` groups are per-deployment config
-  (`.megabrain/docsearch.json` or env), not engine knowledge.
-- **PATH-SCOPE** everywhere: pass a sub-path (`~/repo/src/auth`) and retrieval is
-  confined to files under it; the repo root is auto-detected from `.megabrain` up
-  the tree. Multi-repo: comma-separated roots, searched concurrently, merged by
-  score.
-- **Web demo** (the megabrain-examples repo, stdlib, one port): live file ranking → per-chunk
-  heatmap (`chunks_for_file` — span, score, *selected by the real cross-file
-  retrieval* flag), native folder picker, doc-mode toggle, and an **Explain** overlay
-  that A/Bs the same question on Claude vs OpenRouter with per-stage timings —
-  streamed over `/api/ask/stream` (SSE): one card per sub-agent appears at `plan`,
-  streams its prose and tool calls live, minimizes on `agent_done`, and the
-  synthesis renders below with the real code spliced in.
+**MCP runs buffered**, deliberately: the protocol is request/response, so the consuming
+agent reads the final text only and streamed events would be written to nobody.
+`megabrain_search`'s `rerank` and `expand` default to **false** for the same reason they do
+on the CLI — the deterministic answer is complete on its own, and a caller that wants a
+model lane asks for it and accepts the call. Registered by `megabrain install`
+(`transports/install/`: a table of six assistants, one module per config format, only ever
+writing the `megabrain` key and pinning `sys.executable`) or by hand with
+`claude mcp add megabrain -- python3 -m megabrain.transports.mcp`.
+
+**A stale index is never auto-refreshed at query time**, unlike v2's 60 s TTL. `index` is
+the one verb that reads disk; everything else answers from the index and *says* when what it
+serves is behind disk (`get`'s stale marker, `GET /health?freshness=1`, the studio's banner).
+An answer that silently re-indexed was an answer whose latency and cost depended on when you
+last edited a file.
+
+### 5.2 HTTP (`transports/http/`)
+
+Stdlib `http.server`, warm state, db-mtime auto-reload. The router is a **table** of
+`(method, path) → route`, so adding an endpoint is one entry and a path that exists under
+another method answers 405 rather than 404:
+
+```
+GET  /health (?freshness=1)  /config  /repos  /project  /scan  /get  /symbols  /graph
+POST /search   /ask/stream (SSE)   /index/stream (SSE)
+GET  /  and  /ui/*           the studio bundle, the only prefix route
+```
+
+Optional Bearer auth (`--token` / `MEGABRAIN_API_TOKEN`) on everything but `/health`,
+`/config` and the UI; `--readonly` 403s the mutating routes so a public box cannot be billed
+by a visitor; `--rate-limit N` caps requests per minute per caller. `get_code` enforces
+repo-root containment (path-traversal hardened). `/repos` merges this server's warm repos
+with the machine-global registry, so a repo indexed elsewhere comes back for the studio to
+load on click.
+
+**PATH-SCOPE everywhere**: pass a sub-path (`~/repo/src/auth`) or `scope_path`/`path_filter`
+and retrieval is confined to files under it; the repo root is auto-detected from
+`.megabrain` up the tree. Scoping EXCLUDES everything outside, so a package root is the
+right granularity — its `src/` subfolder cuts away the tests that specify it.
 
 ---
 
@@ -483,11 +482,12 @@ counts + thresholds), fail-open to "Community N" (and `--no-labels` / offline sk
 entirely). Everything else is deterministic. `mode=node` splices the file's REAL chunks —
 the graph never paraphrases code (rule 5 holds here too).
 
-Surfaces: CLI `megabrain graph [path] [--node F] [--path A B] [--no-labels] [--json]`,
-MCP `megabrain_graph(repo_path, mode=map|node|path, node?, source?, target?, scope_path?)`,
-HTTP `GET /graph?mode=&node=&source=&target=&repo=`, and the studio's force-directed
-canvas (§5). Measured: this repo 122 files / 324 links in ~8 ms; graphify 630 files in
-~37 ms.
+Surfaces: CLI `megabrain graph [path] [--node F] [--from A --to B] [--code] [--no-labels]
+[--json]`, HTTP `GET /graph?mode=map|node|path&node=&source=&target=&repo=`, and the
+studio's force-directed canvas (§5). **Not an MCP tool** — the map is a human's reading
+aid, and a fifth tool would cost every agent a routing decision for something `ask` and
+`grep` already answer in the shape an agent needs. Measured: this repo 122 files / 324
+links in ~8 ms; graphify 630 files in ~37 ms.
 
 ---
 
@@ -517,7 +517,7 @@ src/megabrain/
 
   L1  contracts/       EVERY cross-boundary payload, TypedDict only, zero logic
                        chunk · bundle · file · graph · node · repo · route · scan ·
-                       prune · lanes · install · tools
+                       prune · lanes · install · tools (the MCP inputSchemas' source)
 
   L2  storage/         PERSISTENCE — the ONLY package allowed to write SQL
         store.py         connection + schema; one table per object
@@ -564,11 +564,12 @@ src/megabrain/
         scoring/         pipeline · lane · lanes (TestPenalty, LexicalBoost) ·
                          _fusion (the BASE: dense + 0.5·file) · _space · context
         bundle/          assemble · _rank · _related · _anchors · floors (the two
-                         recall floors) · _convert
-        render/          markdown · _lang
+                         recall floors) · _pins · widen · _convert
+        render/          markdown · _entries · _evidence · _fence · _lang
+        intent.py        what SHAPE of question this is — no model, no network
       graph/       THE GRAPH (§6) — candidates + annotations, never ranking
         build.py         RepoGraph + load_graph · node.py · views.py the map
-        graph/           weights · semantic · aliases — what an edge WEIGHS
+                         weights · semantic · aliases — what an edge WEIGHS
         clusters/        communities · labels · _naming · gods · surprises
                          ← the package's ONLY LLM touch lives here, on purpose
         routes/          paths (BFS) · route · story · carriers · tolls
@@ -576,7 +577,9 @@ src/megabrain/
 
   L4  enrich/          Bundle → Bundle, opt-in, fail-open to the input
         rerank.py        the judge lane: the model returns IDS, never code
-        _batches · _cards · _prompt · _verdict
+        expand.py        the widener: the model names identifiers, the SYMBOL TABLE
+                         resolves them — a name it cannot resolve is dropped
+        _batches · _cards · _prompt · _verdict · _terms · _echo
       ask/             NARRATE — the only layer that talks to an LLM at query time
         narrator.py · events.py · stream.py
         prompt/          what the model is HANDED: 8 bodies + a map of the rest.
@@ -588,20 +591,24 @@ src/megabrain/
                          _broken repair _rescue
         checks/          deterministic, no model: grounded pinned callees prune surface
         agents/          fan-out, one sub-narrator per subsystem
-        sites/           WHERE TO EDIT — the lanes behind megabrain_grep, and NO
-                         model: sites mentions referenced spans idents spread rows words
+        ask.py           the VERB: retrieve → serve from cache or narrate → remember
+      grep/            WHERE TO EDIT — its own package, so "it calls no model" is a
+                       test and not a promise: grep.py the verb (the opt-in `why`
+                       lives HERE, above the lanes) · sites mentions referenced
+                       spans idents spread rows words — none of them can call out
       flows/           the cached-walkthrough lane (cache · serve · match · covers ·
                        freshness · chrome)
 
-  L5  usecases/        ONE FILE PER VERB — every transport calls THESE
-        get · scan · repos · freshness · starters — the verbs that belong to no
-        single feature. `ask`, `grep`, `search` and `index` live in THEIR packages.
-        search · ask · get · scan · repos · freshness · _flows · _registry
+  L5  usecases/        the verbs that belong to no single feature — get · scan ·
+                       repos · freshness · starters · _registry. `ask`, `grep`,
+                       `search` and `index` live in THEIR OWN packages, next to the
+                       logic they compose, and are re-exported from here so every
+                       transport still has one import to reach any verb.
       transports/      SURFACES — thin adapters: args → use-case → render
         cli/            main.py + commands/{index,scan,search,ask,grep,get,
                         graph,studio,install}.py — one per verb, no branch in main
         mcp/            server · protocol · dispatch (a TABLE of 3-line handlers) ·
-                        tools (the three) · schema (inputSchema GENERATED from
+                        tools (the four) · schema (inputSchema GENERATED from
                         contracts/tools.py) · arguments · answers · __main__
         http/           app · router (a TABLE, never a chain of ifs) · messages
                         (the two records) · replies (the Reply factories) · _target
@@ -622,16 +629,16 @@ Runnable examples (programmatic API · custom .sql chunker · chunk heatmap ·
 web demo) live in their own repo, `~/megabrain-examples` — they need the engine
 installed (`pip install megabrain`).
 
-Public API (lazy, typed): `megabrain.{index_repo, search, render, get_code,
-load_state, search_with_state, prune_search, prune_search_root, render_pruned,
-Store, ChunkMeta, ChunkStrategy, Chunk, Symbol, FileResult, validate_partition,
-MegabrainError, IndexNotFound, EmptyIndex, MissingAPIKey, ProviderError}`; the
-walkthrough via `from megabrain.ask import ask, render_ask, stream_ask`.
-`prune_search(state, query, path_filter=None, with_text=True,
-include_pruned=False)` returns `{query, repo, chunks:[{id, file, start_line,
-end_line, kind, name, score, text}], kept, pruned, scanned, ms}` (with
-`include_pruned=True`, also `noise:[...]`); `prune_search_root(root, query, …)` is
-the one-shot entry.
+Public API (lazy, typed): `megabrain.{index_repo, discover, search,
+search_with_state, load_state, score_chunks, Store, ChunkMeta, Strategy, Registry,
+Chunk, Symbol, FileResult, validate_partition, MegabrainError, IndexNotFound,
+EmptyIndex, ModelMismatch, MissingCredential, MissingAPIKey, ProviderError}` — a
+lazy `__getattr__` over a name→module map, with a `TYPE_CHECKING` block so checkers
+and IDEs still see real symbols, and `__all__` spelled out rather than derived
+(a checker cannot follow `[*mapping]`, and the two are pinned to each other by a
+test). `import megabrain` loads no numpy — also pinned by a test. The verbs live in
+`megabrain.usecases`: `ask · grep · search · build_index · get_code · scan ·
+freshness · starters_for · known · remember · resolve_root`.
 
 ---
 
@@ -641,7 +648,7 @@ the one-shot entry.
   R@1 **0.86** · **bundle_full 1.00** · p50 ~10 ms warm. Multi-repo and 134K-line
   scale gates alongside. The offline suite (`python -m pytest`, no network/key) is
   what CI runs on 3.10–3.13 × Linux/macOS/Windows.
-- **RELATED analysis** (this doc, §3.3): CORE-only bundle_full 0.36 vs 1.00 with
+- **RELATED analysis** (this doc, §3.2): CORE-only bundle_full 0.36 vs 1.00 with
   RELATED; RELATED ≈ 5% verified gold by count but 45% of all gold files.
 - **Embedding bakeoff**: pplx-embed-v1-0.6b beat pplx-4b, codestral-embed,
   openai-3-large and bge-m3 on code recall (`evals/`).

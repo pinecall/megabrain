@@ -2,18 +2,16 @@
 
 Every tool costs the calling agent context and a routing decision, and the host
 already has Read, Grep and an editor. So the surface carries only what megabrain
-alone can do: narrate a mechanism from the whole repository (`ask`), map it
-(`search`), and make a repository answerable at all (`index`).
+alone can do: narrate a mechanism from the whole repository (`ask`), say where a
+change lands (`grep`), map it (`search`), and make a repository answerable at all
+(`index`).
 
 It was briefly five. `megabrain_code` and `megabrain_replace` were measured
 across five tasks in three languages and REMOVED: what carried the value was
 the narrator opening files until it had the whole flow, and that now belongs to
-`ask` itself. The edit machinery around it — prepared batches, APPLY anchors —
-kept being thrown away by the readers it was built for, and applying an edit is
-work the host's own editor already does.
-
-Reading a span is likewise the caller's own tool: a surface that offers its own
-invites the agent to re-verify what the render already showed.
+`ask` itself. The edit machinery around it kept being thrown away by the readers
+it was built for. Reading a span is likewise the caller's own tool — a surface
+that offers its own invites the agent to re-verify what the render showed.
 """
 
 from __future__ import annotations
@@ -58,10 +56,12 @@ TOOLS: tuple[Tool, ...] = (
          "WHERE TO LOOK for a change you are about to make — the grep "
          "replacement. Returns the files to open, the symbols inside them worth "
          "opening, each one's EXACT line range from the index, and one line on "
-         "why it matters. Runs NO MODEL by default — the rows come from the "
-         "index in ~50 ms, which is what lets it stand in for a grep at all; "
-         "pass `why: true` for one model call that adds a note per row plus the "
-         "site whose text never contains the task's own words. It quotes NO "
+         "why it matters. The lanes run NO MODEL — the rows come from the index "
+         "in ~50 ms, which is what lets it stand in for a grep at all; `why: "
+         "true` adds one model call for a note per row plus the site whose text "
+         "never contains the task's own words, and a task naming no identifier "
+         "the index knows falls back to that same pass rather than answering "
+         "empty. It quotes NO "
          "code on purpose — your editor opens the file anyway, so a render that "
          "pasted the body would bill you for reading it twice; the line range is "
          "what turns an open into a jump. Use it INSTEAD OF grepping a repo you "

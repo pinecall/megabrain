@@ -2,4 +2,16 @@
 # The full OFFLINE suite — no key, no network. Exactly what CI runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+# The project venv wins, same as scripts/lint. Without this the script ran
+# whatever `python` the shell happened to have — on a machine where that is not
+# the venv it fails at import with "No module named megabrain._home", which
+# reads as a broken repository rather than a missing interpreter.
+[ -d .venv/bin ] && PATH="$PWD/.venv/bin:$PATH"
+
+command -v python >/dev/null || {
+    echo "python is not on PATH — run: uv sync --group dev" >&2
+    exit 1
+}
+
 exec python -m pytest "$@"

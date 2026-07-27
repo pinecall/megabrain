@@ -12,175 +12,130 @@ Reference implementation to imitate: `~/experiments/anthropic-sdk-python` (index
 
 ## STATUS — read this before touching anything
 
-**Phases 0–7 are done, gated, and committed, and the domain audit that followed
-them is fully triaged and fixed.** Phases 8–17 (§6) have not started. This
-section is the truth as of commit `179f430`; the plan below it is unchanged
-from when it was written and still describes what's left.
+**Phases 0–15 are done, gated and committed.** What remains is phase 16
+(`forge/`), phase 17 (algorithm work), and two lanes named under "Not yet
+ported" below. The plan text after this section is unchanged from when it was
+written — read it for the *reasoning*, not for the current state.
 
 ### Verify the state yourself before trusting this section
 
 ```bash
 cd ~/megabrain-v3
-git log --oneline -1                                   # 179f430
-git log --oneline | wc -l                               # 219
-git tag | wc -l                                          # 34
-uv sync --group dev                                       # the gates are a PEP 735 dev group
-./scripts/lint                                            # ruff + mypy + pyright + architecture — ALL GREEN
-.venv/bin/python -m pytest tests                           # 376 passed, 1 skipped
+git log --oneline | wc -l        # 315+
+git tag | wc -l                  # 34
+uv sync --group dev               # the gates are a PEP 735 dev group
+./scripts/lint                    # ruff + mypy + pyright + architecture — ALL GREEN
+./scripts/test                    # 1474 passed, 3 skipped
 ```
 
 ### What exists
 
+Packaged **by domain**, not by layer, after the argument in `docs/DOMAINS.md`:
+`retrieval/` → `search/`, `knowledge/` → `graph/`, and `ask/sites/` → its own
+top-level `grep/` — which is what made "grep calls no model" an executable test
+instead of a promise, since `ask/` imports a chat provider by design. Each verb
+then moved in beside its own logic (`usecases/search.py` → `search/search.py`,
+and there turned out to be **two** functions named `search` with different
+behaviour depending on which one you imported; the verb was a strict superset,
+so the primitive died).
+
 ```
 src/megabrain/
-├── _types.py _arrays.py _errors.py _version.py __init__.py     L0
-├── contracts/            chunk.py bundle.py prune.py            L1 — TypedDicts only
-├── storage/               store.py schema.py model.py            L2
-│                          _blobs.py _chunks.py _files.py _symbols.py _graph.py
-├── providers/             http.py _retry.py _urllib.py _wire.py   L2 (embeddings)
-│                          _width.py _config.py cache.py embeddings.py
-├── chunkers/               units.py model.py cast.py python.py     L3
-│                          _spans.py _merge.py _split.py _balance.py
-│                          _breadcrumb.py _signature.py _pysymbols.py
-└── retrieval/              params.py paths.py state.py search.py   L3 — NO LLM, enforced
-   ├── scoring/             lane.py lanes.py _fusion.py context.py pipeline.py
-   └── bundle/              assemble.py _rank.py _related.py _anchors.py
-                            floors.py _render.py
-
-evals/harness/gate.py    the golden-set runner, versioned (the private corpus is not)
-tests/                   376 tests: unit/ (chunkers, indexing, providers, storage,
-                         retrieval, sentinels, public surface),
-                         contracts/ (shape validation against captured payloads),
-                         architecture/ (the hard rules, executable), golden/
+  L0  _types _arrays _errors _provider_errors _version _home _models
+      _config_file  project.py (megabrain.json)  __init__.py (lazy public API)
+  L1  contracts/     every cross-boundary payload, TypedDict only
+  L2  storage/       the ONLY package that writes SQL
+      providers/     http/ · embeddings/ · chat/ (L4, fenced from search/)
+  L3  chunkers/      cast · _cast/ · treesitter/+specs/ · languages/ (11)
+      indexing/      indexer · discover · strategies · passes/ · edges/
+      search/        scoring/ · bundle/ · render/ · state · params · search.py
+      graph/         build · clusters/ · routes/ · symbols/ · weights · semantic
+  L4  enrich/        rerank (order) · expand (recall) — Bundle → Bundle
+      ask/           narrator · prompt/ · converse/ · citing/ · checks/ · agents/
+      grep/          the lanes + the verb — NO model, enforced
+      flows/         the cached-walkthrough lane
+  L5  usecases/      the verbs owned by no feature + a re-export of the four
+      transports/    cli/ · mcp/ (four tools) · http/ (+ the built studio) · install/
+studio/              the TypeScript workspace (esbuild → transports/http/ui/)
+evals/harness/       the golden runner (committed; the corpus is not)
+benchmarks/          measure.py · rows.py · spans.py · thresholds.py · setup.sh
+tests/               unit/ contracts/ architecture/ golden/
 ```
 
-`__init__.py` is the public API: a lazy `__getattr__` over a name→module map,
-with a `TYPE_CHECKING` import block so checkers and IDEs still see real
-symbols. `import megabrain` loads no numpy — pinned by a test.
-
-`providers/chat`, `enrich/`, `knowledge/`, `ask/`, `usecases/`, `transports/`
-and `studio/` do not exist yet — that's phases 8–16.
+Every file is under **100 lines** and every function under **30**, enforced by
+a parametrised test per module.
 
 ### Gate status right now
 
 | Gate | Result |
 |---|---|
-| ruff | clean |
-| mypy strict | clean, 67 files |
-| pyright strict | clean, 0 errors |
-| pytest | **376 passed, 0 failed, 1 skipped** |
-| golden (`evals/harness/gate.py` against `~/pinecall/sdk-server`) | **R@1 0.91 · bundle_full 1.00 · p50 ~10ms — matches v2 exactly, same 2 misses (q01, q03)** |
-| `retrieval/` importing `providers.chat` or `enrich` | zero occurrences (checked by AST walk, not just grep) |
+| ruff · mypy strict · pyright strict | clean |
+| pytest | **1474 passed, 3 skipped** |
+| architecture invariants | green — no LLM under `search/`/`grep/`, SQL only in `storage/`, no `assert` in shipped code, L0 imports nothing, sync engine, no multi-inheritance between project classes, the line budgets |
+| golden (`evals/harness/gate.py`) | **R@1 0.91 · bundle_full 1.00 · p50 ~10 ms** — matches v2 exactly |
+| CI (3 OS × 4 Python + lint + build + studio) | 16/16 green |
 
-The golden gate is not wired into `pytest` by default — it needs
-`MEGABRAIN_GOLDEN` and `MEGABRAIN_GOLDEN_REPO` pointing at a real corpus (see
-`tests/golden/test_gate.py`), which is why `pytest` alone shows it skipped.
-Without those two env vars set, **you cannot verify retrieval parity** — set
-them before touching anything under `retrieval/` or `providers/embeddings.py`.
+The golden gate needs `MEGABRAIN_GOLDEN` + `MEGABRAIN_GOLDEN_REPO` pointing at a
+real corpus (`tests/golden/test_gate.py`), which is why `pytest` alone shows it
+skipped. **Without those two env vars set you cannot verify retrieval parity** —
+set them before touching anything under `search/`, `chunkers/` or
+`providers/embeddings/`, and put the three actual numbers in the commit message.
 
-### The domain audit — RUN, TRIAGED, FIXED (`da33d41`…`179f430`)
+### Not yet ported (known, deliberate, not a regression)
+
+- **`forge/`** — the chunkers the engine writes for itself, gated by the
+  partition oracle. Phase 16, untouched.
+- **Issue mode** — the long-query lane (BM25 sparse entity-ID matching +
+  traceback/identifier grounding pins for bug-report-shaped queries). It
+  reweights, so it needs no new shape: one more `Lane` beside `TestPenalty` and
+  `LexicalBoost`. It does not fire on the golden set, which is why parity holds
+  without it — but it is the gap between golden-set parity and full behavioural
+  parity with v2.
+- **The Claude Agent SDK chat provider** — v2 narrated on a logged-in Claude Code
+  subscription with no key. The `megabrain[claude]` extra is still declared and
+  nothing selects it.
+
+The flow cache IS ported (`flows/`, and `storage/_flows.py`) — the earlier note
+here saying otherwise was written before phase 10.
+
+### Two standing rules for whatever comes next
+
+- **Re-run the golden gate** after any change touching `search/`, `chunkers/` or
+  `providers/embeddings/`, and put `R@1` · `bundle_full` · `p50` in the commit
+  message — not "still passes", the actual numbers.
+- **A test first, RED, every time** (§3). The audit's evidence: every bug it
+  found in code that talks to something external had a green unit test beside
+  it, because the fixture and the bug came from the same wrong assumption.
+  Where behaviour meets a real corpus, endpoint or database, the test must too.
+
+### The domain audit — RUN, TRIAGED, FIXED (`ae74e32`…`179f430`)
 
 One background agent per L0–L3 domain, read-only, briefed to find the class of
-bug that answers confidently wrong. Every finding it raised is either fixed or
-was rejected with a reason. Each fix followed §3: a test written first and
-confirmed RED, then the change, then the full gate — and the golden gate after
-anything touching `retrieval/`, `chunkers/` or `providers/`. Eight commits:
+bug that answers confidently wrong. Every finding is fixed or rejected with a
+reason, each following §3 (test first, confirmed RED, then the change, then the
+full gate). The eight commits, kept here because each one names a failure mode
+worth not reintroducing:
 
 | Commit | Domain | What it was |
 |---|---|---|
 | `ae74e32` | gate | the committed golden gate could not run — it imported a name that was never exported, so every "gate re-confirmed" claim had used an ad-hoc import |
-| `6bb3a4b` | contracts | tier-1 emitted raw storage rows as `SymbolRef`; the strict shape checker had four fail-open holes (bool passing as int, `Literal` compared by value only, unknown annotations passing) and nothing validated THIS engine's own output |
-| `da33d41` | chunkers | orphan fragments escaped the balance pass; `splitlines()` split on `\v`/`\f`/` `, corrupting spans; typed constants (`X: Final = …`) were dropped from the lexical lane |
-| `73cf6f8` | providers | index SET unvalidated (`[0,0,2]` sorts fine and misassigns); per-row width detection (~1/200 misreads → hundreds of silently wrong vectors per cold index, cached forever); a zero-byte cache file served as a HIT; an honoured `Retry-After` clamped by the backoff ceiling |
-| `e963a49` | storage | `with Store(...)` closed WITHOUT committing — a full index reported success and wrote nothing; `_` unescaped in a LIKE (`get_meta` matched `getXmeta`); mismatched vector matrix zipped short; `except OperationalError: pass` swallowing every migration failure |
-| `45f8693` | indexing | a SKIPPED file pruned as an orphan, taking OTHER files' incoming edges with it; `edge_schema` stamped by passes that built no edges, disabling the rebuild it exists to trigger; unchecked embedder reply length |
-| `a580bc6` | retrieval | unstable argsort on ties; neighbour order derived from a SET (measured: different bundle per process); empty file matrix crashed the query; both production `assert`s removed by making the design say what they asserted |
-| `179f430` | L0 + infra | `import megabrain` exported nothing; a local endpoint (Ollama/LM Studio) was refused for want of a key; the released error code `missing_api_key` had been renamed on the wire; `./scripts/lint` ran a mixture of global and missing tools |
+| `6bb3a4b` | contracts | tier-1 emitted raw storage rows as `SymbolRef`; the strict shape checker had four fail-open holes and nothing validated this engine's own output |
+| `da33d41` | chunkers | orphan fragments escaped the balance pass; `splitlines()` split on `\v`/`\f`, corrupting spans; typed constants were dropped from the lexical lane |
+| `73cf6f8` | providers | index SET unvalidated (`[0,0,2]` sorts fine and misassigns); per-ROW width detection (~1/200 misreads → hundreds of silently wrong vectors per cold index, cached forever); a zero-byte cache file served as a HIT |
+| `e963a49` | storage | `with Store(...)` closed WITHOUT committing — a full index reported success and wrote nothing; `_` unescaped in a LIKE; `except OperationalError: pass` swallowing every migration failure |
+| `45f8693` | indexing | a SKIPPED file pruned as an orphan, taking other files' incoming edges with it; `edge_schema` stamped by passes that built no edges, disabling the rebuild it exists to trigger |
+| `a580bc6` | retrieval | unstable argsort on ties; neighbour order derived from a SET (measured: a different bundle per process); both production `assert`s removed by making the design say what they asserted |
+| `179f430` | L0 + infra | `import megabrain` exported nothing; a local endpoint refused for want of a key; a released error code renamed on the wire; `./scripts/lint` running a mixture of global and missing tools |
 
-Three invariants were added along the way, so these classes cannot come back
-quietly: **no `assert` in shipped code** (`python -O` deletes them), **layer 0
-imports nothing from the package**, and the pre-existing line/function budgets
-now cover every new module.
-
-**Every fix above kept the golden gate identical: R@1 0.91 · bundle_full 1.00 ·
-p50 10–11ms, same two misses (q01, q03).** That is the point — the audit
+**Every fix kept the golden gate identical.** That is the point — the audit
 changed behaviour only where behaviour was wrong.
 
-### Two real bugs found and fixed during phase 7 (context for review)
-
-Both were caught by comparing behavior against the live embeddings endpoint
-and against v2's actual request/response handling — not by unit tests with
-fake data, which had the bugs baked into their own fixtures and couldn't see
-them. Worth knowing before reviewing `providers/`:
-
-1. **Wire format detection.** The endpoint can return base64-encoded float32
-   *or* int8, and misreading one as the other doesn't crash — it produces
-   either a dimension mismatch (loud) or finite-but-denormal floats around
-   `1e-42` that underflow to zero on normalization (silent, and the vector
-   then scores against nothing). `_reads_as_float32` in `providers/_width.py`
-   checks three things before trusting a float32 read: byte-count divisibility
-   by 4, `isfinite`, and magnitude above `1e-20`. **The audit then found those
-   three tells are not enough per ROW** — a plausible quantised int8 row passes
-   them about once in a few hundred, which is invisible to any test and
-   catastrophic across a 50 K-chunk cold index. `decode_all()` now decides once
-   per BATCH: float32 only if every row reads cleanly at one shared dimension.
-2. **Row ordering.** The embeddings endpoint may answer batched requests
-   out of order and says so via an `index` field per row. The code did not
-   sort by it. This is the single worst class of bug the module can have —
-   nothing raises, every text gets *a* vector, just not necessarily its own —
-   and it was found only by manually diffing this code's request/response
-   handling line by line against the engine it replaces, not by any test.
-   Fixed in `_ordered()` in `_wire.py`; falls back to arrival order if `index`
-   is absent (some OpenAI-compatible endpoints omit it). **The audit found the
-   same bug one layer deeper**: sorting without validating the index SET, so
-   `[0, 0, 2]` passes the count check, sorts cleanly, and hands one row's
-   vector to a text it was never computed for. The set must now be exactly
-   `0..n-1`.
-
-**Lesson for this round:** don't trust a green test suite alone when a module
-talks to something external. Re-derive the wire contract from a real request/
-response pair (or from the older implementation's actual behavior, not its
-docstring) before assuming the code matches it.
-
-### Not yet ported (known, deliberate, not a regression)
-
-Phase 7's commit message already flagged these; repeating here so this round
-doesn't rediscover them as mysteries:
-
-- **Issue mode** — the long-query lane (BM25 sparse entity-ID matching +
-  traceback/identifier grounding pins for bug-report-shaped queries). v2 had
-  it as a fourth scoring lane; here the pipeline is one `BASE`
-  (`DenseFileFusion`, in `scoring/_fusion.py`) plus two reweighting `LANES`
-  (`TestPenalty`, `LexicalBoost`). Issue mode would be a third `Lane` — it
-  reweights, so it needs no new shape. It does not fire on the
-  golden set, which is why parity holds without it — but it needs to exist
-  before v3 can claim full behavioral parity with v2, not just golden-set parity.
-- **The cached-answer (flow) lane.** `Bundle.flows` is wired in the contract
-  and always returns `[]` in `assemble.py`. `storage/flows.py`'s equivalent
-  (the SQLite `flows` table, its cache-attach/serve split) has not been
-  ported at all.
-- **`related_entry`'s `via_flow` field** exists in the contract
-  (`contracts/bundle.py`) precisely because the flow lane is coming — it's not
-  dead code, it's a contract written ahead of its producer.
-
-### What the next round does
-
-**Phase 8 (§6).** The audit is closed and phases 0–7 are clean, so the next
-work is building forward, not fixing behind. Two standing rules for whatever
-comes next:
-
-- **Re-run the golden gate after any change touching `retrieval/`,
-  `chunkers/`, or `providers/embeddings.py`,** and put the exact numbers
-  (`R@1`, `bundle_full`, `p50`) in the commit message — not "still passes", the
-  actual numbers, so a regression is visible in `git log` even if nobody ran
-  the gate at merge time.
-- **A test first, RED, every time** (§3). The audit's own evidence: every bug
-  it found in code that talks to something external had a green unit test
-  sitting next to it, because the fixture and the bug were written from the
-  same wrong assumption. Where behaviour meets a real corpus, a real endpoint
-  or a real database, the test has to meet one too — the audit's tests use an
-  on-disk SQLite index, two subprocesses under different hash seeds, and a
-  600 KB file, not hand-built stand-ins.
+**The lesson, still the most valuable line in this file:** don't trust a green
+test suite alone when a module talks to something external. Re-derive the wire
+contract from a real request/response pair before assuming the code matches it.
+Both phase-7 provider bugs (row ordering ignored despite the `index` field; a
+float32/int8 misread that underflows to zero on normalisation instead of
+crashing) were found that way and by no test.
 
 ---
 
@@ -644,12 +599,12 @@ every PR. The big private corpus stays in `evals/private/` (gitignored). Today
 `tests/test_engine_golden.py` is gitignored — the engine's #2 rule has no
 versioned gate at all. **Fixing that is part of this phase, not a follow-up.**
 
-### Phase 8 — L3 knowledge (the graph) — NOT STARTED
+### Phase 8 — L3 knowledge (the graph) ✅ DONE — landed as `graph/`, not `knowledge/`
 
 Split `graph.py` (852) into `knowledge/{build,communities,paths,render}.py`.
 **The graph never ranks** — it supplies candidates and annotations only.
 
-### Phase 9 — L4 chat + `enrich/` — NOT STARTED
+### Phase 9 — L4 chat + `enrich/` ✅ DONE (`expand` joined `rerank`)
 
 `providers/chat/{router,openai_compat,claude}.py`, then `enrich/{expand,rerank,deep,closure}.py`.
 
@@ -659,7 +614,7 @@ opt-in and fail-open; on any failure it returns its input unchanged.
 **Tests first:** for each enricher — provider raises → the input bundle comes
 back identical. That test is the hard rule, executable.
 
-### Phase 10 — L4 ask — NOT STARTED
+### Phase 10 — L4 ask ✅ DONE (with `flows/`, the cached-walkthrough lane)
 
 `narrator` + `splice` + `agents/` + `stream`.
 
@@ -675,7 +630,7 @@ fabricated code and assert **none of it** reaches the output; only spliced
 disk bytes do. Port `test_ask_citation`, `test_ask_modes`,
 `test_ask_v2_integration`.
 
-### Phase 11 — L5 `usecases/` — NOT STARTED
+### Phase 11 — L5 `usecases/` ✅ DONE — then revised: each verb moved in beside its own logic (`docs/DOMAINS.md`), leaving here only the verbs no feature owns
 
 One file per verb. Decompose `app.prune()` (165 lines, 7 responsibilities) into
 `prune.py` + the helpers it calls. **The test-file scan moves into `Store`** —
@@ -683,7 +638,7 @@ no raw SQL outside `storage/`.
 
 **Gate:** behaviour parity with v2 on the captured fixtures.
 
-### Phase 12 — CLI · Phase 13 — MCP · Phase 14 — HTTP — NOT STARTED
+### Phase 12 — CLI · Phase 13 — MCP · Phase 14 — HTTP ✅ DONE
 
 In that order (cheapest surface first, and each validates the use-case layer
 before the next).
@@ -697,7 +652,7 @@ before the next).
 
 **Gate:** `test_mcp_tools_golden`, `test_serve_api_ui`, `test_studio_boot`, e2e CLI.
 
-### Phase 15 — the studio — NOT STARTED
+### Phase 15 — the studio ✅ DONE — `studio/` (esbuild → `transports/http/ui/`), three tabs + the code navigator. **The built bundle IS committed**, which was the open question below; a CI job rebuilds it and fails on a non-empty diff
 
 `studio/` as its own TypeScript workspace (esbuild), with `studio/src/api/`
 typed against `contracts/` — the same contract the MCP serves. Build output
@@ -719,12 +674,12 @@ non-empty.** Both benefits, no drift.
 `bernardocastro.dev/services/megabrain/` passes (every assertion in it came
 from a real outage).
 
-### Phase 16 — forge — NOT STARTED
+### Phase 16 — forge — NOT STARTED (the only phase left before 17)
 
 `coverage` (LLM, partition-gated) + `specialize` + `ab_gate` (both no-LLM).
 Last because it depends on `chunkers` + `indexing` + `providers/chat`.
 
-### Phase 17 — **algorithm improvements** (only after full parity) — NOT STARTED, and not eligible until 8–16 land
+### Phase 17 — **algorithm improvements** (only after full parity) — NOT STARTED, and not eligible until 16 lands
 
 **Do not touch the algorithm before phase 16's gate is green.** Refactoring and
 re-tuning at the same time makes a regression unattributable — you will not know

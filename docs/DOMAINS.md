@@ -1,7 +1,12 @@
 # Proposal: package by DOMAIN, not by layer
 
-> Status: **proposal**. Nothing here is implemented. `docs/STRUCTURE.md` records
-> the tree as it actually is.
+> Status: **the small version LANDED, the full split did not.** `retrieval/ → search/`,
+> `knowledge/ → graph/`, `ask/sites/ → grep/`, and then each verb moved in beside its own
+> logic — so §1's complaint no longer describes the tree (`docs/STRUCTURE.md` §12 records
+> what happened, and the table in §1 below is kept as the diagnosis that motivated it).
+> What is still only proposed is §2's `core/` + `features/` + `transports/` layout: the
+> objection in §5 — that the layer numbering is what the executable invariants name, and
+> that the features are not peers — was never answered, only outweighed for the cheap half.
 
 ## 1. The complaint, stated precisely
 
