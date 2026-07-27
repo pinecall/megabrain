@@ -21,6 +21,7 @@ from ._chunks import ChunkTable
 from ._files import FileTable
 from ._flows import FlowTable
 from ._graph import GraphTable
+from ._locking import BUSY_TIMEOUT
 from ._symbols import SymbolTable
 from .locate import INDEX_FILE
 
@@ -34,7 +35,8 @@ class Store:
         self.root = Path(repo_root)
         db_path = self.root / INDEX_FILE
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(db_path, check_same_thread=check_same_thread)
+        self.db = sqlite3.connect(db_path, check_same_thread=check_same_thread,
+                                  timeout=BUSY_TIMEOUT)
         schema.apply(self.db)
 
     # ---- tables (cached: one object per store, built on first touch)
