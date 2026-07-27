@@ -81,12 +81,12 @@ The tree mirrors the pipeline; full detail in [ARCHITECTURE.md](ARCHITECTURE.md)
 |---|---|
 | `chunkers/` | content → chunks behind one `FileResult` contract. `cast` is the shared engine · `_cast/` its six steps · `treesitter/` ONE walk parameterised by a `LangSpec` (+ `specs/`) · `languages/` eleven bindings of 13–18 lines each, plus `python` (stdlib ast) and `markdown` (no-LLM) |
 | `indexing/` | `indexer` (incremental by content hash — **no auto-refresh**, at query time or otherwise) · `strategies` (ext → registry, the OCP point, `EDGE_SCHEMA`) · `passes/` plan→embed→write→resymbol · `edges/` per-language extractors + `pins` · `_gitignore` |
-| `retrieval/` | **no LLM in here**, enforced by a test. `scoring/` (the lane pipeline) · `bundle/` (rank, tier, the two recall floors) · `render/` · `state` (warm `SearchState`) · `paths` (the path vocabulary) |
-| `knowledge/` | the graph (candidates + annotations, **never ranking**). `graph/` what an edge weighs · `clusters/` communities and their labels — *the package's only LLM touch* · `routes/` BFS questions asked at query time · `symbols/` go-to-definition and its inverse |
+| `search/` | **no LLM in here**, enforced by a test. `scoring/` (the lane pipeline) · `bundle/` (rank, tier, the two recall floors) · `render/` · `state` (warm `SearchState`) · `paths` (the path vocabulary) |
+| `graph/` | the graph (candidates + annotations, **never ranking**). `graph/` what an edge weighs · `clusters/` communities and their labels — *the package's only LLM touch* · `routes/` BFS questions asked at query time · `symbols/` go-to-definition and its inverse |
 | `ask/` | the only query-time LLM layer. `narrator` · `prompt/` (8 bodies + a map) · `converse/` (the `open_file` loop) · `citing/` (**rule 5**: the model cites, the engine splices) · `checks/` (deterministic, no model) · `agents/` (fan-out) · `sites/` (**`megabrain_grep`** — no model at all) |
 | `enrich/` | `Bundle → Bundle`, opt-in, fail-open to the input. `rerank` = the judge lane: the model returns IDS, never code |
 | `storage/` | `store` (SQLite, the ONLY package that writes SQL) · one module per table · `_flows` · `locate` (`resolve_root` + `INDEX_FILE`, the layout in one line) |
-| `providers/` | model APIs, one folder per backend: `http/` (the shared transport) · `embeddings/` (Layer 2 — retrieval depends on it) · `chat/` (Layer 4 — nothing under `retrieval/` may import it) · `_local` (asked by both) |
+| `providers/` | model APIs, one folder per backend: `http/` (the shared transport) · `embeddings/` (Layer 2 — retrieval depends on it) · `chat/` (Layer 4 — nothing under `search/` may import it) · `_local` (asked by both) |
 | `usecases/` | the use-case layer — **one file per verb**; every transport maps its args to these. `build` composes `index` + `study` behind `llm=True`, so no surface can disagree about what "index with the LLM" means |
 | `transports/` | `cli` (one module per verb) · `mcp` (four tools; `inputSchema` GENERATED from `contracts/tools.py`) · `http` (studio + JSON API, `ui/` is the built studio bundle) · `install` (`megabrain install` — the six-assistant MCP registration table) |
 

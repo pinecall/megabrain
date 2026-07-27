@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 
-from ...retrieval.paths import is_test
+from ...search.paths import is_test
 from ...storage import PIN_KIND, Store
 from ..citing._codeonly import outside_strings
 from ..citing._window import window_around

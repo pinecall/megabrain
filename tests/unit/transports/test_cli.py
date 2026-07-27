@@ -31,7 +31,7 @@ def offline(monkeypatch: pytest.MonkeyPatch) -> None:
     only on a machine that had one — green here, red on every CI runner, for as
     long as the CI was red for other reasons and nobody read it.
     """
-    monkeypatch.setattr("megabrain.retrieval.state.Embedder", CountingEmbedder)
+    monkeypatch.setattr("megabrain.search.state.Embedder", CountingEmbedder)
     monkeypatch.setattr("megabrain.providers.embeddings.Embedder", CountingEmbedder)
 
 

@@ -11,10 +11,10 @@ from pathlib import Path
 
 from .._types import Content
 from ..contracts import Bundle, Tier2File
-from ..retrieval.bundle import search_with_state
-from ..retrieval.bundle._rank import rank_files
-from ..retrieval.scoring.pipeline import Scored, score_chunks
-from ..retrieval.state import SearchState, load_state
+from ..search.bundle import search_with_state
+from ..search.bundle._rank import rank_files
+from ..search.scoring.pipeline import Scored, score_chunks
+from ..search.state import SearchState, load_state
 from ..storage.locate import resolve_root
 
 __all__ = ["search"]
@@ -70,7 +70,7 @@ def _expanded(bundle: Bundle, root: Path, state: SearchState,
     from ..enrich.expand import expand as widen
     from ..enrich.rerank import judge_provider
     from ..project import load_project
-    from ..retrieval.bundle.widen import term_entries
+    from ..search.bundle.widen import term_entries
 
     provider = judge_provider(load_project(root).rerank_model)
     if provider is None:

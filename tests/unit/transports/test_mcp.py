@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[3]
 @pytest.fixture(autouse=True)
 def offline(monkeypatch: pytest.MonkeyPatch) -> None:
     """No network in a transport test — patched at the seam `load_state` uses."""
-    monkeypatch.setattr("megabrain.retrieval.state.Embedder", CountingEmbedder)
+    monkeypatch.setattr("megabrain.search.state.Embedder", CountingEmbedder)
 
 
 @pytest.fixture

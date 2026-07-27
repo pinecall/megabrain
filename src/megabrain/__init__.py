@@ -41,17 +41,17 @@ if TYPE_CHECKING:
     from ._provider_errors import MissingAPIKey, MissingCredential, ProviderError
     from .chunkers import Chunk, FileResult, Symbol, validate_partition
     from .indexing import Registry, Strategy, discover, index_repo
-    from .retrieval import load_state, score_chunks, search, search_with_state
+    from .search import load_state, score_chunks, search, search_with_state
     from .storage import Store
     from .storage.model import ChunkMeta
 
 _EXPORTS = {
     "index_repo": ".indexing",
     "discover": ".indexing",
-    "search": ".retrieval",
-    "search_with_state": ".retrieval",
-    "load_state": ".retrieval",
-    "score_chunks": ".retrieval",
+    "search": ".search",
+    "search_with_state": ".search",
+    "load_state": ".search",
+    "score_chunks": ".search",
     "Store": ".storage",
     "ChunkMeta": ".storage.model",
     # custom content types

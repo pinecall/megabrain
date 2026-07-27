@@ -14,7 +14,7 @@ ruff check .
 These were each decided by measured experiments (see README → Design). Don't
 send PRs that violate them without new evidence:
 
-1. **No LLM in the retrieval/query path.** LLM pruning was tested four ways and
+1. **No LLM in the search/query path.** LLM pruning was tested four ways and
    always cost bundle completeness. The only LLM calls are `ask` (narration)
    and `--best` (optional reorder) — both fail-open.
 2. **Completeness beats ordering.** Changes must not lower bundle completeness;
@@ -32,7 +32,7 @@ The public suite (`python -m pytest`) is offline and covers chunkers
 (partition guarantees per language), retrieval plumbing, the MCP server, and
 security containment. The end-to-end retrieval benchmark (a 30-query golden
 set over a private corpus) runs maintainer-side before releases; PRs that
-could shift ranking (weights in `retrieval/params.py`, chunk budgets, issue grounding)
+could shift ranking (weights in `search/params.py`, chunk budgets, issue grounding)
 will be gated on it — say so in the PR description so it gets run.
 
 ## Adding a language (the best first contribution)

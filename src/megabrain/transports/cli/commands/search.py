@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from ....retrieval.render import render
+from ....search.render import render
 from ....usecases import search
 
 __all__ = ["register"]

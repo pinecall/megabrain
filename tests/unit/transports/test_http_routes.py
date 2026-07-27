@@ -20,7 +20,7 @@ from tests.unit.indexing.fake import CountingEmbedder, write
 
 @pytest.fixture(autouse=True)
 def offline(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("megabrain.retrieval.state.Embedder", CountingEmbedder)
+    monkeypatch.setattr("megabrain.search.state.Embedder", CountingEmbedder)
 
 
 @pytest.fixture

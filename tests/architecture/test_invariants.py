@@ -28,18 +28,39 @@ def test_the_walker_actually_sees_the_package() -> None:
     assert len(modules_under("")) >= 3
 
 
-def test_retrieval_never_imports_an_llm() -> None:
+def test_grep_never_imports_a_model() -> None:
+    """`megabrain_grep` answers in ~50 ms because NOTHING in it can call out.
+
+    That is the tool's entire performance claim, and until the package moved it
+    could not be checked: `grep` lived in `ask/sites/`, and `ask/` imports a
+    chat provider by design, so any assertion here would have been about the
+    wrong directory. Lifting it to `grep/` is what made the rule expressible —
+    which was the argument for the move, not a side effect of it.
+
+    `why: true` is the documented exception, and it does not live here: the
+    model pass is `usecases/grep.py`'s, reached through `ask`, so the lanes stay
+    deterministic whatever the caller asks for.
+    """
+    modules = modules_under("grep")
+    assert modules, "grep/ is gone — this test would pass by checking nothing"
+    for module in modules:
+        for imported in imports_of(module):
+            assert "providers.chat" not in imported, f"{module}: grep calls no model"
+            assert not imported.startswith("megabrain.enrich"), \
+                f"{module}: grep calls no model"
+            assert not imported.startswith("megabrain.ask.converse"), \
+                f"{module}: that is the narrator's model loop"
+
+
+def test_search_never_imports_an_llm() -> None:
     """HARD RULE #1 — no LLM in the retrieval path.
 
     LLM pruning was tested four ways and every variant cost completeness or
     added seconds for no recall gain. The deterministic floor is the product,
     so the LLM lanes live in `enrich/` and this test is the fence between them.
     """
-    modules = modules_under("retrieval")
-    if not modules:
-        # A green test that checked nothing is a lie. Until phase 7 lands the
-        # package, say so out loud instead of reporting a pass.
-        pytest.skip("retrieval/ not built yet (phase 7) — nothing to enforce")
+    modules = modules_under("search")
+    assert modules, "search/ is gone — this test would pass by checking nothing"
     for module in modules:
         for imported in imports_of(module):
             assert "providers.chat" not in imported, f"{module}: hard rule #1"
@@ -140,14 +161,14 @@ def test_no_function_exceeds_the_line_budget(module: str) -> None:
     assert not over, f"{module}: {over} (max {MAX_FUNC_LINES} lines)"
 
 
-def test_retrieval_never_imports_a_chat_backend() -> None:
+def test_search_never_imports_a_chat_backend() -> None:
     """HARD RULE #1, now that a chat backend exists to import.
 
     The earlier version of this checked a package that did not exist yet, so
     it could not have failed. `providers.chat` is real from this phase on, and
     an import of it from anywhere under retrieval/ is the rule breaking.
     """
-    for module in modules_under("retrieval"):
+    for module in modules_under("search"):
         for imported in imports_of(module):
             assert "providers.chat" not in imported, f"{module}: hard rule #1"
             assert "providers._stream" not in imported, \

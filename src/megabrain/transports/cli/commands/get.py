@@ -6,7 +6,7 @@ import argparse
 import json
 
 from ....contracts import SymbolRef
-from ....retrieval.render import lang_of
+from ....search.render import lang_of
 from ....usecases import get_code
 
 __all__ = ["register"]

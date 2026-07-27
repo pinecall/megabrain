@@ -12,7 +12,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from megabrain.ask.sites.spans import span_of
+from megabrain.grep.spans import span_of
 from megabrain.storage import Store
 
 __all__ = ["mb_rows", "grep_hits", "resolve"]

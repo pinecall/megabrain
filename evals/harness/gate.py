@@ -127,7 +127,7 @@ def resolve_search() -> SearchFn:
     inline in `main()` pointing at a name its module never exported — every
     ad-hoc parity run passed while the committed runner died on first import.
     """
-    from megabrain.retrieval.search import search
+    from megabrain.search.search import search
     return search
 
 

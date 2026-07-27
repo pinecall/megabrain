@@ -19,9 +19,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, TypedDict
 
-from ..knowledge.build import load_graph
+from ..graph.build import load_graph
 from ..project import load_project
-from ..retrieval.paths import is_test
+from ..search.paths import is_test
 from ..storage import Store
 from ..storage.locate import resolve_root
 

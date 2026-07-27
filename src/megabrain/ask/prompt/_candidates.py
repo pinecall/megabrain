@@ -9,7 +9,7 @@ without explaining the mechanism.
 from __future__ import annotations
 
 from ...contracts import Bundle, ChunkHit, ChunkRef
-from ...retrieval.paths import is_test
+from ...search.paths import is_test
 from ...storage.model import ChunkMeta
 
 __all__ = ["candidates_of", "MAX_CANDIDATES"]

@@ -32,9 +32,9 @@ from ..ask.converse.loop import answered
 from ..ask.events import Emit, emit_nothing
 from ..ask.prompt._candidates import candidates_of
 from ..ask.prompt._chunkblocks import chunk_blocks
-from ..ask.sites.sites import sites_from
-from ..ask.sites.words import GREP_PROMPT
 from ..contracts import Bundle
+from ..grep.sites import sites_from
+from ..grep.words import GREP_PROMPT
 from ..storage import Store
 from ..storage.locate import resolve_root
 from .search import search

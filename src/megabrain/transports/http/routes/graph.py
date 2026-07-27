@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...._errors import MegabrainError
-from ....knowledge import graph_map, graph_node, graph_path
+from ....graph import graph_map, graph_node, graph_path
 from ..messages import Reply, Request
 from ..replies import error_reply, from_engine, json_reply
 

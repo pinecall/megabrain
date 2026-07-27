@@ -293,3 +293,42 @@ The last three packages were moved by a written rewriter (relative → absolute 
 map → relative, level recalculated per file) rather than by hand, at the repo
 owner's explicit request — global RULE 2 bans mass rewrites, so it printed every
 one of the 215 import lines it changed, and the suite was the net.
+
+---
+
+## 12. Follow-up: the three names became their features
+
+`docs/DOMAINS.md` argued that the packages are named after LAYERS while the
+product is named after VERBS — and that three of the four features had no folder
+by their own name. The recommended half of that proposal landed:
+
+| was | is | why |
+|---|---|---|
+| `retrieval/` | **`search/`** | it is the search feature; "retrieval" is the layer it happens to be |
+| `knowledge/` | **`graph/`** | the CLI verb, the HTTP route and the docs all say graph |
+| `ask/sites/` | **`grep/`** | a separate deliverable, and it was living inside the one package whose job is calling a model |
+
+66 files, no behaviour change, every architecture test kept working with a
+renamed string — which was the whole reason to prefer this over the full
+`core/` + `features/` split (§DOMAINS 4).
+
+**The move paid for itself immediately, with a test that could not be written
+before it:**
+
+```python
+def test_grep_never_imports_a_model() -> None:
+    """`megabrain_grep` answers in ~50 ms because NOTHING in it can call out."""
+```
+
+That is the tool's entire performance claim. While the lanes lived in
+`ask/sites/`, it was unassertable — `ask/` imports a chat provider by design, so
+any check would have been about the wrong directory. Verified to bite: adding
+`from ..providers.chat import router` to `grep/spans.py` fails it.
+
+`graph/graph/` was flattened on the way (`weights`, `semantic`, `aliases` to the
+package root) — a folder whose name repeats its parent's tells the reader
+nothing, and `graph.graph.weights` is a worse import than `graph.weights`.
+
+What DOMAINS proposed and this did not do: `usecases/` still holds a verb per
+file away from its logic, and `core/` does not exist. That is the part the full
+split fixes, and it stays proposed rather than done.

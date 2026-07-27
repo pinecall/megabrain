@@ -11,7 +11,7 @@ import hashlib
 from pathlib import Path
 
 from ..contracts import FileView, SymbolRef
-from ..retrieval.bundle._convert import to_outline
+from ..search.bundle._convert import to_outline
 from ..storage import Store
 from ..storage.locate import resolve_root
 

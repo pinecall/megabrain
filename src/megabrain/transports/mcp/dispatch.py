@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ..._errors import MegabrainError
-from ...retrieval.render import render
+from ...search.render import render
 from ...usecases import ask, build_index, search
 from ...usecases.grep import grep
 from . import arguments as arg

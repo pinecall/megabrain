@@ -12,7 +12,7 @@ from pathlib import Path
 from ..ask.events import Emit
 from ..contracts import Bundle, FlowHit
 from ..flows import cache_flow, match_flows, serve_verbatim
-from ..retrieval.state import load_state
+from ..search.state import load_state
 
 __all__ = ["matched_flows", "served", "remember_answer", "FLOW_FILE_ADDS"]
 

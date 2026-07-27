@@ -6,7 +6,7 @@ import argparse
 import json
 
 from ....contracts import GraphMap, Neighbourhood
-from ....knowledge import graph_map, graph_path, neighbourhood
+from ....graph import graph_map, graph_path, neighbourhood
 from ._route import render_route
 
 __all__ = ["register"]

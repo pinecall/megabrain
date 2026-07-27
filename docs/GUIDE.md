@@ -312,7 +312,7 @@ God nodes — the files everything leans on, which *is* the reading order for a 
 
 ```
 providers/__init__.py   deg 37    every LLM/embedding call goes through here
-retrieval/bundle.py     deg 32    the retrieval assembly
+search/bundle.py     deg 32    the retrieval assembly
 indexing/indexer.py     deg 29    the index pipeline
 ```
 
@@ -320,8 +320,8 @@ And a path names the **functions that carry each hop**, not just which files con
 
 ```
 $ megabrain graph . --path scoring.py narrator.py
-retrieval/scoring.py
-└─ call → retrieval/bundle.py    · via score_chunks, chunks_for_file, search_with_state
+search/scoring.py
+└─ call → search/bundle.py    · via score_chunks, chunks_for_file, search_with_state
 └─ call → ask/narrator.py        · via ask, search
 ```
 

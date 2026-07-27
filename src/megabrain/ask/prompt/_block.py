@@ -8,7 +8,7 @@ the shape it is written in is a contract.
 
 from __future__ import annotations
 
-from ...retrieval.render import lang_of
+from ...search.render import lang_of
 from ...storage.model import ChunkMeta
 
 __all__ = ["fenced_block"]

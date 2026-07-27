@@ -229,7 +229,7 @@ span-IoU 0.037 → 0.115 with hit@1 held). Do not chase it on ordinary code.
 
 ## 3. Query time — retrieval (no LLM)
 
-`retrieval/` (scoring in `scoring.py`, assembly in `bundle.py`, exposed through
+`search/` (scoring in `scoring.py`, assembly in `bundle.py`, exposed through
 `app.py`'s use-case layer). `load_state()` (in `state.py`) loads matrices once (servers keep it warm and reload on
 db-mtime change); `search_with_state()` runs per query, all vectorized.
 
@@ -307,7 +307,7 @@ and dispatched?"). There is no blend mode anywhere: `ask --with-docs` claimed to
 be one and wasn't — it left both filters off, so the same crowding applied and
 the prose simply won (CORE = `[README.md]`, no code). Removed in 0.17.1.
 
-**LLM rerank (`retrieval/rerank.py`, the `llm_rerank` lane, layered ON the prune).**
+**LLM rerank (`search/rerank.py`, the `llm_rerank` lane, layered ON the prune).**
 The deterministic prune is recall-safe by design — every bundle file contributes its
 best chunk — so files that merely *share vocabulary* with the query (tests, eval
 scripts, A/B gates) survive as "signal" and bloat the output; cosine can't tell
@@ -403,7 +403,7 @@ that window. `Store.stale_flows()` keeps the index comparison, which is the
 right question for the *pruning* path. The Ask
 surfaces show the cache working: a verbatim serve is bannered
 "⚡ served from flow cache"; attached flows show as "known flows" chips (the
-`retrieval` stream event carries them). A repo can commit **starter queries**
+`search` stream event carries them). A repo can commit **starter queries**
 at `<root>/.megabrainqueries` (one per line, `#` comments; `GET /queries`):
 the studio renders them as one-click chips in Ask with an explicit **Warm
 all** button — the newcomer flow: open the repo, click through the starters,
@@ -687,7 +687,7 @@ surfaces — one subpackage per layer (src/ layout, PyPA standard). Loose files
 at the package root are only the cross-cutting spine:
 
 Layers are numbered L0–L5 and the dependency arrow only ever points **down**. Two of
-them are enforced by executable tests rather than documented: `retrieval/` may not import
+them are enforced by executable tests rather than documented: `search/` may not import
 `providers.chat` or `enrich/` (rule 1), and only `storage/` may write SQL.
 
 ```
@@ -721,7 +721,7 @@ src/megabrain/
         embeddings/      client.py (OpenAI-compatible /embeddings) · cache.py
                          (content-addressed) · _config _send _batching _budget
                          _oversize _wire _width _replies
-        chat/            L4 — nothing under retrieval/ may import this
+        chat/            L4 — nothing under search/ may import this
           base.py          ChatProvider Protocol · openai_compat.py · router.py
 
   L3  chunkers/        CONTENT → CHUNKS behind one partition-guaranteed contract
@@ -745,7 +745,7 @@ src/megabrain/
         _exclude.py      megabrain.json ignores + the legacy dotfiles
         _gitignore.py    the repo's own .gitignore (on by default, opt-out)
         unsupported.py   the census of files NOTHING can chunk
-      retrieval/       ANSWER queries — NO LLM IN HERE (rule 1, enforced by a test)
+      search/       ANSWER queries — NO LLM IN HERE (rule 1, enforced by a test)
         search.py        the neutral primitive · params.py every knob, frozen
         state.py         SearchState + load_state (warm matrices)
         paths.py         is_test / is_demo / ident_tokens — path vocabulary
@@ -754,7 +754,7 @@ src/megabrain/
         bundle/          assemble · _rank · _related · _anchors · floors (the two
                          recall floors) · _convert
         render/          markdown · _lang
-      knowledge/       THE GRAPH (§6) — candidates + annotations, never ranking
+      graph/       THE GRAPH (§6) — candidates + annotations, never ranking
         build.py         RepoGraph + load_graph · node.py · views.py the map
         graph/           weights · semantic · aliases — what an edge WEIGHS
         clusters/        communities · labels · _naming · gods · surprises

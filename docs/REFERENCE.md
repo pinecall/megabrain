@@ -112,7 +112,7 @@ repo.
 `--readonly` refuses the mutating routes with a 403. `--token` exempts only `/health`,
 `/config` and the UI.
 
-**SSE events** (`/ask/stream`): `retrieval` · `cached` · `classified` · `planning` ·
+**SSE events** (`/ask/stream`): `search` · `cached` · `classified` · `planning` ·
 `plan` · `agent_start` · `agent_delta` · `agent_tool` · `agent_done` · `agent_error` ·
 `synthesis_start` · `synthesis_delta` · `length` · `bundle` · `error` · **`done`**.
 `done` terminates the stream on **every** path — a sink never has to know which branch
