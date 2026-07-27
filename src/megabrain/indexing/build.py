@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import Sequence
 
 from .._errors import NothingToIndex
-from ..indexing import index_repo
-from ..indexing.passes.embed import Embeddable
-from ..indexing.strategies import Strategy
 from ..storage import Store
-from .repos import remember
+from ..usecases.repos import remember
+from .indexer import index_repo
+from .passes.embed import Embeddable
+from .strategies import Strategy
 
 __all__ = ["build_index"]
 

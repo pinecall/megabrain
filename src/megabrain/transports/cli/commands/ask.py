@@ -6,8 +6,8 @@ import argparse
 import sys
 from typing import cast
 
+from ....ask.ask import ask
 from ....ask.events import Event
-from ....usecases.ask import ask
 
 __all__ = ["register"]
 

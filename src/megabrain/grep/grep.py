@@ -33,11 +33,11 @@ from ..ask.events import Emit, emit_nothing
 from ..ask.prompt._candidates import candidates_of
 from ..ask.prompt._chunkblocks import chunk_blocks
 from ..contracts import Bundle
-from ..grep.sites import sites_from
-from ..grep.words import GREP_PROMPT
+from ..search import search
 from ..storage import Store
 from ..storage.locate import resolve_root
-from .search import search
+from .sites import sites_from
+from .words import GREP_PROMPT
 
 __all__ = ["grep"]
 
@@ -81,7 +81,7 @@ def _judged(root: Path, bundle: Bundle, task: str, emit: Emit) -> str:
     Fails OPEN: with no credential the deterministic rows are still the answer,
     so a missing key degrades the render instead of the command.
     """
-    from .ask import _narrator
+    from ..ask.ask import _narrator
 
     provider = _narrator(root)
     if provider is None:

@@ -17,14 +17,14 @@ from pathlib import Path
 
 from .._provider_errors import MissingCredential
 from .._types import Content
-from ..ask.events import Emit, emit_nothing
-from ..ask.narrator import narrate
 from ..contracts import Bundle, FlowHit
 from ..project import load_project
 from ..providers.chat import ChatProvider, OpenAICompatible
+from ..search import search
 from ..storage.locate import resolve_root
 from ._flows import matched_flows, remember_answer, served
-from .search import search
+from .events import Emit, emit_nothing
+from .narrator import narrate
 
 __all__ = ["ask"]
 

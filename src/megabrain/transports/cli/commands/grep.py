@@ -6,7 +6,7 @@ import argparse
 import sys
 
 from ....ask.events import Event
-from ....usecases.grep import grep
+from ....grep.grep import grep
 
 __all__ = ["register"]
 

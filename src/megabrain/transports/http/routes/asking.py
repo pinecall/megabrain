@@ -15,7 +15,7 @@ from typing import Any, Iterator
 
 from ...._errors import MegabrainError
 from ...._types import Content
-from ....usecases.ask import ask
+from ....ask.ask import ask
 from ..messages import Reply, Request
 from ..replies import error_reply
 

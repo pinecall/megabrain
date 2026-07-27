@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ..._errors import MegabrainError
+from ...grep.grep import grep
 from ...search.render import render
 from ...usecases import ask, build_index, search
-from ...usecases.grep import grep
 from . import arguments as arg
 from .answers import Answer, answer, failure, from_engine
 
