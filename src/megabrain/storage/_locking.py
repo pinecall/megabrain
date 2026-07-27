@@ -16,6 +16,20 @@ MEASURED, because the answer is not the one the internet gives:
   Python default) while the first still held the lock. With the timeout below it
   waits 7 s and commits.
 
+**A QUEUE of writers is fine; a single slow writer is not.** Measured with real
+processes, because the two behave nothing alike:
+
+    3 writers holding 6 s each   locks at 0.0 / 6.1 / 12.1 s   all commit
+    6 writers holding 6 s each   locks at 0.0 … 30.2 s         all commit
+    1 writer holding 35 s        the waiter dies at 31.2 s     `database is locked`
+
+The sixth waited THIRTY SECONDS on a thirty-second timeout and still got in: the
+timeout is not a ceiling on total wait. SQLite restarts the busy handler every
+time the lock changes hands, so a queue drains at whatever length. What the
+timeout actually bounds is how long ONE holder may keep the lock — which is why
+the number below is set against the commit window and not against the number of
+sessions somebody might have open.
+
 So the fix is a longer wait, not WAL:
 
 - WAL lets a reader run beside a writer — the case that ALREADY works here.
@@ -37,7 +51,9 @@ from __future__ import annotations
 __all__ = ["BUSY_TIMEOUT"]
 
 BUSY_TIMEOUT = 30.0
-"""Seconds before a blocked connection gives up.
+"""Seconds ONE holder may keep the lock before the waiters give up.
 
-~15x the widest commit window measured (a full 119-file re-index writes in under
-2 s), so a second indexer waits its turn instead of dying at five."""
+Not a budget for the queue — six writers drained past this number without a
+failure. It is ~15x the widest commit window measured (a full 119-file re-index
+writes in under 2 s), so the margin is against a single pathological write, not
+against how many sessions are open."""

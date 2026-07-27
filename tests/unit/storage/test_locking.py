@@ -77,3 +77,35 @@ def test_a_SECOND_WRITER_waits_instead_of_dying(tmp_path) -> None:
         thread.join()
     waited = time.monotonic() - started
     assert waited > 4.0, f"it did not actually contend (waited {waited:.1f}s)"
+
+
+def test_a_QUEUE_of_writers_drains_rather_than_racing(tmp_path) -> None:
+    """Three at once, which is the shape a machine with several sessions makes.
+
+    They SERIALISE — measured with real processes at 0.0 / 6.1 / 12.1 s — and the
+    queue is not bounded by the timeout: six writers holding six seconds each all
+    committed, the last one getting in at 30.2 s on a 30 s timeout. SQLite
+    restarts the busy handler each time the lock changes hands, so what the
+    timeout bounds is ONE holder, never the length of the line.
+    """
+    with Store(tmp_path) as seed:
+        seed.files.upsert("seed.py", "sha", "", None)
+        seed.commit()
+
+    def writer(name: str) -> None:
+        with Store(tmp_path) as store:
+            store.db.execute("BEGIN IMMEDIATE")
+            store.files.upsert(f"{name}.py", "sha", "", None)
+            time.sleep(0.4)
+            store.commit()
+
+    threads = [threading.Thread(target=writer, args=(f"w{n}",)) for n in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    with Store(tmp_path) as store:
+        written = store.files.all_paths()
+    assert written == {"seed.py", "w0.py", "w1.py", "w2.py"}, \
+        "a writer was lost to contention"
