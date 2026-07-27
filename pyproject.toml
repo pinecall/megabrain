@@ -136,6 +136,7 @@ files = ["src/megabrain"]
 typeCheckingMode = "strict"
 pythonVersion = "3.10"          # the OLDEST supported, not the newest
 include = ["src/megabrain"]
+stubPath = "typings"          # our own stubs for the grammar wheels (no py.typed)
 reportImportCycles = false      # lazy imports make this noisy
 reportPrivateUsage = false
 # reportImplicitOverride would be ON (it catches real hierarchy bugs), but

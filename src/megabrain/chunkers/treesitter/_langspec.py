@@ -39,7 +39,8 @@ class LangSpec:
     """Fallbacks when `name` is absent. Rust's `impl Foo` carries its target in
     `type`; Ruby's `class << self` carries `self` in `value`."""
 
-    name_via: dict[str, tuple[str, str]] = field(default_factory=dict)
+    name_via: dict[str, tuple[str, str]] = field(
+        default_factory=lambda: {})
     """Types whose name lives one level down: type -> (child type, field)."""
 
     body_field: str = "body"

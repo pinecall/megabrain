@@ -38,11 +38,28 @@ class HopCode(TypedDict):
     definition: CodeSnip | None
 
 
-class Hop(TypedDict, total=False):
-    """One step of a route, and why it exists."""
+class _HopFound(TypedDict):
+    """What every hop has the moment the route is walked."""
 
     file: str
     via: str                 # "import", "call/import", "semantic 0.91", or ""
+
+
+class Hop(_HopFound, total=False):
+    """One step of a route, and why it exists.
+
+    Split in two rather than written with `NotRequired`, which is 3.11+ and this
+    package supports 3.10 — inheritance expresses the same thing everywhere, and
+    the base class is where the required half is stated.
+
+    `file` and `via` are required because `paths._walk_back` writes both on every
+    hop it builds; there is no route step without a file. Declaring the whole
+    class `total=False` made each `hop["file"]` an access to a key that might be
+    missing — seven of those in `story.py` alone, every one for a value that is
+    always there. The two below genuinely arrive later, added by `tell` after the
+    route is walked.
+    """
+
     symbols: list[str]       # the names that carry this hop, strongest first
     code: HopCode | None
 

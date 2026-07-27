@@ -85,8 +85,7 @@ def _definition_of(store: Store, name: str,
     """
     defs = [d for d in store.symbols.find(name)
             if d.get("kind") not in _CONTAINERS
-            and not _HEADING.match(str(d.get("kind") or ""))
-            and isinstance(d.get("line"), int) and isinstance(d.get("end_line"), int)]
+            and not _HEADING.match(str(d.get("kind") or ""))]
     cited_files = {path for path, _, _ in cited}
     picked = [d for d in defs if d["file"] in cited_files] or defs
     if len({(d["file"], d["line"]) for d in picked}) != 1:

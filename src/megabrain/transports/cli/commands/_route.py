@@ -50,11 +50,11 @@ def _code_lines(code: dict[str, object]) -> list[str]:
 
 def _snip_lines(role: str, snip: CodeSnip) -> list[str]:
     where = snip.get("in_symbol")
-    head = (f'      {role} · {snip["file"]}:{snip["start_line"]}'
+    head = (f'      {role} · {snip.get("file", "?")}:{snip.get("start_line", 0)}'
             + (f" in {where}()" if where else ""))
     marked = set(snip.get("hi_rows") or ())
     body = [f'      {">" if index in marked else " "} {line}'
-            for index, line in enumerate(snip["text"].splitlines())]
+            for index, line in enumerate(snip.get("text", "").splitlines())]
     return [head, *body, ""]
 
 

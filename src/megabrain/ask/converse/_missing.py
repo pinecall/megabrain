@@ -59,8 +59,7 @@ def missing_bodies(store: Store, raw: str) -> str:
 
 def _definition(store: Store, name: str) -> tuple[str, int, int] | None:
     """Where `name` is defined, when the index says exactly one place."""
-    found = [d for d in store.symbols.find(name)
-             if isinstance(d.get("line"), int) and isinstance(d.get("end_line"), int)]
+    found = list(store.symbols.find(name))
     if len({(d["file"], d["line"]) for d in found}) != 1:
         return None
     hit = found[0]

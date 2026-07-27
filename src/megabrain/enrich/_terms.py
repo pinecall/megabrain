@@ -65,9 +65,10 @@ def listing(found: list[Any]) -> str:
     absent, and a declaration list shows that at a fraction of the tokens — a
     round that costs as much as the answer is a round nobody leaves on.
     """
-    lines = []
+    lines: list[str] = []
     for entry in found[:MAX_LISTED]:
-        names = [s.get("name", "") for s in (entry.get("symbols") or [])][:6]
+        symbols: list[dict[str, object]] = list(entry.get("symbols") or [])
+        names = [str(s.get("name", "")) for s in symbols][:6]
         suffix = f"  ({', '.join(n for n in names if n)})" if names else ""
         lines.append(f"- {entry['file']}{suffix}")
     return "\n".join(lines) or "- (nothing)"

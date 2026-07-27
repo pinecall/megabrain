@@ -63,7 +63,7 @@ def discover(root: Path, extensions: Sequence[str], *,
     # is excluded because it is vendored, not because git happens to ignore it.
     ignored = (git_ignored(root, [relpath for _, relpath in candidates
                                   if not excluder.excludes(relpath)])
-               if uses_gitignore(root) else frozenset())
+               if uses_gitignore(root) else frozenset[str]())
     files: list[Found] = []
     skipped: list[Skipped] = []
     for path, relpath in candidates:

@@ -9,6 +9,7 @@ threw it away.
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from ..._provider_errors import ProviderError
 
@@ -36,7 +37,11 @@ def _upstream_message(payload: bytes) -> str | None:
         body = json.loads(payload)
     except ValueError:
         return None
-    error = body.get("error") if isinstance(body, dict) else None
+    if not isinstance(body, dict):
+        return None
+    fields = cast("dict[str, object]", body)
+    error = fields.get("error")
     if isinstance(error, dict):
-        return str(error.get("message") or error)
+        detail = cast("dict[str, object]", error)
+        return str(detail.get("message") or detail)
     return str(error) if error else None

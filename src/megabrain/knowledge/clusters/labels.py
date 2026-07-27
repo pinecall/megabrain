@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from typing import cast
 
 from ...storage import Store
 from ..build import RepoGraph
@@ -30,8 +31,10 @@ def label_communities(root: str, graph: RepoGraph,
     fingerprint = _fingerprint(graph)
     with Store(root) as store:  # type: ignore[arg-type]
         cached = store.graph.get_meta("graph_labels")
-        if isinstance(cached, dict) and cached.get("fp") == fingerprint:
-            return {int(k): str(v) for k, v in dict(cached["labels"]).items()}
+        meta = cast("dict[str, object]", cached) if isinstance(cached, dict) else {}
+        if meta.get("fp") == fingerprint:
+            stored = cast("dict[object, object]", meta.get("labels") or {})
+            return {int(str(k)): str(v) for k, v in stored.items()}
         named = _ask(root, store, graph, communities, ids)
         if not named:
             return fallback              # nothing usable: never cache a miss

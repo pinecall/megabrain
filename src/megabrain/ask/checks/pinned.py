@@ -68,7 +68,7 @@ def _symbols_in(store: Store, path: str, lo: int, hi: int) -> set[str]:
     """
     return {str(s["name"]).rsplit(".", 1)[-1]
             for s in store.symbols.read_for(path)
-            if isinstance(s.get("line"), int) and lo <= int(s["line"]) <= hi}
+            if lo <= s["line"] <= hi}
 
 
 def _chunks_naming(store: Store, names: set[str], pinning: set[str],
@@ -86,7 +86,7 @@ def _chunks_naming(store: Store, names: set[str], pinning: set[str],
     a chunk mentions.
     """
     wanted = re.compile(r"\b(" + "|".join(re.escape(n) for n in sorted(names)) + r")\b")
-    hits = []
+    hits: list[tuple[int, str, int, int]] = []
     for meta in store.chunks.read_metas():
         if meta.file not in pinning or not is_test(meta.file):
             continue

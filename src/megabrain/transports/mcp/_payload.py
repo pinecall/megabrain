@@ -9,7 +9,7 @@ observed in the field, not a defensive reflex.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from ._missing import Missing
 
@@ -50,12 +50,13 @@ def operations(arguments: dict[str, Any]) -> list[dict[str, Any]]:
         found = arguments.get(name)
         if isinstance(found, str) and found.strip():
             try:
-                found = json.loads(found)
+                found = json.loads(found)                       # Any, narrowed below
             except ValueError as bad:
                 raise Missing(f"`{name}` is a string that is not JSON: {bad}") from bad
         if isinstance(found, dict):
-            found = [found]                  # a single op, unwrapped
+            found = [cast("object", found)]  # a single op, unwrapped
         if isinstance(found, list) and found:
-            return [op for op in found if isinstance(op, dict)]
+            ops = cast("list[object]", found)
+            return [cast("dict[str, object]", op) for op in ops if isinstance(op, dict)]
     raise Missing("`operations` is required — a non-empty list of "
                   "{file, find, replace, count?}")

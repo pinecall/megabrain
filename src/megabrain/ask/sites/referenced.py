@@ -70,9 +70,7 @@ def _body(store: Store, path: str, low: int, high: int) -> str:
 def _resolved(store: Store, name: str) -> tuple[str, str, int, int] | None:
     """Where `name` is declared, when that is exactly one jumpable place."""
     found = [entry for entry in store.symbols.find(name)
-             if isinstance(entry.get("line"), int)
-             and isinstance(entry.get("end_line"), int)
-             and int(entry["end_line"]) - int(entry["line"]) < MAX_REF_SPAN
+             if entry["end_line"] - entry["line"] < MAX_REF_SPAN
              and not _HEADING.match(str(entry.get("kind") or ""))]
     if len({(entry["file"], entry["line"]) for entry in found}) != 1:
         return None

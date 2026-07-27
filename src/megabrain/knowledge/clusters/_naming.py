@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import cast
 
 from ...storage import Store
 from ..build import RepoGraph
@@ -65,8 +66,9 @@ def _strict(reply: str, valid: set[int]) -> dict[int, str]:
         return {}
     if not isinstance(payload, dict):
         return {}
-    return {int(key): str(value)[:60] for key, value in payload.items()  # pyright: ignore[reportUnknownVariableType]
-            if str(key).lstrip("-").isdigit() and int(key) in valid}
+    named = cast("dict[object, object]", payload)
+    return {int(str(key)): str(value)[:60] for key, value in named.items()
+            if str(key).lstrip("-").isdigit() and int(str(key)) in valid}
 
 
 def _unescape(label: str) -> str:

@@ -10,6 +10,8 @@ graph a person can read; every pair above the floor is a hairball.
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 
 from ..._arrays import Matrix
@@ -47,9 +49,14 @@ def semantic_lane(
 
 def _cosines(vectors: Matrix, rows: dict[str, int], order: list[str]) -> Matrix:
     kept = vectors[[rows[path] for path in order]]
-    norms = np.linalg.norm(kept, axis=1, keepdims=True)  # pyright: ignore[reportUnknownMemberType]
-    unit = kept / np.where(norms == 0, 1, norms)
-    sims = (unit @ unit.T).astype(np.float32)
+    norms: Matrix = np.linalg.norm(kept, axis=1, keepdims=True)  # pyright: ignore[reportUnknownMemberType]
+    safe: Matrix = np.where(norms == 0, 1, norms)  # pyright: ignore[reportUnknownMemberType]
+    unit: Matrix = kept / safe
+    # `unit.T` resolves to Unknown against numpy's shipped stubs, and the
+    # matmul inherits it. `cast` states what the operation produces — the shape
+    # is (n, n) by construction, and every reader of `sims` below indexes it as
+    # exactly that.
+    sims = cast("Matrix", (unit @ unit.T).astype(np.float32))  # pyright: ignore[reportUnknownMemberType]
     # A file is its own nearest neighbour at 1.0, which would fill every top-k
     # slot with self-edges and leave the lane empty.
     np.fill_diagonal(sims, -1.0)

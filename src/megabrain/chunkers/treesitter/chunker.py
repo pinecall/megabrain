@@ -34,7 +34,10 @@ def parser_for(spec: LangSpec, ext: str) -> Any:
     if key not in _PARSERS:
         from tree_sitter import Language, Parser
 
-        _PARSERS[key] = Parser(Language(spec.grammar(ext)))
+        # `Language(...)` is typed against a deprecated int overload in the
+        # shipped stubs; the capsule form is the current API. The ignore is on
+        # the DEPRECATION only — the call itself is what tree-sitter documents.
+        _PARSERS[key] = Parser(Language(spec.grammar(ext)))  # pyright: ignore[reportDeprecated]
     return _PARSERS[key]
 
 

@@ -41,7 +41,7 @@ def shortest_path(graph: RepoGraph, source: str, target: str) -> list[Hop]:
     if source not in graph.near or target not in graph.near:
         return []
     if source == target:
-        return [{"file": source, "via": ""}]
+        return [Hop(file=source, via="")]
     toll = tolls_of(graph, exempt=(source, target))
     came_from = _dijkstra(graph, source, target, toll)
     if target not in came_from:
@@ -92,7 +92,7 @@ def _walk_back(came_from: dict[str, tuple[str, str]], source: str,
     current = target
     while current != source:
         previous, via = came_from[current]
-        hops.append({"file": current, "via": via})
+        hops.append(Hop(file=current, via=via))
         current = previous
-    hops.append({"file": source, "via": ""})
+    hops.append(Hop(file=source, via=""))
     return hops[::-1]

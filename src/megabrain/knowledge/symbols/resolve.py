@@ -10,9 +10,11 @@ match is the worst kind of clever.
 from __future__ import annotations
 
 from pathlib import PurePosixPath
+from typing import cast
 
 import numpy as np
 
+from ..._arrays import Vector
 from ...retrieval.params import RetrievalParams
 from ...retrieval.paths import is_test
 from ...storage import Store
@@ -51,21 +53,23 @@ def _closest(store: Store, files: list[str], term: str,
     query = _embed(term, embedder)
     if query is None or query.shape[0] != matrix.shape[1]:
         return usable[0]               # no comparable vector: the first, stably
-    norms = np.linalg.norm(matrix, axis=1)  # pyright: ignore[reportUnknownMemberType]
-    sims = (matrix @ query) / np.where(norms == 0, 1, norms)
-    penalty = np.array([RetrievalParams().test_penalty if is_test(path) else 1.0
-                        for path in usable], dtype=np.float32)
-    return usable[int(np.argmax(sims * penalty))]
+    norms: Vector = np.linalg.norm(matrix, axis=1)  # pyright: ignore[reportUnknownMemberType]
+    safe: Vector = np.where(norms == 0, 1, norms)  # pyright: ignore[reportUnknownMemberType]
+    sims: Vector = (matrix @ query) / safe
+    penalty: Vector = np.array([RetrievalParams().test_penalty if is_test(path) else 1.0
+                                for path in usable], dtype=np.float32)
+    best: int = int(np.argmax(sims * penalty))  # pyright: ignore[reportUnknownMemberType]
+    return usable[best]
 
 
-def _embed(term: str, embedder: object) -> np.ndarray | None:
+def _embed(term: str, embedder: object) -> Vector | None:
     """The configured embedder unless one was injected. A provider that is down
     is not an error here — the ladder simply stops one rung short."""
     if embedder is None:
         from ...providers.embeddings import Embedder
         embedder = Embedder()
     try:
-        vectors = embedder.embed([term])       # type: ignore[attr-defined]
+        vectors = cast("list[Vector]", embedder.embed([term]))  # type: ignore[attr-defined]
     except Exception:                          # noqa: BLE001 — resolution is best-effort
         return None
     return np.asarray(vectors[0], dtype=np.float32) if len(vectors) else None

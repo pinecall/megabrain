@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from ....contracts import GraphMap, GraphPath, Neighbourhood
+from ....contracts import GraphMap, Neighbourhood
 from ....knowledge import graph_map, graph_path, neighbourhood
 from ._route import render_route
 
@@ -82,6 +82,3 @@ def _render_node(view: Neighbourhood) -> str:
         *(f"  ← {relpath}" for relpath in view["imported_by"]),
     ])
 
-
-def _render_path(view: GraphPath) -> str:
-    return render_route(view, code=False)
