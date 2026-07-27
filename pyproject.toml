@@ -97,6 +97,13 @@ ignore = [
   "ARG002",
 ]
 
+[tool.ruff.lint.isort]
+# Declared, because otherwise the classification DEPENDS ON THE INSTALL: from a
+# checkout `megabrain` resolves as first-party, from CI's `pip install -e .` it
+# looked third-party, and the same file was sorted two different ways — green
+# here, `I001` on the runner.
+known-first-party = ["megabrain"]
+
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "functools.lru_cache".msg = "Use megabrain._utils.cache — the stdlib one drops type information"
 
