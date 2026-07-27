@@ -14,6 +14,14 @@ import pytest
 
 from megabrain._home import HOME_VAR
 
+CREDENTIALS = ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY")
+"""Provider keys the engine reads under a name of its own.
+
+Not `MEGABRAIN_*`, so the loop above never saw them — which is precisely why
+they were the ones that leaked. Kept as a list rather than a prefix match
+because a blanket "delete anything ending in _API_KEY" would reach into
+whatever else the developer's shell is holding for other work."""
+
 
 @pytest.fixture(autouse=True)
 def hermetic_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -27,10 +35,22 @@ def hermetic_env(monkeypatch: pytest.MonkeyPatch) -> None:
     The golden corpus variables are kept: they point the retrieval gate at a
     real index, and stripping them would silently turn a measurement into a
     skip.
+
+    CREDENTIALS go too, and that half was missing. Stripping `MEGABRAIN_*` left
+    `OPENROUTER_API_KEY` in place, so a test that reached for a real endpoint
+    passed on the machine that had a key and failed on every CI runner —
+    exactly the "whose shell ran it" failure this fixture exists to prevent,
+    one variable to the left. It hid for weeks because the CI was already red
+    for unrelated reasons, and a permanently red CI is one nobody reads.
+
+    A test that needs a provider now fails HERE, while it is being written,
+    with the same error the runner would give.
     """
     for name in list(os.environ):
         if name.startswith("MEGABRAIN_") and not name.startswith("MEGABRAIN_GOLDEN"):
             monkeypatch.delenv(name, raising=False)
+    for name in CREDENTIALS:
+        monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture(autouse=True)

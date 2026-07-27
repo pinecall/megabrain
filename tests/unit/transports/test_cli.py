@@ -20,12 +20,19 @@ from tests.unit.indexing.fake import CountingEmbedder, write
 def offline(monkeypatch: pytest.MonkeyPatch) -> None:
     """No network in a CLI test.
 
-    Patched where `load_state` LOOKS the class up, which is the seam the CLI
+    Patched where each caller LOOKS the class up, which is the seam the CLI
     actually goes through — the commands take no embedder argument on purpose,
     since a production surface that lets its caller inject one has an
     injection point nobody wants.
+
+    TWO seams, because there are two: `load_state` for the query side, and
+    `indexer._default_embedder` for `index`. Only the first was patched, so
+    `test_index_reports_what_it_did` reached for a real credential and passed
+    only on a machine that had one — green here, red on every CI runner, for as
+    long as the CI was red for other reasons and nobody read it.
     """
     monkeypatch.setattr("megabrain.retrieval.state.Embedder", CountingEmbedder)
+    monkeypatch.setattr("megabrain.providers.embeddings.Embedder", CountingEmbedder)
 
 
 @pytest.fixture

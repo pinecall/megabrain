@@ -55,7 +55,15 @@ def _check_value(value: object, hint: Any, path: str) -> list[str]:
         return [] if ok else [f"{path}: {value!r} not in {opts}"]
     if isinstance(hint, type) and hasattr(hint, "__required_keys__"):
         return check(value, hint, path)
-    if isinstance(hint, type):
+    # `origin is None` is what makes this a real class rather than a subscripted
+    # one, and it has to be asked BEFORE `isinstance(hint, type)` because that
+    # question changes answer across the versions this package supports:
+    # `isinstance(tuple[int, int], type)` is True on 3.10 and False from 3.11.
+    # On 3.10 the generic reached `_check_scalar`, whose `isinstance(value,
+    # hint)` raises "argument 2 cannot be a parameterized generic" — so the one
+    # test asserting that unknown forms FAIL CLOSED died with a TypeError on the
+    # oldest runtime in the matrix, and only there.
+    if origin is None and isinstance(hint, type):
         return _check_scalar(value, hint, path)
     # FAIL CLOSED. The old fallback returned [] — a validator that passes what
     # it cannot read is vacuous for exactly the fields most likely to be new
