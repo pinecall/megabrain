@@ -40,9 +40,13 @@ A one-word name is admitted because the repo declares it, and that admission
 cannot tell a target from its container. The site count can: MEASURED, `Option`
 resolves to 10 implementation sites in click and contributed 10 rows of noise
 beside `show_envvar`'s 3, while the one-word names that WERE the target resolve
-to one or two (`attachment` 1, `inline` 1, express's `render` 5). Six splits
-those cleanly — and it is tuned on three repositories, so it is a threshold,
-not a law."""
+to one or two (`attachment` 1, `inline` 1, express's `render` 5).
+
+SURVEYED after the fact over 15 indexed repositories in 5 languages, ~1 900
+one-word names: median 0, p90 **3**, p99 **22**, max 108. The distribution is the
+shape the rule assumes — nearly all resolve to a handful, a long tail runs to a
+hundred — and six sits between p90 and p99, keeping 95% and cutting the tail.
+Still a threshold, no longer three data points."""
 
 MAX_TESTS = 4
 """Test cases kept per identifier.
