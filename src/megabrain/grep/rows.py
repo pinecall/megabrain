@@ -13,8 +13,8 @@ it had to undo when the answer turned out to be no.
 
 from __future__ import annotations
 
-from ..ask.checks.surface import import_surface
 from ..storage import Store
+from .surface import import_surface
 
 __all__ = ["rendered"]
 

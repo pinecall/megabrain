@@ -26,15 +26,15 @@ import time
 from pathlib import Path
 
 from ..contracts import Bundle
+from ..converse.candidates import candidates_of
+from ..converse.loop import answered
+from ..events import Emit, emit_nothing
 from ..providers.chat import ChatProvider
 from ..storage import Store
+from ._flowctx import flow_context
 from .checks.grounded import unlinked_hops
 from .citing._quote import quote_citations
 from .citing._rescue import rescue
-from .converse._flowctx import flow_context
-from .converse.loop import answered
-from .events import Emit, emit_nothing
-from .prompt._candidates import candidates_of
 from .prompt._widen import widen
 from .prompt.prompt import build_prompt
 from .stream import Splicer

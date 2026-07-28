@@ -215,8 +215,8 @@ code shown is verbatim, a summary doesn't.
 ## 3. The studio
 
 ```bash
-megabrain studio                    # every repo you've indexed → http://127.0.0.1:2137
-megabrain studio --port 8080        # …anywhere else
+megabrain ui                    # every repo you've indexed → http://127.0.0.1:2137
+megabrain ui --port 8080        # …anywhere else
 ```
 
 *(Screenshot on the [README](../README.md) — this section is the tour behind it.)*

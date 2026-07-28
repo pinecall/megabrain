@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ..._provider_errors import ProviderError
+from .._provider_errors import ProviderError
 
 __all__ = ["RequestBody", "rejects_tools", "without_tools"]
 

@@ -58,8 +58,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _serve(self, method: str, *, body: bool = True) -> None:
         path, query = split_target(self.path)
+        caller = self.guard.caller_of(self.client_address[0],
+                                      self.headers.get("X-Forwarded-For", ""))
         refusal = self.guard.refuse(path, authorization=self.headers.get("Authorization", ""),
-                                    caller=self.client_address[0])
+                                    caller=caller)
         if refusal:
             return self._write(error_reply(refusal[0], refusal[1]), body=body)
         try:

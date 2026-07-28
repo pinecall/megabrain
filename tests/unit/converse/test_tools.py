@@ -13,8 +13,8 @@ proving here, because the whole feature rests on it.
 
 from __future__ import annotations
 
-from megabrain.ask.converse.tools import MAX_LINES, OPEN_FILE, open_file
 from megabrain.chunkers.model import Chunk
+from megabrain.converse.tools import MAX_LINES, OPEN_FILE, open_file
 from megabrain.storage import Store
 
 SOURCE = "\n".join(f"line {n}" for n in range(1, 31))

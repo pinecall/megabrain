@@ -1,216 +1,198 @@
 # REFACTOR — the gap between "works" and 10/10
 
-Findings from a full read of `src/megabrain/` + `studio/src/` (335 files, 21,383
-lines, 2026-07-28). Everything below passes the gates today; that is exactly why
-it is written down — a green suite does not argue with a design error. Ordered by
-severity. Each item names the files and the fix; none changes public behaviour,
-so every one lands with the golden gate byte-identical.
+Findings from a full read of the source tree (`src/megabrain/`, `studio/src/`,
+`tests/`, 2026-07-28). Everything below **passes the gates today** — that is
+exactly why it is written down: a green suite does not argue with a design
+error. Ordered by severity; each item names the files, the failure it enables,
+and the fix. Unless marked, a fix lands with the golden gate byte-identical.
 
-Rules referenced: **[R4]** no duplicated logic / reuse before rewriting ·
-**[OCP]** extend, don't modify · **[LAY]** dependency arrows point down only.
+Rules referenced: **[LAY]** dependency arrows point down only · **[OCP]**
+extend, don't modify · **[R4]** reuse before rewriting · **[SEC]** security /
+abuse surface · **[SCALE]** breaks at repository or deployment scale.
 
 ---
 
 ## P0 — design errors (wrong even though they work)
 
-### 1. `grep/` reaches into `ask/`'s privates — a layering inversion [LAY]
+### 1. `grep/` imports `ask/`'s privates — a layering inversion [LAY]
 
-`grep` is the package whose whole identity is "no model, its own deliverable" —
-it earned its own folder precisely to escape `ask/`. Yet its verb still imports
-**four private internals of the package it escaped**:
-
-```
-grep/grep.py:36   from ..ask.converse.loop import answered
-grep/grep.py:38   from ..ask.prompt._candidates import candidates_of
-grep/grep.py:39   from ..ask.prompt._chunkblocks import chunk_blocks
-grep/grep.py:89   from ..ask.ask import _narrator          ← a PRIVATE function
-grep/rows.py:18   from ..ask.checks.surface import import_surface
-```
-
-Two siblings at L4 with an arrow between them, three of the five targets
-underscore-private. `ask` cannot rename `_narrator` or reshape its prompt
-internals without silently breaking `grep` — the exact drift the package split
-was bought to prevent. The architecture test only fences `grep/`'s **lanes**
-(`grep.grep` is exempt by name), so this cannot even be caught.
-
-**Fix:** promote the three shared pieces to a neutral home they both sit above:
-
-- `_narrator(root)` → `providers/chat/for_repo.py::narrator_for(root)` — it is
-  provider resolution, not narration; `graph/clusters/labels.py` re-implements
-  the same 4 lines a third time (see P1-4).
-- `candidates_of` + `chunk_blocks` (+ `answered`) → they are "turn a Bundle into
-  a prompt over candidates", used by two features. Either `search/render/` grows
-  a `prompt.py`, or a small `promptkit/` at L4 that both import. The measured
-  balance (`MAX_BODIES = 8`) is the shared asset; today it is shared by reaching
-  into a sibling's underscore modules.
-- `import_surface` → it reads the Store and produces metadata; it belongs beside
-  the symbol table (`storage/` helper or `grep/` itself — `ask` only uses it via
-  `checks/`, which can import from the new home).
-
-Then extend `test_grep_never_imports_a_model` to assert `grep/` (verb included)
-imports nothing from `megabrain.ask` at all.
-
-### 2. One computation, three implementations: "sha256 of a file on disk" [R4]
+`grep/` earned its own top-level package precisely so "no model in the lanes"
+is an importable fact. Its verb still reaches into **the package it escaped**,
+three of the targets private by name:
 
 ```
-flows/freshness.py:sha_of          read_text(errors="replace") → sha256, "" on OSError
-usecases/freshness.py:_sha         identical, re-written
-usecases/get.py:_changed_on_disk   identical, inlined a third time
+grep/grep.py:31        from ..ask.converse.loop import answered
+grep/grep.py:33        from ..ask.prompt._candidates import candidates_of
+grep/grep.py:34        from ..ask.prompt._chunkblocks import chunk_blocks
+grep/grep.py:84        from ..ask.ask import _narrator          ← a PRIVATE function
+grep/referenced.py:22  from ..ask.citing._quote import lines_of
+grep/rows.py:16        from ..ask.checks.surface import import_surface
 ```
 
-`flows/freshness.py`'s docstring says "the same content hash indexing uses, so
-the two agree by construction" — and then two more copies exist that agree only
-by coincidence. `indexing/passes/plan.py:1135` hashes the same way a fourth time
-(justifiable: it hashes an already-read string), but the three *file* hashers
-are one function. **Fix:** `sha_of(path)` lives once (it already has the best
-home and docstring in `flows/freshness.py`; move it to `storage/` or `_utils`
-so `usecases/` doesn't import a feature package) and the other two call it. A
-future change to the read policy (`errors=`, encoding) currently has three
-places to miss.
+Two L4 siblings with an arrow between them means a change to `ask/`'s
+internals can break `grep` with no test naming the coupling — and `_narrator`
+imported across a package boundary is a privacy the underscore no longer
+means anything by. **Fix:** promote the five shared pieces to a neutral home
+(`lines_of` belongs beside `storage` readers; `import_surface`,
+`candidates_of`, `chunk_blocks`, the narrator resolution into a shared
+`ask`-independent module — or an L4 `_shared/`), then add the missing
+architecture test: `grep/` may import `providers.chat` only in its `--why`
+verb module, and `ask/` not at all.
 
-### 3. "Resolve a bare name to its unique definition" exists three times [R4]
+### 2. The rate limiter cannot see through a reverse proxy [SEC]
 
-```
-ask/checks/callees.py:_definition_of    find(name), filter kinds, unique-or-None
-ask/converse/_missing.py:_definition    find(name), unique-or-None
-grep/referenced.py:_resolved            find(name), span filter, unique-or-None
-```
+`transports/http/_handler.py:62` keys the rate limit on
+`self.client_address[0]`, and the `ui` command exposes no `--trust-proxy`
+(`transports/cli/commands/ui.py` — v2 had the flag; the public demo's runbook
+uses it). Behind nginx **every caller is the proxy's IP**: one abusive client
+exhausts the sliding window for everyone, and the operator cannot tell abuse
+from popularity. **Fix:** a `Policy.trust_proxy` flag; when set, `Guard`
+reads the first `X-Forwarded-For` hop. Off by default — trusting the header
+on a directly-exposed box lets any caller mint identities, which is the
+opposite bug.
 
-All three implement the same safety rule ("a jump that could land anywhere is
-worse than no jump") with slightly different filters — `callees` excludes
-containers and headings, `_missing` excludes nothing, `referenced` excludes
-headings and wide spans. The differences are undocumented, so nobody can say
-whether `_missing` serving a `class` body (which `callees` would refuse) is a
-decision or an accident. **Fix:** one
-`storage/_symbols.py::unique_definition(name, *, exclude_kinds, max_span, prefer_files)`
-with the three call sites passing their policy explicitly. The policy deltas
-become visible parameters instead of three drifting copies.
+### 3. `Guard._hits` grows forever [SEC] [SCALE]
 
-### 4. `grep` fabricates a Bundle and suppresses the type error
-
-```python
-# grep/grep.py:95
-blocks = chunk_blocks(candidates_of({**bundle, "flows": []}))  # type: ignore[typeddict-item]
-```
-
-A `type: ignore` on a TypedDict construction is the contract saying "this shape
-is wrong" and being overruled. The real problem: `candidates_of` demands the
-narrator's flow-carrying Bundle while `search()` returns one without `flows`
-populated the way `ask` attaches them. **Fix:** `candidates_of` should accept
-the search Bundle (read `bundle.get("flows", [])`) — one `.get` deletes the
-fake construction and the suppression. This falls out of P0-1's promotion.
+`transports/http/security.py`: the per-caller deques are pruned by time, but
+**the dict keys never are**. A public box accumulates one entry per distinct
+caller IP for the life of the process — an unbounded map an attacker can grow
+deliberately with spoofed forwarded addresses once #2 lands. **Fix:** drop a
+caller's entry when its deque empties during pruning (two lines, same lock).
 
 ---
 
-## P1 — duplication and dead weight
+## P1 — logic and scale risks
 
-### 5. Dead code inventory (verified: zero callers)
+### 4. The judge's timeout is per-batch, not per-lane [R4]
 
-| what | where | why it's dead |
-|---|---|---|
-| `operations()` + `_OPERATIONS` | `transports/mcp/_payload.py:40-63` | served `megabrain_replace`, removed with it. Its `Missing` message still tells agents to send edit batches no tool accepts |
-| `limit()` + `BRIEF_LIMIT/BRIEF_MAX` | `transports/mcp/arguments.py:56-60` | no surviving tool takes `limit`; also duplicated as `_BRIEF_LIMIT/_BRIEF_MAX` in `transports/http/routes/query.py:23-24` (equally unused) |
-| `contracts/prune.py` — `PruneResult`, `NoiseSpan`, `RelatedDoc`, `RelatedTest` | whole module | no producer in v3 (`--prune` was not ported). Exported from `contracts/__init__` as if live |
-| `MAX_CANDIDATES = 40` | `ask/narrator.py:44` | shadow of the real one in `prompt/_candidates.py`; never read in `narrator.py` |
-| `Running = "dict[Future[str], Task]"` | `ask/agents/_pool.py:26` | a string constant pretending to be a type alias; never used |
-| `_PROSE_REF`, `_ANY_BRACKETED` | `ask/citing/repair.py:43-46` | exact copies of `_broken.py`'s; `repair` calls `broken_references` and never touches its own copies |
-| `EventType` Literal | `ask/events.py` | defined, unexported, unused; `EVENT_TYPES` duplicates the list by hand. Keep one and derive the other (`get_args`) |
-| `studio/src/search.ts`, `studio/src/files.ts` | whole modules | superseded by `views/search.ts` / `views/files.ts`; `main.ts` imports only the `views/` pair. Dead source esbuild still ships |
+`enrich/_batches.py` claims *"ONE hung batch bounds the whole lane"*, but
+`future.result(timeout=wall)` is evaluated **sequentially per future** — the
+wall restarts for each one, so k staggered slow batches bound the lane at
+~k×wall, not wall. Also `ThreadPoolExecutor(max_workers=len(batches))` is
+unbounded in the number of batches. Both are small today (tier-2 is ~20
+entries → 3 batches) and wrong by construction. **Fix:** one deadline
+(`monotonic() + wall`), each `result(timeout=deadline - now)`; cap workers.
 
-Delete all of it. Dead code with a docstring reads as live; every future reader
-pays the read.
+### 5. `~/.megabrain/registry.json` writes race [SCALE]
 
-### 6. The judge-provider resolution is pasted twice in `search.py` [R4]
+`usecases/repos.py` `remember()` is read-modify-write with **no lock** on a
+file explicitly co-owned with the v2 engine. Two concurrent `index` runs (or
+v2 and v3 at once — the exact scenario the module documents) can interleave
+and silently drop an entry; the suite tests merge semantics, not concurrency.
+**Fix:** the same atomic pattern the embed cache already uses — write to a
+temp file and `replace()` — plus a retry-on-change loop or an `fcntl`/msvcrt
+lock. Losing a registry entry is data no re-index brings back for the *other*
+engine's user.
 
-`search/search.py:_expanded` (L268-269) and `_judged` (L292-293) both do
-`proj = load_project(root); judge_provider(proj.rerank_model, provider=proj.chat_provider)`.
-Two sites already drifted once (the `provider=` param was added to both by
-hand). **Fix:** one `_judge_of(root)` helper — or fold into P0-1's
-`providers/chat/for_repo.py` (`judge_for(root)` beside `narrator_for(root)`),
-which also absorbs the third copy in `graph/clusters/labels.py:_ask`.
+### 6. The graph keeps an O(n²) matrix and rebuilds per request [SCALE]
 
-### 7. `Store` takes `Path`, callers pass `str`, ignores paper over it
+`graph/semantic.py` returns the **full cosine matrix** (kept for surprises):
+10 000 files with skeletons is 100 M float32 = **400 MB**, transient per
+`graph_map` call — and `transports/http/routes/graph.py` rebuilds the whole
+graph on every request (only the *labels* are cached, under the graph
+fingerprint). The studio's Graph tab makes this a click-frequency cost.
+**Fix:** (a) compute surprises inside `semantic_lane` and discard the matrix
+(top-k already exists; surprises need one extra masked argpartition, not the
+matrix); (b) cache the built `RepoGraph` in the server process keyed by the
+same fingerprint the labels already use.
 
-`storage/store.py:37` declares `repo_root: Path`; `graph/build.py:73` and
-`graph/clusters/labels.py:32` call `Store(root)` with `str` under
-`# type: ignore[arg-type]`, because the whole `graph/` package threads
-`root: str` (from `load_graph(str(root))` upward). One package speaking `str`
-in a codebase that is `Path` everywhere else is the incoherence; the ignores
-are the symptom. **Fix:** `Store.__init__(repo_root: Path | str)` (one-line
-`Path(repo_root)` it already does) **and** migrate `graph/`'s signatures to
-`Path` so the `str(root)` casts at every `graph_map`/`graph_node` call site
-disappear too.
+### 7. The embedding cache never shrinks [SCALE]
 
----
+`providers/embeddings/cache.py` is content-addressed and correct, and has
+**no eviction**: every model ever pointed at (`~/.megabrain/embeddings`)
+keeps its full corpus of vectors forever. Switching models twice on a large
+repo triples the footprint silently. **Fix:** an `mtime`-based sweep behind
+`megabrain cache prune` (never automatic — deleting cache during an index is
+how you pay twice), and a size line in `megabrain scan`/`ui` so the growth is
+at least visible.
 
-## P2 — naming, cohesion, small smells
+### 8. The intent and coverage lanes are English-only [SCALE]
 
-### 8. `_toolless.py` owns the always-used request builder
+Three deterministic classifiers are keyword regexes over English:
+`search/intent.py` (`wants_tests`, `is_task`), `flows/covers.py` (the STOP
+list). For a Spanish or Chinese query every one of them silently returns the
+conservative default — the test penalty never stands down, tasks are answered
+as questions, the flow cache never serves verbatim. The *failure direction*
+is safe (features turn off, nothing lies), but for a tool whose own author
+queries it in Spanish, three lanes being dead is a product gap nobody is
+told about. **Fix:** at minimum, document it in `docs/REFERENCE.md`; better,
+add the top-5 languages' keyword sets to the same tables — they are data,
+not code, which is the shape these modules already chose.
 
-`ask/converse/_toolless.py` is named for the exceptional case but exports
-`RequestBody` — the class **every** conversation routes through
-(`loop.py:body = RequestBody(_body)`). A reader looking for "who builds the
-request" will not open a file called "toolless". **Fix:** `RequestBody` →
-`_body.py` (or into `loop.py`, it's 25 lines); `_toolless.py` keeps the
-detection (`rejects_tools`, `without_tools`) it is named for.
+### 9. `enrich` echoes its own naming split [R4]
 
-### 9. `ClaudeProvider._chosen` (method) vs `chosen` (ctor param) — same word, two meanings
-
-`providers/chat/claude.py`: the constructor's `chosen: bool | None` is "the
-opt-in, already resolved"; the private method `_chosen(requested)` is "pick the
-model name". Adjacent lines, unrelated concepts, one word. Rename the method
-`_model_for(requested)`.
-
-### 10. Two `_missing.py`, opposite meanings
-
-`ask/converse/_missing.py` (the bodies an answer lacked) and
-`transports/mcp/_missing.py` (a required-argument exception). Different
-packages, so imports are unambiguous — but a grep for `_missing` returns both
-and the names teach nothing. The MCP one is one exception class; fold it into
-`arguments.py` (its only real consumer surface) and delete the module.
-
-### 11. `enrich/rerank.py` cosmetics
-
-Line 26-29: `MAX_TOKENS = 300` followed by two stray blank lines (the scar of
-the old `judge_provider` body). `ruff format` would catch it if formatting ran
-in the gate; it doesn't — `scripts/format` exists but `scripts/lint` never
-checks formatting. Consider `ruff format --check` in the lint gate so scars
-like this can't accumulate.
-
-### 12. `graph/routes/carriers.py` — the `((two, one), (one, two))` dance, twice
-
-`hop_symbols` and `_pair` both iterate the direction pairs with the same
-inverted-tuple idiom and no shared name for it. Minor, but a
-`_directions(one, two)` helper (or a comment naming the pattern once) would
-stop the next reader from re-deriving why the tuples are backwards.
-
-### 13. Studio: `judge.ts` and `scope.ts` at root, their consumers under `views/`
-
-After deleting the dead root `search.ts`/`files.ts` (P1-5), the remaining root
-modules split into "framework" (`dom`, `api`, `contracts`, `icons`, `theme`,
-`markdown`) and "widgets used by views" (`judge`, `scope`, `suggestions`). The
-second group belongs in `views/` or a `widgets/` folder — directory coherence,
-same argument `docs/STRUCTURE.md` §1 makes for the Python tree.
+`enrich/_terms.py` builds the expander prompt, `enrich/_prompt.py` the
+judge's, `grep/words.py` the grep one — three "the wording IS the behaviour"
+modules with three different naming conventions (`_terms`, `_prompt`,
+`words`). Cosmetic until someone greps for "the prompt" and finds one of
+three. **Fix:** one convention (`_prompt.py` per package) in the next touch
+of each file; not worth its own commit.
 
 ---
 
-## Explicitly NOT proposed
+## P2 — product debt (the road already named)
 
-- **Merging small files.** The 100-line budget is the architecture, not a smell.
-- **A `core/`+`features/` re-layout.** `docs/DOMAINS.md` §5's objection stands.
-- **Touching any tuned constant or prompt.** Phase 17 territory, pre-registered
-  hypotheses only.
-- **De-duplicating the studio's `contracts.ts` mirror.** Hand-mirrored is the
-  documented decision; a generator is a second build step to keep alive.
+### 10. `grep` → `map` [naming]
 
-## Suggested order
+The deliverable is a **map of the task's edit surface**; the verb name
+collides with the tool it replaces and undersells the difference (the README
+now says so). **Fix when taken:** rename the MCP tool to `megabrain_map`
+keeping `megabrain_grep` registered as a deprecated alias for two minors;
+CLI `map` with `grep` as an argparse alias (the `ui`/`studio` pattern,
+`transports/cli/commands/ui.py`, is the template); `GrepParams` →
+`MapParams` with a re-export.
 
-1. P1-5 dead-code sweep (pure deletion, instant win, shrinks every later diff)
-2. P0-1 + P1-6 together (the `providers/chat/for_repo.py` home solves both, and
-   P0-4 falls out) — then tighten the grep architecture test
-3. P0-2, P0-3 (the two R4 consolidations, one PR each, tests first)
-4. P1-7 (`Path | str` + `graph/` migration)
-5. P2 batch
+### 11. Issue mode — the last behavioural-parity gap
 
-Every step: test first, RED, gates green, golden numbers in the commit message
-where retrieval-adjacent (P0-1 touches prompt assembly for `ask`/`grep` — run it).
+v2's long-query lane (BM25 over entity-IDs + traceback/identifier grounding
+pins for bug-report-shaped queries) is not ported. It reweights, so it needs
+no new shape: one more `Lane` beside `TestPenalty` in
+`search/scoring/lanes.py`, self-gated on query length. It does not fire on
+the golden set — port it **with its own golden cases**, or it will regress
+invisibly forever.
+
+### 12. `forge/` — phase 16
+
+The self-authored chunkers (LLM writes a `ChunkStrategy`, accepted only if
+`validate_partition` passes on every matching file, sha-trust-gated). The
+oracle and the trust store already exist; the port is the last phase before
+algorithm work is allowed.
+
+### 13. Version truth
+
+`_version.py` currently overstates what PyPI serves (published latest:
+0.18.6). Reconcile to `0.19.0` before tagging — the guard job in
+`release.yml` will otherwise refuse the tag, which is the guard working.
+
+---
+
+## The road to 10/10 as an open-source project
+
+What the engine already has is rarer than what it lacks: enforced invariants,
+measured defaults, an offline suite, typed contracts, Trusted-Publishing
+releases. The remaining distance is **external legibility** — a stranger being
+able to verify the claims without trusting the author:
+
+- [ ] **A public benchmark.** The golden corpus is private; `evals/harness/`
+      is committed but unrunnable by outsiders. Publish a small public corpus
+      (5–8 permissively-licensed repos + queries, the `benchmarks/` pin
+      pattern already does this for the grep A/B) and wire `bundle_full` into
+      CI on it. Then run one recognised external set (SWE-bench-retrieval or
+      CodeSearchNet) once and publish the numbers, including the losses.
+- [ ] **Fix P0 1–3** — the layering inversion and the two public-box holes
+      are the difference between "audited" and "audited except".
+- [ ] **Issue mode + forge** (11, 12): close the v2 parity list so
+      "rewrite complete" is simply true.
+- [ ] **Scale honesty** (6, 7): a `LIMITS.md` section stating the measured
+      envelope — chunks per repo before p50 moves, files before the graph
+      matrix hurts, cache growth per model — with the numbers, the same way
+      every other constant in this codebase is documented.
+- [ ] **The rename** (10) plus a versioned MCP-tool deprecation policy, so
+      agent integrations can trust the surface across minors.
+- [ ] **Community surface:** CONTRIBUTING already points at "add a language"
+      — make it real with a cookiecutter test (`tests/unit/chunkers/
+      test_languages.py` is already parametrised; a new language is a
+      `LangSpec` + one `Case`). Add issue templates that ask for the census
+      (`megabrain scan`) output — the diagnosis is usually in it.
+
+**10/10 does not exist. This list is the argument for 9.5.**

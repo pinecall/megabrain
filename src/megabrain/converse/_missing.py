@@ -13,10 +13,10 @@ names most of the repository.
 
 from __future__ import annotations
 
-from ...storage import Store
-from ..checks.callees import NAMED
-from ..citing._quote import lines_of
+from ..storage import Store
+from ..storage.lines import lines_of
 from ._admits import admitted_gap
+from .names import NAMED
 
 __all__ = ["missing_bodies", "FILL", "MAX_FILL_LINES"]
 

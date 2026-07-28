@@ -138,7 +138,7 @@ cites and re-checks them byte-for-byte before serving.
 Serve the real studio publicly without letting visitors index anything or burn your budget.
 
 ```bash
-megabrain studio --readonly --rate-limit 30 --port 2137
+megabrain ui --readonly --rate-limit 30 --port 2137
 ```
 
 - `--readonly` — 403s every mutating route (index, scan). Enforced **server-side**; the UI

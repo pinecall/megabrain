@@ -52,8 +52,36 @@ def test_grep_never_imports_a_model() -> None:
             assert "providers.chat" not in imported, f"{module}: grep calls no model"
             assert not imported.startswith("megabrain.enrich"), \
                 f"{module}: grep calls no model"
-            assert not imported.startswith("megabrain.ask.converse"), \
+            assert not imported.startswith("megabrain.converse"), \
                 f"{module}: that is the narrator's model loop"
+
+
+def test_grep_never_imports_ask() -> None:
+    """`grep/` earned its own top-level package so "no model in the lanes" is an
+    importable fact — reaching back into the package it escaped (worse, into
+    `_`-private names there) rebuilt the coupling the move existed to cut. The
+    pieces both verbs share live in `converse/` and `storage/`, which is where
+    grep gets them from."""
+    modules = modules_under("grep")
+    assert modules, "grep/ is gone — this test would pass by checking nothing"
+    for module in modules:
+        for imported in imports_of(module):
+            assert not imported.startswith("megabrain.ask"), \
+                f"{module} imports {imported}: grep may not reach into ask/"
+
+
+def test_converse_is_neutral_ground() -> None:
+    """`converse/` exists so BOTH verbs can share the model loop without an
+    arrow between them. An import of either verb from here recreates the cycle."""
+    modules = modules_under("converse")
+    assert modules, "converse/ is gone — this test would pass by checking nothing"
+    for module in modules:
+        for imported in imports_of(module):
+            for verb in ("megabrain.ask", "megabrain.grep", "megabrain.flows",
+                         "megabrain.enrich"):
+                assert not imported.startswith(verb), \
+                    f"{module} imports {imported}: converse serves the verbs, " \
+                    "never the other way"
 
 
 def test_search_never_imports_an_llm() -> None:

@@ -18,8 +18,8 @@ from typing import Any
 import pytest
 
 from megabrain._provider_errors import ProviderError
-from megabrain.ask.converse.loop import converse
 from megabrain.chunkers.model import Chunk
+from megabrain.converse.loop import converse
 from megabrain.providers.chat import Answer
 from megabrain.storage import Store
 

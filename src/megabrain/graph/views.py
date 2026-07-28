@@ -12,11 +12,12 @@ from pathlib import Path
 
 from ..contracts import Community, GraphLink, GraphMap, GraphNode
 from ..storage.locate import resolve_root
-from .build import RepoGraph, load_graph
+from .build import RepoGraph
 from .clusters.communities import communities_of
 from .clusters.gods import god_nodes
 from .clusters.labels import label_communities
 from .clusters.surprises import surprises_of
+from .warm import warm_graph
 
 __all__ = ["graph_map", "HUBS"]
 
@@ -32,7 +33,7 @@ def graph_map(start: Path | str, *, label: bool = True) -> GraphMap:
     """
     started = time.perf_counter()
     root = resolve_root(start)
-    graph = load_graph(str(root))
+    graph = warm_graph(str(root))
     labels = communities_of(graph)
     names = (label_communities(str(root), graph, labels) if label
              else {cid: f"Community {cid}" for cid in set(labels.values())})

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 
-from ...storage.model import ChunkMeta
+from ..storage.model import ChunkMeta
 
 __all__ = ["chunk_blocks", "MAX_BODIES", "MAX_CTX_CHARS"]
 

@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import re
 
-from ...storage import Store
-from ..citing._quote import lines_of
+from ..storage import Store
+from ..storage.lines import lines_of
 
 __all__ = ["import_surface", "MAX_NAMES"]
 

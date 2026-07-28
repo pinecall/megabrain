@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 
+from ...converse.names import NAMED
 from ...storage import Store
 from ..citing._quote import CITATION
 
@@ -29,18 +30,6 @@ spec named five helpers and the cap dropped `body` — the single helper whose
 subtlety (its setter deletes content-length) caused the original second
 question. The definitions are short; the cap only guards against a
 name-dropping answer pasting half the codebase."""
-
-NAMED = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*[!?]?)[^`\n]*`")
-"""The leading identifier of a backticked span — `body`, `body(value)`,
-`content_type(:json)` all name `content_type`'s kind of thing.
-
-The trailing `[!?]` is Ruby, and its absence was MEASURED. Asked when sinatra's
-before filters run, the answer said `dispatch!` was "not shown in the provided
-chunks, though its behavior is implied" — and this pass could not rescue it,
-because the name was cut at the bang and `dispatch` matches nothing. The index
-had `dispatch!` at base.rb:1195 all along. Sinatra's whole request lifecycle is
-bang methods (`dispatch!`, `route!`, `filter!`, `invoke`), so on that repository
-the omission hit exactly the symbols a walkthrough needs most."""
 
 _CONTAINERS = {"class", "module"}
 """A class's definition is the whole file. Citing it answers nothing."""

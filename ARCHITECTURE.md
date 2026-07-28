@@ -1,709 +1,553 @@
 # megabrain — Architecture
 
-> Code-intelligence engine. One call returns all the code related to a question,
-> explained like a senior engineer with the real code spliced in. Built to replace
-> minutes of agent file-crawling with one grounded answer.
+This document is written **from the source**, not from intent: every claim below
+names the module that implements it, and the invariants are the ones the test
+suite actually enforces (`tests/architecture/` fails the build when one breaks).
 
-> **Verified against `src/megabrain/` on 2026-07-27.** The sections that described
-> packages this branch does not have — `forge/`, `atlas/`, `brief`/`study`, issue
-> mode, ask's multi-agent v2 — were removed rather than annotated: a document that
-> warns you which of its own paragraphs are lies is a document nobody can use.
-> Anything below names a module that exists.
-
-Every load-bearing choice below is locked by experimental data (golden-set gates,
-model bakeoffs — see §8). The five hard rules:
-
-1. **No LLM in the retrieval path** — LLM pruning was tested four ways and every
-   variant cost completeness or added 1–2 s for no recall gain. Query-time LLM calls
-   live *above* retrieval and all fail open: `ask` (the post-retrieval narrator) and
-   the optional `enrich/` lanes (`rerank.py` for order, `expand.py` for recall).
-   Exactly one model call happens outside a query — `graph/clusters/labels.py` names
-   the graph's communities, cached by a fingerprint of the graph — and it cannot reach
-   retrieval either. The rule is **enforced by a test that walks imports**: nothing
-   under `search/` or `grep/` may import `providers.chat` or `enrich/`. The two verb
-   modules (`search/search.py`, `grep/grep.py`) are exempt by name, because composing
-   an opt-in lane the caller asked for is their job — the LANES underneath, which are
-   where the milliseconds live and what answers when nobody opts in, are fenced.
-2. **Completeness beats ordering** — the bundle is tuned so golden `bundle_full`
-   recall is **1.00**. A change that lowers it is not merged. Noise is handled by
-   *render structure* (§3.3), never by dropping files.
-3. **The graph never ranks** — import/call edges supply candidates and map
-   annotations only. PageRank-as-ranking was rejected (Acc@1 0.91 → 0.73).
-4. **Chunks are a line partition** — every file's chunks cover every line exactly
-   once, no gaps, no overlaps (`validate_partition` must stay clean).
-5. **`ask` shows real code only** — the LLM cites spans; the engine splices verbatim
-   code from disk. The model can never emit (hallucinate) code.
+```
+question ──► embed (1 call, cached) ──► score (numpy, no LLM) ──► Bundle
+                                                                    │
+                       ┌────────────────────────────────────────────┤
+                       ▼                    ▼                       ▼
+                     grep                  ask                   search
+              (edit surface, no LLM)  (narrated, spliced)   (the map / docs)
+```
 
 ---
 
-## 1. The pipeline at a glance
+## 1. The five hard rules
 
-```
-                 INDEX TIME (once per repo, incremental after)
-  repo files ──► chunkers (cAST) ──► embed (OpenRouter/local) ──► SQLite (.megabrain/db.sqlite)
-                     │                                        chunks · vectors · symbols
-                     ├─ symbols (defs/classes/consts)         file skeletons · edges
-                     ├─ file skeleton (signatures)            edges · pins
-                     └─ import/call graph edges (py · ts/js)
+Each one is executable, not aspirational:
 
-                 QUERY TIME (per question — retrieval itself never calls a model)
-  question ──► retrieve (no LLM, ~10–200 ms) ──┬─► [search] the bundle, as a map
-               dense + file-fusion + graph     ├─► [grep]   WHERE TO EDIT, no model
-                                               └─► [ask]    narrate (1 chat call),
-                                                            splicing verbatim code
-```
+| # | rule | enforced by |
+|---|---|---|
+| 1 | **No LLM in the retrieval path.** Nothing under `search/` or `grep/`'s lanes may import `providers.chat` or `enrich/` | an import-walking test |
+| 2 | **Completeness beats ordering.** Recall floors only ever *append*; a change lowering `bundle_full` is not merged | the golden gate (`evals/harness/gate.py`) |
+| 3 | **The graph never ranks.** Edges supply candidates and evidence only (PageRank-as-ranking: Acc@1 0.91 → 0.73, rejected) | the assembly-only split in `graph/views.py` |
+| 4 | **Chunks are an exact line partition.** No gaps, no overlaps, full coverage | `validate_partition` — the same oracle that gates generated chunkers |
+| 5 | **The model never emits code.** It cites `[[k:lo-hi]]`; the engine splices verbatim bytes from the index | `ask/citing/splice.py` — fenced blocks in a model reply are *deleted* |
 
-Entry points share one retrieval core: CLI (`megabrain …`), MCP stdio
-(`megabrain_ask` · `megabrain_grep` · `megabrain_search` · `megabrain_index` — §5.1), HTTP
-(`megabrain studio`, which also serves the studio UI), and the Python API
-(`megabrain.search/…`, lazy imports, `py.typed`).
-
-| command | LLM? | latency | use |
-|---------|------|---------|-----|
-| `search` | no | ~10–200 ms | complete bundle: CORE full code + RELATED map (`--full` for RELATED bodies) |
-| `ask`   | 1 chat call | ~6–25 s | narrated walkthrough, verbatim code spliced at each citation |
-| `get` | no | <10 ms | one file or symbol |
+Plus the structural ones: SQL only inside `storage/`, no `asyncio.run()` inside
+the engine, no `assert` in shipped code, L0 imports nothing, every file ≤100
+lines and every function ≤30 — all parametrised tests.
 
 ---
 
-## 2. Index time
+## 2. Layering
 
-### 2.1 Chunkers (`megabrain/chunkers/`)
-
-All chunking sits behind one contract (`chunkers/units.py`): `chunk_file(relpath,
-source) -> FileResult` — chunks + symbols + skeleton, **partition-guaranteed**.
-
-Split-then-merge over the AST (the cAST recipe, arXiv 2506.15655): walk top-level
-nodes (comment/blank gaps attach to the following unit), **merge** small units up to
-a budget of **4000 non-whitespace chars**, **split** oversized ones (big class →
-class-header + per-method chunks; big function → `part k/n` blocks; unsplittable
-giants → line windows). Every chunk carries a **breadcrumb**
-(`repo > path > class Sig > def method(sig)`) that is prepended to the embedded text
-(contextual retrieval).
-
-- `python.py` — stdlib `ast`.
-- `treesitter/` — the same algorithm parameterized by a **`LangSpec`** (grammar,
-  def node types, name/body fields, export unwrap): TS/TSX/JS/JSX, Ruby, Go, Rust,
-  PHP, C, C++, Java, C#. Adding a language = one spec entry in
-  `treesitter/specs/` + a module in `chunkers/languages/` (13–18 lines) +
-  `pip install tree_sitter_<lang>` — it auto-activates when the grammar imports, so a
-  missing wheel costs that language and nothing else.
-- PHP rides the same tree-sitter walk (`specs/optional.py::PHP_SPEC`, mixed-HTML
-  handled by the grammar). v2's shape-routed legacy-PHP section chunker was NOT
-  ported — deliberate, tracked, and re-addable as one more spec if a real legacy
-  corpus asks for it.
-- `markdown.py` — no-LLM doc chunker: score candidate cut lines (H1=100…H6=50,
-  code-fence boundary=80, paragraph=20) and cut at the best score near the budget,
-  so chunks are heading-aligned and never split mid-section. Headings become
-  symbols; the outline is the skeleton.
-
-**Custom strategies (public extension point):** the registry contract is the
-`Strategy` **Protocol** — an object of the right shape, no import and no inheritance;
-`index_repo(root, strategies=[MyStrategy()])` injects caller strategies ahead of the
-built-ins — claim a new content type (`.sql`,
-`.proto`, `.ipynb`…) or override an existing one without forking. Partition is the
-only hard requirement. Runnable demo: the megabrain-examples repo.
-
-### 2.2 Two embedded granularities
-
-Embeddings go through any OpenAI-compatible `/embeddings` endpoint — OpenRouter by
-default (model `perplexity/pplx-embed-v1-0.6b`, 1024-d), or a local server
-(Ollama/LM Studio/vLLM) via `MEGABRAIN_EMBED_BASE_URL` (keyless on localhost).
-Wire detail: int8-base64 **unnormalized** vectors are decoded and L2-normalized
-(float arrays handled too). A content-addressed disk cache (atomic writes) makes
-re-indexing near-identical checkouts almost free; changing the embed model
-auto-triggers a full re-embed on the next `index` so vectors never silently mismatch.
-
-- **Chunk vectors** — breadcrumb + code of each chunk.
-- **File skeletons** — per file, signatures + docstrings + module constants embedded
-  as one vector: the file-level relevance signal for the fusion in §3.1.
-
-### 2.3 Symbols & graph
-
-- **Symbol table** — every def/class/method/const with qualified name, kind, line
-  range, signature, doc first-line. Powers outlines, the entity-ID lexical lane and
-  `get --symbol`. Two node shapes are declarations only because a real repository
-  said so: a CommonJS `res.send = function () {}` (`LangSpec.assign_defs` — half of
-  npm's API) and a mocha/jest `it('…', fn)` (`group_calls`/`case_calls`), which is
-  what took express from 3.9 to 12.3 symbols per file. A `describe` is recursed into
-  and never recorded: it spans the file, and the lanes keep the symbol no other
-  symbol contains, so recording it would swallow every case inside it.
-- **`SYMBOL_SCHEMA`** (`indexing/passes/resymbol.py`) — a chunker that learns to see a new
-  declaration changes nothing for an already-indexed repo, since the indexer revisits
-  a file only when its bytes change. Bumping the marker re-extracts the symbols of
-  unchanged files on the next plain `index`, with no embedding calls (measured: seven
-  repos, +2 000 symbols, `changed=0`). Symbols only — a change to where a file may be
-  CUT still needs `--force`, because those rows carry vectors.
-- **Import/call graph** (`indexing/edges/`) — Python: imports (relative levels,
-  re-exports through a package `__init__`, repo-wide `self.x = ImportedClass()`
-  attribute bindings) + calls through resolved aliases. TS/JS: relative imports
-  incl. the ESM `.js → .ts` rewrite, `export * from`, dynamic `import()`. Plus the
-  language-agnostic **pin lane** (`edges/pins.py`): which test file exercises which
-  implementation file, computed from unambiguous shared symbols — the lane that
-  gives Ruby/Go/Rust repos a graph at all. Other languages chunk and search without
-  extractors. Edges feed **candidates and annotations only** (rule 3).
-
-### 2.4 Storage, incrementality, freshness (`storage/store.py`, `indexing/indexer.py`)
-
-One SQLite file per repo at `<repo>/.megabrain/db.sqlite` (`chunks`, `files`,
-`symbols`, `edges`, `meta`). Indexing is incremental by SHA-256; orphans are pruned
-(incoming edges drop only then — re-index preserves them). Relpaths are **POSIX on
-every platform** (`as_posix()`; Windows backslash keys corrupted the index once —
-CI's Windows matrix is the regression guard). No daemon, no watcher, and — unlike v2 — **no auto-refresh at query time** (§5.1's
-last bullet said so all along while this paragraph claimed the opposite; the code
-has no refresh on the `search`/`ask`/`grep` path at all). The consequence is worth
-knowing because it is invisible: the line numbers a query returns are the INDEX's,
-so your own first edit makes them drift. Measured while an agent worked — the index
-held 3 792 lines of a file the disk had grown to 3 820, and citations checked
-against the edited file looked misattributed when the splice was in fact exact.
-Re-run `megabrain index` after editing, or read the ranges before you change
-anything. Vectors
-load into one NumPy matrix; brute-force cosine is <2 ms up to ~50 K chunks, so ANN
-indexing is deliberately deferred.
-
-## 3. Query time — retrieval (no LLM)
-
-`search/` — scoring in `scoring/`, assembly in `bundle/`, and `search.py` as the verb
-that composes them and owns the content policy. `load_state()` (in `state.py`) loads matrices once (servers keep it warm and reload on
-db-mtime change); `search_with_state()` runs per query, all vectorized.
-
-### 3.1 Scoring
+Lower layers never import higher ones; the architecture suite walks the imports.
 
 ```
-dense_i  = cosine(query, chunk_i)                      # chunk relevance
-file_i   = cosine(query, skeleton(file of chunk_i))    # file relevance
-fused_i  = dense_i + 0.5 · file_i                      # dual granularity (validated)
-fused_i *= 0.85   if chunk_i is in a test file         # soft test down-weight
+L0  vocabulary      _types  _arrays  _errors  _provider_errors  _version
+                    _home  _models  _config_file  project.py
+L1  contracts/      every cross-boundary payload — TypedDict only
+L2  storage/        the ONLY package that writes SQL
+    providers/      http/ · embeddings/          (chat/ is L4 — see §7)
+L3  chunkers/       content → chunks (partition-guaranteed)
+    indexing/       walk → chunk → embed → store
+    search/         scoring · bundle · render — deterministic
+    graph/          build · clusters · routes · symbols
+L4  enrich/         opt-in model lanes, contract: Bundle → Bundle, fail-open
+    ask/            the narrated walkthrough
+    grep/           the edit surface — no model in the lanes
+    flows/          the cached-walkthrough lane
+L5  usecases/       the verbs no feature owns + re-exports
+    transports/     cli/ · mcp/ · http/ (+ built studio) · install/
 ```
 
-The `+ 0.5 · file` term is the validated core hypothesis: a strong chunk in a weak
-file shouldn't outrank a decent chunk in the clearly-relevant file. For short
-developer queries (≤25 identifier tokens), small grid-tuned boosts reward exact
-filename/symbol token matches.
+Two deliberate placements worth naming:
 
-### 3.2 Bundle assembly + the RELATED render policy
+- **`providers/chat/` is L4** even though it lives under `providers/`: it is
+  fenced from retrieval by the rule-1 test. `providers/embeddings/` is L2
+  because retrieval depends on it — an embedding is a pure function of its
+  text, which is what makes it deterministic and cacheable.
+- **`grep/` is a top-level package**, not a submodule of `ask/`, so "grep's
+  lanes call no model" is an *importable* fact a test can check — `ask/`
+  imports a chat provider by design, so nothing inside it can be fenced.
+  (Its verb still borrows `ask/` internals for the `--why` lane — a known
+  layering debt, see [REFACTOR.md](REFACTOR.md) §P0.)
 
-Rank files by best chunk; take top candidates; pull **graph neighbors** of the top
-files as extras. **CORE** = files within 3% of the top score → matching chunks in
-full + a symbol index of the rest. **RELATED** = every other candidate.
+Packaging is **by domain, not by layer** (`docs/DOMAINS.md`): each verb lives
+beside its own logic (`search/search.py`, `grep/grep.py`), and `usecases/`
+keeps only what no feature owns (`resolve_root`, `repos`, `scan`, `get`).
 
-Measured on the golden set (22 queries, 40 verified gold files):
+---
 
-| | bundle_full |
+## 3. L0 — the vocabulary
+
+| module | what it is |
 |---|---|
-| CORE only | 0.36 |
-| CORE + RELATED | **1.00** |
+| `_types` | the three-state sentinels (`NotGiven`/`not_given`, `Omit`/`omit`, `is_given`) and `Content = Literal["code","docs"]`. Only an *omitted* credential reads the environment; an explicit `None` means "no key" and fails loudly |
+| `_arrays` | named numpy aliases — `Vector`, `Matrix`, `IndexArray`, `BoolMask`. float32 end to end; naming the dtype stops a float64 promotion from silently doubling the hottest matrix |
+| `_errors` | the engine taxonomy: `MegabrainError` root, each subclass carrying a stable machine `code` + `http_status`, **dual-inherited** from the builtin a pre-typed caller would have caught (`IndexNotFound(MegabrainError, ValueError)`) |
+| `_provider_errors` | the environment half (`ProviderError` with optional upstream `status`, `MissingCredential`) — split out because L0 may import nothing and these sit one layer up |
+| `_home` | `megabrain_home()`: `$MEGABRAIN_HOME` or `~/.megabrain` — one answer for machine-global state, injectable so tests never touch the real home |
+| `_models` | the default model per **job** (`NARRATOR_MODEL`, `RERANK_MODEL`, `CLAUDE_NARRATOR_MODEL`) — one constant per lane, because sharing one model between jobs is what made the judge take 16 s |
+| `_config_file` | lenient JSON reading for files a human edits: take what's valid, ignore what isn't, never let one wrong field take the file down |
+| `project.py` | `megabrain.json` — the repo's committed config: `ignore`, `queries`, `gitignore`, `models.{narrator,rerank,provider}`. A committed file travels with the clone; an env var doesn't |
 
-**45% of gold files live in RELATED — it can never be dropped** (and LLM pruning
-stays rejected: every variant lost gold files). But by *volume*, RELATED is
-~17 files/query at ~5% verified gold, and its inline code bodies were ~16K of a
-~22K-token render. So the fix is structural, in the **render only**: the default
-answer is a MAP — every file with its **best-match span pointer and symbols**, no
-bodies (measured on a real bundle: 2 660 tokens against 8 135 for CORE-with-bodies).
-`search --full` (MCP `bodies: true`) restores inline code. The bundle **data** always
-carries the best chunk either way, so `ask`, the HTTP API and the studio consume one
-shape. Expansion is multi-turn and explicit: `megabrain get <file> [--symbol N]`.
-
-**Content policy — code OR docs, one place (`search/search.py`).** `content="code"`
-drops markdown before scoring, `content="docs"` flips the whole bundle to markdown,
-and `None` lets them compete — which is the honest default for a question whose shape
-nobody has inspected. The retrieval primitives stay neutral; the verb is the only
-thing that decides, so CLI, MCP, HTTP and the studio cannot drift apart. `ask`
-defaults to code instead, because a walkthrough diluted with prose explains the
-documentation rather than the mechanism. Blending is not neutral: once a repo indexes both, a large
-README wins prose-shaped questions and buries the code (measured on sinatra —
-`README.md` displaced `lib/sinatra/base.rb` from CORE for "how are routes defined
-and dispatched?"). There is no blend mode anywhere: `ask --with-docs` claimed to
-be one and wasn't — it left both filters off, so the same crowding applied and
-the prose simply won (CORE = `[README.md]`, no code). Removed in 0.17.1.
-
-**The judge lane (`enrich/rerank.py`, opt-in, `Bundle → Bundle`).**
-Retrieval is recall-safe by design — every candidate file contributes its
-best chunk — so files that merely *share vocabulary* with the query (tests, eval
-scripts, A/B gates) survive and bloat the output; cosine can't tell
-"implements scoring" from "tests scoring". This optional lane fixes exactly that: one
-buffered call sees a COMPACT view of the RELATED tier (ids + spans + names + a one-line
-hint, no bodies, ~2K tokens) and returns the relevant ids, ordered. The engine then
-**reorders its own verbatim chunks** — the model *selects*, it never writes code (the
-same anti-hallucination stance as ask's splice).
-
-**It never drops a file.** Unpicked entries move behind the picked ones and stay in the
-bundle: the recall floors exist so a bundle can only gain files, a judge that deleted
-one would undo that from above, and the reader would never learn what was taken. What
-does travel is the verdict — `judge: {kept, of}` — because returning the bundle
-byte-identical made "judged and rejected everything" look exactly like "the lane never
-ran", and that is the one signal the evidence band cannot compute for itself.
-
-Fail-open in every branch (no provider, timeout, malformed reply, unknown ids → the
-deterministic bundle untouched) and **opt-in on every surface**: `search --rerank`,
-`megabrain_search rerank: true`, `POST /search {"rerank": true}`, the studio's judge
-toggle. The model is `models.rerank` / `MEGABRAIN_RERANK_MODEL` — its own constant, never
-the narrator's: three batches through the narration model took 16 s for a JSON array of
-integers (§4.1). Its sibling `enrich/expand.py` buys the other axis, RECALL, and only
-ever adds.
-
-### 3.3 Flow cache — self-caching workflow retrieval (`flows/`, on by default)
-
-**ON by default, and there is nothing to turn on.** The only opt-out is per call —
-`ask(..., cache=False)`, which exists so a measurement can see what the engine does
-cold, since the second run would otherwise answer from the first. No CLI subcommand
-manages it and no environment variable disables it: a cache whose correctness is
-guaranteed by sha rechecks (below) has nothing for a flag to protect against.
-
-Every successful `ask` synthesizes a cross-file WORKFLOW ("VAD detects speech →
-`TurnController.on_vad_start` → cancel TTS") that used to be thrown away. It is
-now cached in the index and the next related question retrieves the whole flow
-at once — validated: a barge-in flow cached from one question was retrieved by a
-fully re-worded paraphrase. The hard rules stay intact by construction:
-
-- **Write path (ask time)** — the RENDERED walkthrough (prose + the real code
-  blocks) goes into the `flows` table with `{cited file: sha}`, and **two**
-  vectors are embedded in ONE call: question + prose (the ATTACH lane) and
-  question-only (the SERVE lane — so prose length can never dilute an identical
-  question). "Prose" means `strip_code`, which removes fenced code, `[[k]]`
-  citations **and the rendered citation headers** (`` **`src/x.py` L58-83** — sym ``).
-  That last one is not cosmetic: the stored answer is what a later narrator
-  reads as context, and a model shown a worked example of its own OUTPUT format
-  imitates it — emitting headers instead of `[[k]]`, so the splicer replaces
-  nothing and the answer names real files and line numbers with **no code
-  behind them** (observed live: eight such headers, zero code). Near-duplicate
-  *questions* (cos > 0.92) replace the old row. Fail-open: a cache error never
-  breaks ask.
-- **Read path (query time, rule 1 intact)** — pure cosine of the
-  ALREADY-computed query vector against the flow matrix, in two lanes:
-  - **SERVE** (`qscore` ≥ 0.88 on the question-only vector) → the cached answer
-    is returned **verbatim, no LLM, ~0 ms** — but only after two guards. The
-    shas of every cited file must still match DISK, *and* the cached question
-    must **cover** the query (`flows.covers`): nearly every content word of the
-    query has to already appear in it. That second guard exists because cosine
-    is **symmetric** while "may I reuse this answer?" is not — a compound
-    question that CONTAINS a cached one scores ~1.0 against it, so
-    *"How do before and after filters run around a handler, **and how is a route
-    defined?**"* was served the cached filters walkthrough alone, silently
-    dropping the routing half (reported live on sinatra, where both halves were
-    cached separately). New content words mean the caller asked for more than
-    the cache holds, so the flow falls through to ATTACH and the narrator
-    answers the whole question. Question scaffolding ("how does…", "where
-    is…") is stopworded out, so it never decides coverage; a re-ask, a light
-    rewording, and a query *narrower* than the cached one all still serve.
-  - **ATTACH** (0.62 ≤ score < serve, top 2) → the flow becomes a "KNOWN FLOW"
-    bundle section + non-citable context for the narrator, which narrates fresh
-    and re-caches. Flows never rank or displace files (rule-3 analog) — their
-    source files append to RELATED only when missing, pure additions, so
-    bundle_full can only rise.
-- **Invalidation (index time)** — `index_repo` prunes any flow whose cited
-  files changed sha, so a stale walkthrough cannot outlive the code it
-  describes. And `ask` splices real code from disk regardless: a stale flow
-  could only mis-prioritize, never fabricate (rule 5 untouched).
-
-**Warming it is just asking.** There is no planner command: the way a cache starts full
-is that somebody asks the repo's main workflows once. A repo declares those in
-`megabrain.json`'s `queries` (or the legacy `.megabrainqueries`), the studio renders them
-as one-click chips (`usecases/starters.py`, whose `source` travels with them: `file` when
-the repo declared them, `derived` when the index did, `none` when there is nothing),
-and clicking through them on day one leaves every answer cached for everyone. Related:
-Knowledge Compression via Question Generation (arxiv 2506.13778).
-
-**Staleness is measured against DISK** (`flows/freshness.py:files_current`, shared with
-the serve path), not against the index's stored shas — the index is only as current as the
-last `megabrain index`, and a flow whose sources are untouched must stay serveable
-regardless. `Store` keeps the index-side comparison too, which is the right question for
-the *pruning* path at index time and reported as `stale_flows` in the index summary.
+`__init__.py` is a lazy `__getattr__` over `_EXPORTS`: `import megabrain` loads
+no numpy and no tree_sitter (pinned by a test that inspects `sys.modules`).
 
 ---
 
-## 4. `ask` — narration with verbatim code (`ask/`)
+## 4. L1 — `contracts/`
 
-The LLM is a narrator that can only **point**, never paste:
+Every payload that crosses a boundary, declared once, as **TypedDict** — at
+runtime these *are* dicts, so the wire format is the same object serialised and
+the engine gains no dependency. Verified against **captured real payloads**
+(`tests/fixtures/parity/`), never against what the producing code looks like.
 
-1. Retrieve (§3); flatten CORE chunks + RELATED best-chunks into a numbered
-   candidate list. Two content modes: **code-only (default)** and `--docs`
-   (docs-only) — they partition the bundle, no overlap and no blend. The mode is applied at RETRIEVAL,
-   not just to the candidate list (the `content` filter in `scoring/pipeline.py`,
-   fail-open both ways): code-only keeps a doc titled like the query from crowding the code
-   out, and docs-only keeps the code from taking the slots — post-filtering a
-   mixed bundle capped a docs walkthrough at whatever markdown outranked the
-   code. Candidates are capped at 200K chars — one call always fits.
-2. **The `open_file` conversation** (`ask/converse/`): the prompt serves the 8 best
-   chunk bodies plus a MAP of the rest, forbids quoting code, and requires
-   double-bracket citations — `[[3]]` (chunk), `[[3:705-731]]` (range), or
-   `[[path:lo-hi]]` for a file the model opened. Up to `MAX_ROUNDS = 5` rounds of
-   opening; a backend that REJECTS the tools field (Ollama's HTTP 400) has the tool
-   retired for that conversation — once, announced by a `toolless` event — and
-   narrates from the retrieved material. An answer that ADMITS it lacked a body the
-   index holds gets exactly one extra round with that body served (`_filled`).
-3. **Splice**: every citation is replaced with the **verbatim block from the index**
-   (real file, real line numbers; a point citation widens to its window; repeats
-   dedupe to a back-reference; the streaming `Splicer` holds a half-arrived
-   citation until it is decidable). Then the deterministic widenings: the
-   definition of every helper the prose names (`checks/callees`), the tests that
-   PIN the behaviour (`checks/pinned`), and a graph check on every narrated hop
-   (`checks/grounded` — a step the import/call graph cannot support is flagged
-   UNVERIFIED rather than left looking authoritative).
-4. **Fail-open**: broken references go to one bounded repair call; a repair that
-   fails drops the fragment — a missing block is a smaller lie than a path with no
-   code under it. No credential at all raises a named `MissingCredential` AFTER
-   retrieval already ran, so the caller keeps the deterministic answer.
+| contract | notes |
+|---|---|
+| `Bundle` | `tier1: Tier1File[]` (CORE, full chunks), `tier2: Tier2File[]` (RELATED, a map), `flows`, `anchors`, `judge: {kept, of} \| None`, `evidence: strong\|weak\|none`, `top_cosine`, `expanded`, `ms`. Six consumers: render, ask, CLI, MCP, HTTP, studio |
+| `ChunkRef` vs `ChunkHit` | load-bearing: a tier-2 `best_chunk` carries **no score** — the *file* was ranked, not that span. Modelling that as one optional field lets a scoreless span reach code that sorts by score |
+| `PruneResult`, `FileView`, `ScanReport`, `RepoEntry`, `HostRow/HostResult` | the flat projection, `get` (with the `stale` flag — the indexed text is what the ranking saw), `scan` (every skip with its reason), the registry, `install` |
+| `GraphMap` / `NodeView` / `Neighbourhood` / `GraphPath` (`Hop`, `HopCode`, `CodeSnip`) | the graph as drawn vs as read; `GraphPath.chain/meet/meet_kind` is the honesty field — a shared callee is a meeting, not a flow |
+| `AskParams`, `GrepParams`, `SearchParams`, `IndexParams` (`contracts/tools.py`) | the MCP `inputSchema` is **generated** from these — one definition, and every `Annotated` description is agent-facing documentation distilled from measured sessions |
 
-### 4.1 Chat providers — one adapter, and one model constant per job
-
-`providers/chat/openai_compat.py` (urllib only) speaks any OpenAI-compatible
-`/chat/completions`: OpenRouter, a provider's native API, or a local runtime.
-`MEGABRAIN_CHAT_BASE_URL` points it anywhere, and a loopback URL needs no key —
-`_local.is_local_url` is why, after a version that refused to run against Ollama for want
-of a credential. `router.resolve()` probes a registry in order rather than branching at
-call sites, so adding a backend is an adapter plus an entry; the registry holds two.
-`_frames.read_stream` reassembles fragmented `delta.tool_calls` into `ToolCall`s on
-every turn; the function-calling loop that consumes them lives in `ask/converse/`.
-
-**Two model constants, not one** (`_models.py`), because the jobs are not the same:
-`NARRATOR_MODEL = google/gemini-3.1-flash-lite` reasons about a flow in prose,
-`RERANK_MODEL = google/gemini-3.5-flash-lite` emits a short id array. Measured over 20
-mined cases × 3 repetitions on identical candidate lists, 3.5-lite prunes one file tighter
-every repetition at equal recall and ordering; and bigger is *worse* — reasoning models
-return empty (thinking eats the 300-token cap) and plain `gemini-3.5-flash`, five times the
-price, failed open at 5.6 s. Sharing one model between the two jobs is what made the judge
-take 16 s. A repository overrides either in `megabrain.json`'s `models`, which beats
-`MEGABRAIN_ASK_MODEL` / `MEGABRAIN_RERANK_MODEL`, which beat the constants.
-
-**The Claude Agent SDK backend** (`providers/chat/claude.py`, extra `megabrain[claude]`)
-is the second entry. It drives the bundled Claude Code binary rather than an HTTP endpoint,
-so credentials are whatever that install resolves. **`ANTHROPIC_API_KEY` takes precedence
-over the local Claude Code login and wins silently** — a key for an account with no credit
-ends the call with "Credit balance is too low" while a working login sits unused, behind a
-CLI warning that is easy to read past. Unset it to narrate on the local login; export it to
-bill that API account deliberately.
-**Opt in per repo (`megabrain.json` `models.provider: "claude"`, which beats the env var —
-committed config travels) or per shell (`MEGABRAIN_CHAT_PROVIDER=claude`)**; unlike v2 it is never preferred
-automatically, because a backend that took over on the machine that happened to `pip
-install` the extra would move the measured numbers with nothing in the output to say which
-lane produced them. **The switch moves every model lane at once** — narrator, `grep --why`,
-the judge (`rerank`), `expand`, the map labels — because they all get their backend from
-`router.resolve(model=…, timeout=…)` and none constructs one by name. Each lane keeps its
-own model and tuning through those parameters; on the SDK backend a namespaced id falls to
-the CLI default, and a lane's HTTP-measured timeout reaches the endpoint only (a CLI spawn
-eats ~14 s before the first token, so walls that need the real number ask the provider —
-`enrich/_batches.wall_for`). Embeddings are untouched by all of this: Anthropic has no
-embeddings API, so retrieval always needs its own embed credential.
-
-Two consequences worth knowing before choosing it. **It narrates without opening files:**
-the SDK runs its own tool loop, so there is no pending call to hand back to `converse`, and
-this lane returns text on the first pass — the fail-open the narrator already documents.
-The walkthrough is written from what retrieval chose, not from files the model went and
-read. And **every call spawns a subprocess** (~18 s before a token arrives), bounded at 300 s.
-
-The async/sync seam is the part with teeth. The SDK is async end to end and this engine has
-no async twin, so `_claude_sdk.py` owns **one thread with one loop** for the process and
-submits work with `run_coroutine_threadsafe`. `asyncio.run` cannot do this job: it raises
-the moment a loop is already running in the calling thread, which is exactly what happens
-when the HTTP transport narrates from inside a route. A timeout cancels the future rather
-than abandoning it — a run left going holds its CLI subprocess open, and one narration per
-timeout would be one process per timeout.
-
-**Embeddings never use this switch** — they have their own config and their own key vars,
-because the two routinely point at different places (embeddings at a hosted model, chat at
-whatever is cheap or local this week) and one shared block cannot express that. A hybrid of
-local embeddings and a cloud narrator, or the reverse, is an ordinary configuration.
-
-## 5. Serving surfaces
-
-### 5.1 MCP — four tools, and the reason there are only four
-
-`transports/mcp/` (stdio, no deps): **`megabrain_ask`** (the whole flow, narrated),
-**`megabrain_grep`** (where to look for a change — files, symbols, real line ranges, and
-NO model by default), **`megabrain_search`** (the map, and the docs), **`megabrain_index`**.
-Nothing else — no `get`, and no edit tools.
-
-`grep` is the one addition that earned a slot rather than being a subtraction, and it
-earned it by replacing something the host already had: an agent about to edit an indexed
-repository was running a chain of literal greps, and the index can answer that in ~50 ms
-*including* the site whose text never contains the task's own words. It quotes no code on
-purpose — the editor opens the file anyway.
-
-It was briefly five. `megabrain_code` (an edit surface) and `megabrain_replace` (a
-transactional batch) were measured across five tasks in three languages against a
-grep-only agent, and the numbers were good — 19 tool calls by hand against 6 on a
-1 220-file repository. But what CARRIED that was the narrator opening files until it had
-the whole flow, and that is now `ask`'s own behaviour. The edit machinery around it kept
-being discarded by the readers it was built for: a prepared edit batch was wrong both
-times it was measured, four readers found the proposed anchor mode misplaced for a guard,
-and applying an edit is work the host's own editor already does.
-
-`ask` therefore runs in the régime that made opening happen: the best eight chunk
-bodies plus a MAP of the rest, an instruction to open at the TOP of the prompt, and the
-`open_file` loop in `_converse`. Served all thirty bodies instead, the same narrator
-opened nothing on four questions — including one that said "open this file". Two
-deterministic widenings then run with no model call: `_callees` (the definition of every
-helper the prose named — three of four measured readers had been paying a second retrieval
-call for exactly this) and `_pinned` (the tests that PIN what was described, found through
-the indexer's pin edges — the one that catches a test 1 600 lines from the code it
-constrains).
-
-Everything else is a deliberate subtraction. Every tool costs the calling agent context and
-a routing decision, and the host it runs in already has Read, Grep and an editor. So the
-surface carries only what megabrain alone can do; a tool that fetches one span invites the
-agent to re-verify what the render already showed.
-
-Two properties worth knowing:
-
-- **The `inputSchema` is GENERATED from `contracts/tools.py`**, not written beside the
-  dispatch. A parameter therefore cannot exist on the wire without existing in the
-  dispatch, or the reverse — which is how a tool ends up advertising a flag nobody
-  reads. The `Annotated[...]` descriptions are part of the contract: they are the only
-  thing a calling agent reads before choosing arguments.
-- **`dispatch.py` is a table of three-line handlers.** The behaviour lives in
-  `usecases/`, so this layer only maps a name to a use case and picks a renderer —
-  which is the whole reason the CLI, MCP and HTTP surfaces cannot drift apart.
-
-**MCP runs buffered**, deliberately: the protocol is request/response, so the consuming
-agent reads the final text only and streamed events would be written to nobody.
-`megabrain_search`'s `rerank` and `expand` default to **false** for the same reason they do
-on the CLI — the deterministic answer is complete on its own, and a caller that wants a
-model lane asks for it and accepts the call. Registered by `megabrain install`
-(`transports/install/`: a table of six assistants, one module per config format, only ever
-writing the `megabrain` key and pinning `sys.executable`) or by hand with
-`claude mcp add megabrain -- python3 -m megabrain.transports.mcp`.
-
-**A stale index is never auto-refreshed at query time**, unlike v2's 60 s TTL. `index` is
-the one verb that reads disk; everything else answers from the index and *says* when what it
-serves is behind disk (`get`'s stale marker, `GET /health?freshness=1`, the studio's banner).
-An answer that silently re-indexed was an answer whose latency and cost depended on when you
-last edited a file.
-
-### 5.2 HTTP (`transports/http/`)
-
-Stdlib `ThreadingHTTPServer`, no framework: a thread per request calls the sync
-use-cases directly — that is the whole concurrency story. The router is a **table** of
-`(method, path) → route`, so adding an endpoint is one entry and a path that exists under
-another method answers 405 rather than 404:
-
-```
-GET  /health (?freshness=1)  /config  /repos  /project  /scan  /get  /symbols  /graph
-POST /search   /ask/stream (SSE)   /index/stream (SSE)
-GET  /  and  /ui/*           the studio bundle, the only prefix route
-```
-
-Optional Bearer auth (`--token` / `MEGABRAIN_API_TOKEN`) on everything but `/health`,
-`/config` and the UI; `--readonly` 403s the mutating routes so a public box cannot be billed
-by a visitor; `--rate-limit N` caps requests per minute per caller. `get_code` enforces
-repo-root containment (path-traversal hardened). `/repos` reads the machine-global
-registry (`~/.megabrain/registry.json`) with live counts, so a repo indexed elsewhere
-shows up for the studio to load on click.
-
-**PATH-SCOPE everywhere**: pass a sub-path (`~/repo/src/auth`) or `scope_path`/`path_filter`
-and retrieval is confined to files under it; the repo root is auto-detected from
-`.megabrain` up the tree. Scoping EXCLUDES everything outside, so a package root is the
-right granularity — its `src/` subfolder cuts away the tests that specify it.
+Optionality is spelled with the **`total=False` split, never `NotRequired`**:
+under `from __future__ import annotations` TypedDict can't see the marker and
+`__optional_keys__` comes back empty (`tests/contracts/test_optionality.py`
+pins the trap). The shape checker itself has an adversarial suite —
+bool-is-not-int, dict value types checked, unknown annotation forms fail
+*closed*.
 
 ---
 
-## 6. Graph — the repo as a knowledge graph (`graph/`)
+## 5. L2 — storage and the deterministic providers
 
-Where a tool like graphify spins up LLM sub-agents to *extract* relationships, megabrain
-already owns them: the AST import/call edges (the `edges` table from §2.3) are the
-**structural lane**, and the per-file skeleton embeddings (§2.2) add a **semantic lane**
-(cosine — files that talk about the same thing without importing each other). No networkx,
-no new store: it reads what indexing already produced (`Store.all_edges()` +
-`Store.file_chunks()` were added for it) and runs pure numpy over it.
+### `storage/` — the only SQL in the codebase
 
-- **Semantic edges** — skeleton-vector cosine, top-3 twins per file above `SEM_EDGE_MIN
-  = 0.80`, capped to keep the graph sparse (`SEM_TOP_K = 3`).
-- **Communities** — deterministic weighted **label propagation** (numpy): structural edges
-  weight 1.0 per kind, semantic edges `SEM_WEIGHT = 0.5 · cosine`; fixed ascending visit
-  order + smallest-label tie-break → byte-stable across runs, renumbered by size. **No
-  PageRank:** PageRank-as-*ranking* was rejected by experiment (rule 3, Acc@1 0.91 → 0.73),
-  but that verdict is about ranking; communities are STRUCTURE, a different use, and label
-  prop is parameter-free.
-- **God nodes** — the highest structural-degree files, the repo's core abstractions.
-- **Surprises** — pairs with cosine ≥ `SURPRISE_MIN = 0.85`, **no** structural edge, in
-  **different** communities: the connection you didn't know was there, scored honestly.
-- **Paths** — BFS between two nodes over the combined graph, each hop labelled by what
-  carries it (an edge kind, or `semantic 0.87`). Endpoints resolve by **embedding**: a
-  concept ("the scoring pipeline") finds its file, not just an exact path match.
+One SQLite file per repo at `<repo>/.megabrain/db.sqlite`. `Store` owns the
+connection; each table is its own object:
 
-The **only** LLM touch is community *labeling* — one buffered call names each community
-in 2–4 words, cached in the store's `meta` table under a graph fingerprint (files + edge
-counts + thresholds), fail-open to "Community N" (and `--no-labels` / offline skips it
-entirely). Everything else is deterministic. `mode=node` splices the file's REAL chunks —
-the graph never paraphrases code (rule 5 holds here too).
+```
+Store
+ ├─ files    FileTable     path · sha256 · skeleton text · skeleton vector
+ ├─ chunks   ChunkTable    the partition + per-chunk vectors (float32 BLOBs)
+ ├─ symbols  SymbolTable   qualified names, kinds, line ranges, signatures, docs
+ ├─ graph    GraphTable    edges (src, dst, kind ∈ import|call|pins) + meta k/v
+ └─ flows    FlowTable     cached walkthroughs + two vectors each (attach/serve)
+```
 
-Surfaces: CLI `megabrain graph [path] [--node F] [--from A --to B] [--code] [--no-labels]
-[--json]`, HTTP `GET /graph?mode=map|node|path&node=&source=&target=&repo=`, and the
-studio's force-directed canvas (§5). **Not an MCP tool** — the map is a human's reading
-aid, and a fifth tool would cost every agent a routing decision for something `ask` and
-`grep` already answer in the shape an agent needs. Measured: this repo 122 files / 324
-links in ~8 ms; graphify 630 files in ~37 ms.
+- `schema.py` owns DDL + late-column migrations, applied idempotently on every
+  open; only "duplicate column" is tolerated — a locked database *raises*.
+- `Store.__exit__` **commits on clean exit, rolls back on exception**. The
+  audit found the original block closing without committing: a full index that
+  reported success and wrote nothing.
+- Vectors load into **one numpy matrix**; row *i* belongs to `metas[i]` — the
+  alignment is the whole contract. Brute-force cosine is <2 ms up to ~50 K
+  chunks, so ANN is deliberately deferred.
+- Relpaths are **POSIX everywhere**; a backslash key is index corruption that
+  only shows as everything silently failing to match. Windows is a first-class
+  CI target for exactly this class of bug.
+- `locate.resolve_root()` walks upward like git; the `.megabrain/db.sqlite`
+  path exists in exactly one line (`INDEX_FILE`).
+- `_locking.BUSY_TIMEOUT`: MCP is stdio, every editor session is its own
+  process, so multi-process access is structural — readers never wait, a
+  second writer queues instead of dying at Python's 5 s default. SQLite
+  restarts the busy handler per lock handoff, so the timeout bounds one
+  holder, never the queue.
+- `model.ChunkMeta` is a frozen slotted **dataclass**, not a TypedDict: it
+  never leaves the process, attribute access wins on the hot path, and the
+  vector is deliberately absent (it lives in the matrix).
+- `symbols.find()` escapes `_`/`%` before its LIKE arm — Python is made of
+  underscores, and unescaped, `get_meta` also matched `getXmeta`.
+
+### `providers/http/` — one retry policy for everything
+
+`Transport` is a Protocol (`send` + `open` for streaming). `RetryPolicy`
+honours `Retry-After` (ms variant preferred, absurd values ignored, honoured
+values **not** clamped by the backoff ceiling), jitters downward only, keeps
+the original `__cause__`, and **stops retrying once the caller has seen
+output** — a retried stream prints the answer twice.
+
+### `providers/embeddings/` — text → unit float32 vectors
+
+`Embedder` = codec + batching policy + cache, the split invisible from outside:
+
+- **Batching by size, not count** (`_batching`, `_budget`): `CHARS_PER_TOKEN =
+  2.0`, deliberately conservative (measured 2.54 on Python, 1.47 on dense
+  generated content). Being wrong downward costs one extra round trip; upward
+  it once failed a whole index.
+- **Oversize recovery** (`_send`, `_oversize`): a size refusal splits the
+  batch and retries (bounded, `MAX_SPLITS = 5`); a single oversize text is
+  clipped rather than failing the repository over one file.
+- **Wire decoding** (`_wire`, `_width`): the `index` SET is validated (not
+  just sorted — `[0,0,2]` sorts fine and misassigns), int8-vs-float32 width is
+  decided **per batch by consensus** (per-row detection misreads ~1/200 and a
+  cold index caches the garbage forever), dimensions must be uniform, and
+  normalisation skips zero vectors (a NaN poisons every score silently).
+- **Errors keep the endpoint's words** (`_replies`): gateways refuse with
+  HTTP 200 + `{"error": …}`; the body is quoted, because
+  `unexpected shape: 'data'` once cost an afternoon.
+- **Cache** (`cache.py`): content-addressed on sha256(model + text) under
+  `~/.megabrain/embeddings`, two-char sharded, atomic-rename writes; a
+  zero-byte file (post-power-loss) is a *miss* and is unlinked. The model is
+  part of the key — two models are two vector spaces.
 
 ---
 
-## 7. Layout
+## 6. L3 — chunkers, indexing, search, graph
 
-The tree mirrors the pipeline — content → index → retrieval → narration →
-surfaces — one subpackage per layer (src/ layout, PyPA standard). Loose files
-at the package root are only the cross-cutting spine:
+### `chunkers/` — content → a guaranteed partition
 
-Layers are numbered L0–L5 and the dependency arrow only ever points **down**. Two of
-them are enforced by executable tests rather than documented: `search/` may not import
-`providers.chat` or `enrich/` (rule 1), and only `storage/` may write SQL.
+The cAST recipe (arXiv 2506.15655): **split what is too big, merge what is too
+small**, budgeted in non-whitespace characters (`DEFAULT_BUDGET = 4000`) so
+indentation isn't punished.
 
 ```
-src/megabrain/
-  L0  _types.py        NotGiven / Omit sentinels — the three-state vocabulary
-      _arrays.py       Vector / Matrix / IndexArray (numpy dtypes, kept apart from
-                       _types so importing a sentinel never drags numpy in)
-      _errors.py       the taxonomy: MegabrainError → code + http_status, dual
-                       inheritance for back-compat (IndexNotFound is a ValueError)
-      _version.py · _home.py · _models.py (the three default models, one per JOB)
-      _config_file.py  reading a JSON file a person edits by hand
-      project.py       megabrain.json — what a REPOSITORY decides about itself
-                       (ignore · gitignore · queries · models.{narrator,rerank})
-      __init__.py      public API: lazy __getattr__ + a TYPE_CHECKING block, so
-                       `import megabrain` costs no numpy (pinned by a test)
-
-  L1  contracts/       EVERY cross-boundary payload, TypedDict only, zero logic
-                       chunk · bundle · file · graph · node · repo · route · scan ·
-                       prune · lanes · install · tools (the MCP inputSchemas' source)
-
-  L2  storage/         PERSISTENCE — the ONLY package allowed to write SQL
-        store.py         connection + schema; one table per object
-        schema.py        DDL + versioned migrations (chunks · files · symbols ·
-                         edges · meta · flows · cards)
-        _chunks · _files · _symbols · _graph · _flows · rows.py (the typed rows
-                         every table hands back)
-        _blobs.py        the untyped sqlite↔numpy boundary
-        locate.py        resolve_root + INDEX_FILE — the layout lives in ONE line
-      providers/       model APIs — one folder per backend, plus what they share
-        _local.py        is this endpoint on this machine? asked by BOTH backends
-        http/            attempt.py · retry.py · _urllib.py · _stream.py
-        embeddings/      client.py (OpenAI-compatible /embeddings) · cache.py
-                         (content-addressed) · _config _send _batching _budget
-                         _oversize _wire _width _replies
-        chat/            L4 — nothing under search/ may import this
-          base.py          ChatProvider Protocol (Answer · ToolCall · OnDelta)
-          router.py        resolve(model, timeout, provider) — the ONE place every
-                           model lane gets its backend · openai_compat.py + _frames
-          claude.py        the Claude Agent SDK backend, opt-in · _claude_sdk (the
-                           one-thread-one-loop async seam) · _claude_prompt · _claude_frames
-
-  L3  chunkers/        CONTENT → CHUNKS behind one partition-guaranteed contract
-        cast.py          the ONE split-then-merge engine · units.py the language seam
-        model.py         Chunk/Symbol/FileResult + validate_partition (the oracle)
-        _cast/           the cAST recipe: _split _merge _balance _spans
-                         _breadcrumb _signature — none of them knows the language
-        treesitter/      ONE walk, parameterised by a table: chunker.py _langspec
-                         _names _nodes _symbols _calls (a mocha `it(…)` is a symbol)
-          specs/           core.py · c_family.py · optional.py — the language tables
-        languages/       one module per language, 13-18 lines each: python markdown
-                         typescript c cpp csharp go java php ruby rust (+_pysymbols)
-      indexing/        BUILD the index
-        indexer.py       orchestration · discover.py the walk · strategies.py the
-                         ext → Strategy registry (OCP) + EDGE_SCHEMA
-        passes/          plan → embed → write → resymbol. The ORDER is the design:
-                         a network failure in embed aborts before write touches a row
-        edges/           python.py · typescript.py · pins.py (test → impl) ·
-                         _imports _calls _attrs _reexports _rebuild
-        builtin.py       the shipped strategies · _languages.py which ones ship on
-        _exclude.py      megabrain.json ignores + the legacy dotfiles
-        _gitignore.py    the repo's own .gitignore (on by default, opt-out)
-        unsupported.py   the census of files NOTHING can chunk
-      search/       ANSWER queries — NO LLM IN HERE (rule 1, enforced by a test)
-        search.py        the neutral primitive · params.py every knob, frozen
-        state.py         SearchState + load_state (warm matrices)
-        paths.py         is_test / is_demo / ident_tokens — path vocabulary
-        scoring/         pipeline · lane · lanes (TestPenalty, LexicalBoost) ·
-                         _fusion (the BASE: dense + 0.5·file) · _space · context
-        bundle/          assemble · _rank · _related · _anchors · floors (the two
-                         recall floors) · _pins · widen · _convert
-        render/          markdown · _entries · _evidence · _fence · _lang
-        intent.py        what SHAPE of question this is — no model, no network
-      graph/       THE GRAPH (§6) — candidates + annotations, never ranking
-        build.py         RepoGraph + load_graph · node.py · views.py the map
-                         weights · semantic · aliases — what an edge WEIGHS
-        clusters/        communities · labels · _naming · gods · surprises
-                         ← the package's ONLY LLM touch lives here, on purpose
-        routes/          paths (BFS) · route · story · carriers · tolls
-        symbols/         links · locals · resolve · uses · usesites · source · snips
-
-  L4  enrich/          Bundle → Bundle, opt-in, fail-open to the input
-        rerank.py        the judge lane: the model returns IDS, never code
-        expand.py        the widener: the model names identifiers, the SYMBOL TABLE
-                         resolves them — a name it cannot resolve is dropped
-        _batches · _cards · _prompt · _verdict · _terms · _echo
-      ask/             NARRATE — the only layer that talks to an LLM at query time
-        narrator.py · events.py · stream.py
-        prompt/          what the model is HANDED: 8 bodies + a map of the rest.
-                         Served all 30, it opened nothing (§5.1)
-        converse/        the open_file loop — loop.py tools.py _toolcall _toolless
-                         (a backend that rejects tools still narrates) _flowctx
-                         _missing _filled _admits
-        citing/          RULE 5 as a package: the model cites, the ENGINE splices.
-                         citations splice _quote _window _elide _codeonly _litter
-                         _broken repair _rescue
-        checks/          deterministic, no model: grounded pinned callees prune surface
-        agents/          fan-out, one sub-narrator per subsystem
-        ask.py           the VERB: retrieve → serve from cache or narrate → remember
-      grep/            WHERE TO EDIT — its own package, so "it calls no model" is a
-                       test and not a promise: grep.py the verb (the opt-in `why`
-                       lives HERE, above the lanes) · sites mentions referenced
-                       spans idents spread rows words — none of them can call out
-      flows/           the cached-walkthrough lane (cache · serve · match · covers ·
-                       freshness · chrome)
-
-  L5  usecases/        the verbs that belong to no single feature — get · scan ·
-                       repos · freshness · starters · _registry. `ask`, `grep`,
-                       `search` and `index` live in THEIR OWN packages, next to the
-                       logic they compose, and are re-exported from here so every
-                       transport still has one import to reach any verb.
-      transports/      SURFACES — thin adapters: args → use-case → render
-        cli/            main.py + commands/{index,scan,search,ask,grep,get,
-                        graph,studio,install}.py — one per verb, no branch in main
-        mcp/            server · protocol · dispatch (a TABLE of 3-line handlers) ·
-                        tools (the four) · schema (inputSchema GENERATED from
-                        contracts/tools.py) · arguments · answers · __main__
-        http/           app · router (a TABLE, never a chain of ifs) · messages
-                        (the two records) · replies (the Reply factories) · _target
-                        (wire parsing) · _handler · _writer · sse · security
-          routes/         query (search · get · symbols) · asking · indexing ·
-                          graph · project · meta · scanning · static
-studio/                the studio's TypeScript workspace (esbuild → transports/http/ui/)
-  src/views/           ask · search · graph · files · adding · progress
+Chunker(parse: ParseFn)
+  cover()     every line owned by exactly one span; the gap BEFORE a unit
+              belongs to it (a docstring banner is about its function)
+  split()     structural first (a container splits at its members, the header
+              region kept as a unit and re-split), by-weight fallback with
+              balanced cuts (_balance — greedy filling reintroduces the
+              no-signal fragment merge exists to avoid)
+  merge()     adjacent small spans fold up to the budget; split fragments never
+  renumber()  consecutive fragments stamped "k/n" once the recursion finishes
 ```
 
-Not yet ported (deliberate, tracked): `forge/` — chunkers the engine writes for itself, gated by the partition oracle. Nothing else from v2 is pending; what is missing was removed on purpose.
+A language contributes a `ParseFn` (source → `Parsed(units, symbols, skeleton,
+ok)`) and nothing else:
 
-The tree-sitter chunker and its languages ARE ported, contrary to what this note
-said until the packages were reorganised: eleven of them live in
-`chunkers/languages/`, gated on their grammar being installed.
+- **Python** — stdlib `ast`; lines split on `\n` **only** (`splitlines()`
+  breaks on `\f`/`\v` and desyncs from ast's line model — silent span
+  corruption); decorators pull a definition's start line up; typed constants
+  (`MAX: int = 10`) are symbols too.
+- **TypeScript / JS / TSX / JSX** — one tree-sitter grammar; `unwrap_exports`
+  (or a modern TS file appears to declare nothing), `assign_defs`
+  (`Route.prototype.dispatch = fn` — how half of npm declares its API), and
+  `called_block`: a mocha/jest `it('…', fn)` becomes a symbol carrying its own
+  line range, while `describe` is recursed but never recorded — recording the
+  group would swallow every case inside it.
+- **Ruby, Go, Rust, PHP, C, C++, Java, C#** — the same walk bound to a
+  `LangSpec` **table** (`treesitter/specs/`): a language is data, not a class.
+  Grammars are optional extras; a missing one degrades to line windows, never
+  to an unindexable repo. Unit end lines are clamped to the file (a grammar
+  half-reading a file can report a node one line past the content).
+- **Markdown** — headings as units (fences and front-matter respected), the
+  skeleton is the table of contents.
 
-Runnable examples (programmatic API · custom .sql chunker · chunk heatmap ·
-web demo) live in their own repo, `~/megabrain-examples` — they need the engine
-installed (`pip install megabrain`).
+Two embedded granularities: **chunk vectors** (breadcrumb + code — contextual
+retrieval; the breadcrumb is prepended for embedding only, the stored text
+stays verbatim) and **file skeletons** (declarations + first doc lines, one
+vector per file — the fusion signal in §6-search).
 
-Public API (lazy, typed): `megabrain.{index_repo, discover, search,
-search_with_state, load_state, score_chunks, Store, ChunkMeta, Strategy, Registry,
-Chunk, Symbol, FileResult, validate_partition, MegabrainError, IndexNotFound,
-EmptyIndex, ModelMismatch, MissingCredential, MissingAPIKey, ProviderError}` — a
-lazy `__getattr__` over a name→module map, with a `TYPE_CHECKING` block so checkers
-and IDEs still see real symbols, and `__all__` spelled out rather than derived
-(a checker cannot follow `[*mapping]`, and the two are pinned to each other by a
-test). `import megabrain` loads no numpy — also pinned by a test. The verbs live in
-`megabrain.usecases`: `ask · grep · search · build_index · get_code · scan ·
-freshness · starters_for · known · remember · resolve_root`.
+### `indexing/` — three phases, one transaction
+
+```
+discover ─► plan (sha256 diff, pure CPU) ─► embed_all (ONE network call)
+        ─► write_files ─► resymbol ─► graph_passes ─► prune_orphans
+```
+
+- **Global batching** is the load-bearing shape: chunk everything first, embed
+  once. Per-file embedding was ~2 sequential requests per file — measured 110
+  requests / 28.5 s vs 4 requests / 0.9 s on the same corpus. An embed failure
+  aborts *before* any row of the pass is written.
+- **Discovery**: universal excludes (incl. `Pods`, `Carthage`, `.gradle`,
+  `third_party` — one React Native project contributed 17 864 vendored
+  headers), the repo's own ignores, and `git check-ignore` driven in **bytes**
+  (text-mode CRLF mangled the paths on Windows and the filter silently
+  excluded nothing). Agent-instruction files (`CLAUDE.md`, `AGENTS.md`) are
+  excluded — indexing them feeds a search its own operating rules back as
+  documentation. Every skip carries its reason into `scan`.
+- **Strategies**: `Strategy` is a structural Protocol (`exts`, `parse`,
+  `edge_context`, `edges`); the `Registry` consults injected strategies before
+  built-ins, so a caller can *override* a shipped language. `edges()`
+  returning `None` means "not examined" — different from `[]`, and only the
+  second replaces stored rows.
+- **Edges** (`edges/`): Python resolves imports (relative levels, submodule
+  bindings, **re-exports** — `from ..storage import PIN_KIND` files against
+  the *defining* module, not the `__init__`), calls only through resolved
+  imports (bare-name matching mints phantom edges), and repo-wide **attribute
+  bindings** (`self.x = ImportedClass()` in one file resolves
+  `session.x.method()` in another — kept only when the name binds to exactly
+  one file). TypeScript resolves all six spellings of a relative specifier,
+  including `./thing.js → ./thing.ts` (ESM writes the compiled extension).
+  **Pins** (`pins.py`) are language-agnostic: a test naming ≥3 symbols that
+  exactly one non-test file declares *pins* that file — the lane that finally
+  connected `helpers_test.rb` to `base.rb` on repositories with zero import
+  edges.
+- **Schema markers** (`EDGE_SCHEMA`, `PIN_SCHEMA`, `SYMBOL_SCHEMA`): derived
+  data re-extracts on engine upgrade without re-embedding a chunk; each marker
+  is stamped only after something was actually examined, and the pin pass uses
+  additive writes (`replace_edges` would erase the import edges the extractor
+  just wrote).
+- **`build_index`** refuses an empty result by *naming what it saw and what it
+  reads* (`NothingToIndex`) — "0 chunks · 0 edges" reported as success once
+  cost somebody an afternoon — and refuses to index a path that isn't a
+  directory (a typo used to create an empty index beside itself).
+
+### `search/` — the deterministic engine
+
+```
+score_chunks:  embed query (1 call) ─► require_same_space ─► QueryContext
+               ─► BASE  DenseFileFusion   chunk cosine + 0.5 · file cosine,
+                                          both mapped [-1,1] → [0,1]
+               ─► LANES TestPenalty ─► LexicalBoost        (order load-bearing)
+bundle:        rank_files (STABLE sort) ─► tiers ─► floors (append-only)
+               ─► anchors ─► pins ─► evidence band
+```
+
+- **`params.RetrievalParams`** — every knob in one frozen dataclass; every
+  default is an experiment result with its provenance in the comment
+  (`file_fusion_w = 0.5`, `graph_extras = 7`, `anchor_df_cap = 10`, …).
+  Variants via `dataclasses.replace()`, never module-global mutation.
+- **`TestPenalty` scales the *signal*, not the score.** Fusion's offset means
+  a zero-cosine chunk already sits at `neutral_score() = 0.75`; multiplying
+  the raw score removed half the dynamic range and delivered the
+  best-matching chunk in a repository at #115. It also **stands down** when
+  `wants_tests(query)` — a down-weight aimed at the thing the reader asked
+  for is an answer being withheld.
+- **`intent.py`** — deterministic query reading (`wants_tests`, `is_task`),
+  no model on the query path, traps pinned ("how does the test runner
+  discover tests" is *not* a request for tests; an interrogative opening
+  always beats a change verb).
+- **Two recall floors** (`bundle/floors.py`), both pure additions: the file
+  floor (a top-N *raw-dense* chunk whose file fusion buried gets a slot; tests
+  admitted when tests were asked for) and the anchor floor (a rare multi-word
+  identifier the query quoted verbatim, capped by document frequency, tests
+  and demos excluded from the count). Plus `pins` and the flow lane — a
+  bundle can only ever *gain* files.
+- **Determinism defended in three places**: stable argsort on ties, neighbour
+  ordering with a total tie-break (a set's iteration order changed the bundle
+  per process), and a test that crosses `PYTHONHASHSEED` values in
+  subprocesses.
+- **Evidence** (`scoring/evidence.py`): the raw top-1 cosine calibrated on two
+  corpora into `strong ≥ 0.45 / none < 0.30 / weak between` — the honesty band
+  that stops confident prose over vocabulary matches. The fused scale cannot
+  say this (zero cosine displays as 0.75). Pre-registered predictions pinned:
+  no answerable query lands in "none", no off-topic query in "strong".
+- **`widen.py`** — go-to-definition in bulk: expander terms resolve through
+  the **symbol table**, never the embedder (measured: embedding the terms
+  found none of the ground truth; the symbol table found it exactly). A name
+  defined in more than `TOO_AMBIGUOUS = 8` files is vocabulary, not an address.
+- **`render/`** — one renderer for every surface; the **map is the default**
+  (~2 700 tokens vs ~8 100 with bodies), the header states what the render
+  actually carries, and the evidence banner is silent on "strong" — a banner
+  on every answer is a banner on none.
+
+### `graph/` — structure, never ranking
+
+- **`build`** — the in-memory `RepoGraph`: structural lanes (`near`/`out`/
+  `into`, kinds preserved) + the **semantic lane** (top-3 skeleton-cosine
+  twins ≥ 0.80, sparse on purpose; the full cosine matrix is retained because
+  surprises need every pair).
+- **`clusters/`** — label propagation with `hub_damping = 1/log2(1+d)`
+  (measured on a 1 210-file corpus: undamped, 97.5 % of files collapsed into
+  one community), semantic ties at half a structural vote (`SEM_WEIGHT =
+  0.5`), model-named labels cached under the graph's fingerprint and fail-open
+  to "Community N". **Surprises** need three legs: similar (≥ 0.85), no edge,
+  different communities — and the genuinely reportable ones are *anchored*
+  twins (a free-floating one merges into its lookalike's community and is
+  correctly excluded).
+- **`routes/`** — Dijkstra with **tolls**: plumbing by name (`__init__.py`,
+  test files), hubs by degree above a floored p90 (scaled, not flat),
+  semantic edges costlier than structural (a cosine is an opinion, an import
+  is a fact), endpoints exempt. `story.py` tells it truthfully: carrier
+  symbols per hop with real use/definition snippets, call-flow reorientation
+  (declared, never silent, never on a mixed route), and a route through a
+  shared callee reported as a **meeting** (`a → M ← b`) with its kind.
+- **`symbols/`** — go-to-definition (`links`, `uses`, `locals` — the two
+  binding forms that are already an answer: `x = Cls()` and `with Cls() as
+  x`), AST-verified use sites (a variable receiver is *inferred*, never
+  *verified*), and the uniqueness rule everywhere: a jump that could land
+  anywhere is worse than no jump.
 
 ---
 
-## 8. Evidence (where the numbers live)
+## 7. L4 — the model lanes
 
-- **Golden gate** (30 human-verified queries over a private corpus, maintainer-side):
-  R@1 **0.86** · **bundle_full 1.00** · p50 ~10 ms warm. Multi-repo and 134K-line
-  scale gates alongside. The offline suite (`python -m pytest`, no network/key) is
-  what CI runs on 3.10–3.13 × Linux/macOS/Windows.
-- **RELATED analysis** (this doc, §3.2): CORE-only bundle_full 0.36 vs 1.00 with
-  RELATED; RELATED ≈ 5% verified gold by count but 45% of all gold files.
-- **Embedding bakeoff**: pplx-embed-v1-0.6b beat pplx-4b, codestral-embed,
-  openai-3-large and bge-m3 on code recall (`evals/`).
-- **Ask-model bakeoff**: qwen3-coder ≈ claude-haiku on citation selection at ~5×
-  lower cost (`evals/`).
-- **SWE-bench Lite localization** (no training): retrieval-only Acc@1 ≈ 0.52 / @5 ≈
-  0.83 — on par with the trained CodeRankEmbed retriever; ask-cited-files Acc@1 ≈
-  0.69–0.71, in range of SWE-bench-trained SweRankEmbed-Large.
+### `providers/chat/` — one Protocol, a registry, two backends
+
+`ChatProvider`: `available()` (cheap, no request), `chat_text`, `stream_chat`,
+`agent_stream: … | None` (capability as an attribute, not a subclass check).
+**`resolve(model=…, timeout=…, provider=…)` is the one place any lane gets a
+backend** — constructing one by name at a call site is the retired bug where
+`MEGABRAIN_CHAT_PROVIDER=claude` switched the narrator while the judge kept
+billing OpenRouter, silently, because every lane is fail-open. The repo's
+committed `models.provider` beats the env var; the env var beats the default.
+
+- **`OpenAICompatible`** — any `/chat/completions` endpoint through the shared
+  retry policy. `_frames.py` handles the four silent traps: keep-alive
+  comments, fragmented tool calls (accumulated per index), errors inside a
+  200 stream (raised — or an outage gets quoted as the model's words), and
+  streams ending without `[DONE]`. The `api_key` parameter is genuinely
+  three-state: omitted reads the environment, explicit `None` means no key.
+- **`ClaudeProvider`** — the Claude Agent SDK driving the bundled Claude Code
+  binary. Async SDK from a sync engine via **one background daemon thread
+  with one loop** (`_claude_sdk.py` — `asyncio.run` raises under the HTTP
+  transport's running loop); a hard wall-clock timeout cancels the future (a
+  stalled CLI is otherwise a leaked subprocess per call). The binary is an
+  *agent* runtime: every built-in tool is denied and the preamble says so, or
+  it spends the turn grepping the repo instead of narrating. `is_error` is
+  the refusal flag, not the SDK's `subtype` (observed: a refused run arrives
+  as `subtype='success'`). Opt-in only — a backend that takes over because a
+  package is importable moves measured numbers with nothing in the output
+  saying which lane produced them.
+
+### `enrich/` — `Bundle → Bundle`, fail-open, opt-in
+
+- **`rerank`** — full chunk bodies in **parallel batches of 8** (one
+  29-candidate call missed 3/18 targets that batches kept; serially the lane
+  cost 16 s), cards carrying the file's *outline* beyond the span (the judge
+  once correctly dropped the file defining the routing DSL, judging by the
+  only evidence it was shown), verdicts merged round-robin, all-or-nothing
+  across batches (a partial verdict is a ranking from half the evidence).
+  Unpicked entries are **moved to the tail, never deleted**, and the verdict
+  travels on the bundle — "judged and rejected everything" and "the lane
+  never ran" are different answers, and the difference is the best signal in
+  a weak-evidence run.
+- **`expand`** — a model names *identifiers* (never files — allowed to, it
+  hallucinated `test/main_test.rb`), echoes of the query are dropped in code
+  (`_echo.py` — an instruction the model can ignore is not a guarantee), the
+  symbol table resolves, and the loop runs **until a round adds nothing**
+  (bounded, `MAX_ROUNDS = 3`). CORE is shown to the namer too — a lane whose
+  job is judging what is *missing* must see what was found. The terms travel
+  on the bundle (`expanded`) so a reader knows which files answered a model's
+  word rather than their question.
+
+### `ask/` — the walkthrough
+
+```
+retrieve ─► converse loop (open_file, ≤5 rounds) ─► stream-splice
+        ─► checks (callees · pinned · grounded · surface · prune) ─► rescue
+        ─► cache flow
+```
+
+- **`citing/`** is rule 5 as a package. Two citation grammars share bracket
+  syntax — `[[k:lo-hi]]` by chunk index, `[[path:lo-hi]]` by file — told
+  apart by `[./]` in the reference. The splice deletes model-written fences;
+  point citations widen to a window (one naked line explains nothing);
+  oversized citations narrow to `SPLICE_CAP`; a repeated range becomes a
+  back-reference; decorators above a cited `def` are pulled in; elision cuts
+  from the **middle** (the tail carries the `end` an `insert_after` depends
+  on); `repair` sends back *only* the broken fragments (a second narration
+  replaces prose the reader is already reading), and the final `drop_unresolved`
+  deletes any bracket no splicer accepted — litter reads as a bug.
+- **`stream.Splicer`** holds the undecidable tail (`PARTIAL` — a `[[3:70` cut
+  by a delta boundary cannot be unprinted) and drops unterminated fences at
+  flush, because `splice` only removes fences that close.
+- **`converse/`** — the open_file loop, bounded (`MAX_ROUNDS = 5`) and
+  fail-open. `_toolless` recognises "this backend cannot take tools" (a 4xx
+  with known tells, never a 500 — a blanket retry would buy a second outage)
+  and retires the field for the whole conversation. `_admits`/`_filled` grant
+  exactly one extra round when the answer *confessed* it lacked a body the
+  index holds — serving every callee up front was measured (159 bodies on
+  sinatra) and rejected.
+- **`checks/`** — deterministic post-passes, each born from a measured
+  failure: `callees` (the definition of every backticked helper, resolved
+  only when unambiguous — a prompt clause was ignored 3/4 times), `pinned`
+  (the test 1 800 lines away that the change breaks, via pin edges, gated on
+  real assertions so fixtures don't surface), `grounded` (every consecutive
+  narrated hop checked against the graph — "delegates to" is a graph fact),
+  `surface` (each cited file's import surface as one metadata line — measured
+  as three wasted Reads per session), `prune` (a section whose every quote is
+  a back-reference is deleted whole).
+- **`agents/`** — the multi-question fan-out: parallel sub-agents, each
+  spliced (invariant 5 one level down), a hung member dies alone on
+  `AGENT_TIMEOUT`, a failed one is dropped and the rest survive.
+
+### `flows/` — walkthroughs as a cache
+
+Two vectors per flow from one embedding call: **attach** (question + prose,
+chrome stripped) and **serve** (question alone — a long walkthrough must not
+dilute an identical question's score). Serving is additionally gated by
+`covers()` — an **asymmetric** containment check cosine cannot make: a
+compound question *contains* a cached one at cosine ~1.0 and would be served
+half an answer. Flows are pinned to the sha of every file they cited and die
+with them at index time; near-duplicate questions replace rather than
+accumulate. `strip_chrome()` removes block headers before a flow is shown to
+a model — shown the format, the model imitates it and the splicer has nothing
+left to replace.
+
+### `grep/` — the edit surface
+
+Deterministic lanes over the index (~50 ms, no model): the task's identifiers
+matched literally and resolved to the **symbols containing them** (`mentions`
+— completeness is computed, not requested of a model; markdown headings are
+excluded, or one changelog contributes 29 rows spanning 1 630 lines each), one
+hop into what those sites *reference* (`referenced` — the TypedDict in another
+file that no literal search reaches, followed only when unambiguous, never
+twice), and spread control (`spread` — a one-word name the index *declares* is
+chased while a container name is vocabulary; test suites are sampled, never
+pasted whole and never zeroed out). `--why` adds exactly one model call whose
+output is pipe-shaped rows the engine re-numbers from the symbol table
+(`sites` — the model names `Choice.get_metavar`, the index answers L415-430;
+it cannot be off by one, and a qualified name beats the base class).
+
+---
+
+## 8. L5 — transports and the studio
+
+- **CLI** — one module per command registering its own flags (`_COMMANDS` in
+  `main.py` is the only list); the error taxonomy maps to exit codes
+  (0 / 1 engine / 2 usage / 130 interrupt). Deltas stream to stdout, the
+  retrieval trace to stderr, so `> answer.md` stays clean. `ui` carries
+  `studio` as an alias (published READMEs keep working).
+- **MCP** — four tools (`grep`, `ask`, `search`, `index`), JSON-RPC over
+  stdio, schemas **generated** from `contracts/tools.py`, `tools/list`
+  answerable without importing numpy (pinned by a subprocess test),
+  notifications never answered, malformed lines skipped rather than fatal.
+  `ask` is buffered — MCP is request/response and a partial stream is a
+  half-written walkthrough with no way back.
+- **HTTP** — threaded stdlib server, no framework, no async twin of the
+  engine. Routes are pure `Request → Reply` functions; `security.Guard`
+  enforces token / read-only (`WRITING_PATHS` listed, not inferred) / a
+  sliding-window rate limit; `build_server` **refuses** a non-loopback bind
+  without a token — indexing is a write endpoint that reads any path the
+  process can. SSE frames are single-line JSON terminated by the blank line
+  (the whole protocol), chunked and flushed per frame; HEAD is answered
+  (monitors send it and the stdlib default is a 501).
+- **Studio** (`studio/` → built into `transports/http/ui/`) — a TypeScript
+  workspace (esbuild, zero runtime deps) typed against the same `contracts/`.
+  Three tabs: **Ask** (retrieval trace *before* the model says anything — the
+  deterministic answer is already complete), **Search** (CORE cards closed by
+  default + the RELATED map), **Graph** (one bubble per community at the
+  overview — the answer to the hairball — click into files, `a → b` routes
+  with step-by-step playback through real code, arrowheads carrying the true
+  call direction). Plus a read-only navigator and a census-first add-repo
+  flow. The built bundle **is committed** so `pip install` serves the UI
+  without node; a CI job rebuilds and fails on a non-empty diff.
+- **install** — MCP registration for six assistants: JSON hosts merged
+  surgically (other servers and unrelated keys survive; a stale megabrain
+  entry is replaced, not merged into), the TOML host edited by section
+  replacement with comments preserved, broken configs reported rather than
+  overwritten. The shared `~/.megabrain/registry.json` is **co-owned with
+  v2**: both shapes read, foreign metadata survives writes, dead entries are
+  hidden but never deleted — a shared file is nobody's to garbage-collect.
+
+---
+
+## 9. The gates
+
+| gate | what it holds |
+|---|---|
+| `./scripts/lint` | ruff + mypy strict + pyright strict + the architecture suite |
+| `./scripts/test` | the full offline suite (~1 500 tests — no key, no network, no private corpus) |
+| golden (`evals/harness/gate.py`) | `R@1 ≥ 0.86 · bundle_full ≥ 0.90 · p50 < 1 s` against the corpus named by `MEGABRAIN_GOLDEN` + `MEGABRAIN_GOLDEN_REPO`; current numbers: **R@1 0.91 · bundle_full 1.00 · p50 ~10 ms** |
+| CI | 3 OS × 4 Python + lint + build + studio-bundle freshness; `release.yml` calls `ci.yml` via `workflow_call` so a tagged commit cannot publish ungated, plus a tag↔`__version__` guard |
+
+The standing rule for any change touching `search/`, `chunkers/` or
+`providers/embeddings/`: re-run the golden gate and put the three numbers in
+the commit message — not "still passes", the numbers.
+
+---
+
+## 10. Known deliberate gaps
+
+Recorded so absence reads as a decision, not an accident:
+
+- **Issue mode** (v2's long-query lane: BM25 entity-IDs + traceback pins) is
+  not yet ported. It doesn't fire on the golden set — which is why parity
+  holds without it — and it lands as one more `Lane` beside `TestPenalty`.
+- **`forge/`** (self-authored chunkers, partition-oracle-gated `exec` of
+  generated code) is not yet ported.
+- **ANN indexing** is deferred until a corpus demands it.
+- The golden corpus is **private**; the harness is committed. External
+  validity via a public benchmark is roadmap, not architecture.
+
+For the audit findings, the design debts and the road to 10/10, see
+[REFACTOR.md](REFACTOR.md).

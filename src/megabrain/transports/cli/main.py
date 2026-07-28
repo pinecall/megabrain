@@ -16,6 +16,8 @@ from ..._errors import MegabrainError
 from ..._version import __version__
 from .commands import (
     ask,
+    cache,
+    forge,
     get,
     graph,
     grep,
@@ -23,12 +25,13 @@ from .commands import (
     install,
     scan,
     search,
-    studio,
+    ui,
 )
 
 __all__ = ["main", "build_parser"]
 
-_COMMANDS = (index, scan, search, ask, grep, get, graph, studio, install)
+_COMMANDS = (index, scan, search, ask, grep, get, graph, forge, ui, cache,
+             install)
 
 
 def build_parser() -> argparse.ArgumentParser:

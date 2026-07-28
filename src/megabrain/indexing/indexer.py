@@ -20,6 +20,7 @@ from .passes.plan import Progress, plan, read_sources
 from .passes.resymbol import resymbol
 from .passes.write import prune_orphans, write_files
 from .strategies import Registry, Strategy
+from .trust import load_repo_strategies
 
 __all__ = ["index_repo"]
 
@@ -36,7 +37,9 @@ def index_repo(root: Path, *, embedder: Embeddable | None = None,
     root = Path(root).resolve()
     started = time.perf_counter()
     embedder = embedder or _default_embedder()
-    registry = default_registry(strategies)
+    # Trusted repo-local strategies load on EVERY index — what keeps a forged
+    # extension alive across ordinary re-runs; explicit strategies still win.
+    registry = default_registry([*(strategies or []), *load_repo_strategies(root)])
     with Store(root) as store:
         stats = _run(store, root, registry, embedder,
                      force=force or _model_changed(store, embedder),

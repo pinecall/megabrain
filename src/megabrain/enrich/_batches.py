@@ -12,8 +12,9 @@ Two findings, both measured, and they pull in opposite directions:
 
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Protocol, Sequence
 
 from ..providers.chat import ChatProvider
 from ._verdict import round_robin
@@ -21,10 +22,16 @@ from ._verdict import round_robin
 if TYPE_CHECKING:
     from ..contracts import Tier2File
 
-__all__ = ["verdict_of", "wall_for", "RERANK_BATCH", "RERANK_TIMEOUT"]
+__all__ = ["verdict_of", "gathered", "wall_for", "RERANK_BATCH",
+           "RERANK_TIMEOUT", "MAX_JUDGES"]
 
 RERANK_BATCH = 8
 RERANK_TIMEOUT = 30.0
+
+MAX_JUDGES = 4
+"""Concurrent judge calls. A thread per batch is unbounded in the number of
+batches; tier-2 is ~20 entries today, so four covers it without letting a
+bigger tier open a thread — and a connection — per eight files."""
 
 
 def wall_for(provider: ChatProvider) -> float:
@@ -58,15 +65,31 @@ def verdict_of(judge: Judge, provider: ChatProvider, question: str,
     # batches are independent by construction, so the lane should cost the
     # slowest one, not their sum. Measured: 16s serial through the narration
     # model, and the whole point of the lane is that it costs almost nothing.
-    pool = ThreadPoolExecutor(max_workers=len(batches))
+    pool = ThreadPoolExecutor(max_workers=min(len(batches), MAX_JUDGES))
     try:
         running = [pool.submit(judge, provider, question, batch, start)
                    for batch, start in zip(batches, offsets)]
-        # `result(timeout)` on each, so ONE hung batch bounds the whole lane
-        # rather than the sum of the batches' patience.
-        return round_robin([future.result(timeout=wall_for(provider))
-                            for future in running])
+        return round_robin(gathered(running, wall_for(provider)))
     finally:
         # Not a `with` block: its shutdown waits, which would hold the caller
         # for a hung batch the timeout above just gave up on.
         pool.shutdown(wait=False, cancel_futures=True)
+
+
+def gathered(running: Sequence[Any], wall: float,
+             clock: Callable[[], float] = time.monotonic) -> list[Any]:
+    """Every result under ONE deadline, so a hung batch bounds the whole lane.
+
+    A per-future `result(timeout=wall)` restarts the wall for each one — k
+    staggered slow batches then cost ~k×wall, which is exactly the sum of
+    patience the comment above promises not to pay. The deadline is computed
+    once; each wait gets only what the earlier ones left.
+    """
+    deadline = clock() + wall
+    out: list[Any] = []
+    for future in running:
+        left = deadline - clock()
+        if left <= 0:
+            raise TimeoutError(f"the lane's {wall:.0f}s wall is spent")
+        out.append(future.result(timeout=left))
+    return out

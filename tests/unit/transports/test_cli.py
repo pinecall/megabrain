@@ -117,4 +117,62 @@ def test_every_command_is_reachable() -> None:
 
     actions = [a for a in build_parser()._actions if a.dest == "command"]
     assert set(actions[0].choices) == {"index", "scan", "search", "ask", "grep",
-                                      "get", "graph", "studio", "install"}  # type: ignore[union-attr]
+                                      "get", "graph", "ui", "studio", "cache",
+                                      "forge", "install"}  # type: ignore[union-attr]
+
+
+def test_studio_is_still_accepted_as_an_alias_of_ui() -> None:
+    """`megabrain studio` is in a published README and in the demo box's deploy
+    script. The verb is `ui` now; the old spelling keeps working."""
+    from megabrain.transports.cli.main import build_parser
+
+    for verb in ("ui", "studio"):
+        args = build_parser().parse_args([verb, "--port", "0"])
+        assert args.port == 0
+        assert args.run.__module__.endswith("commands.ui")
+
+def test_ui_exposes_trust_proxy() -> None:
+    """The public demo runs behind nginx, where every socket is the proxy's —
+    v2 had the flag and the demo's runbook uses it. Off unless typed: trusting
+    the forwarded header on a directly-exposed box lets callers mint identities."""
+    from megabrain.transports.cli.main import build_parser
+
+    args = build_parser().parse_args(["ui", "--trust-proxy"])
+    assert args.trust_proxy is True
+    assert build_parser().parse_args(["ui"]).trust_proxy is False
+
+
+def test_cache_reports_and_prunes(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """The embedding cache never shrank and nothing showed its growth. `cache`
+    makes it visible; `cache prune` is the explicit — never automatic — sweep."""
+    import numpy as np
+
+    from megabrain.providers.embeddings import EmbedCache
+
+    monkeypatch.setenv("MEGABRAIN_HOME", str(tmp_path))
+    EmbedCache().put("m", "text", np.ones(4, dtype=np.float32))
+    assert "1 vector" in main_output(["cache"])
+    pruned = main_output(["cache", "prune", "--older-than", "0"])
+    assert "1 vector" in pruned
+    assert EmbedCache().size() == (0, 0)
+
+
+def main_output(argv: list[str]) -> str:
+    import contextlib
+    import io
+
+    from megabrain.transports.cli.main import main
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        assert main(argv) == 0
+    return out.getvalue()
+
+
+def test_forge_is_registered_with_its_flags() -> None:
+    from megabrain.transports.cli.main import build_parser
+
+    args = build_parser().parse_args(["forge", ".", "--ext", "sql", "--dry-run",
+                                      "--attempts", "2"])
+    assert args.ext == "sql" and args.dry_run and args.attempts == 2
+    assert args.run.__module__.endswith("commands.forge")

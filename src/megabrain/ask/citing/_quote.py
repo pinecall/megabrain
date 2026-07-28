@@ -14,10 +14,11 @@ from __future__ import annotations
 import re
 
 from ...storage import Store
+from ...storage.lines import lines_of
 from ._elide import MAX_QUOTE_LINES, elide
 from ._litter import drop_unresolved
 
-__all__ = ["quote_citations", "lines_of", "CITATION", "MAX_QUOTE_LINES"]
+__all__ = ["quote_citations", "CITATION", "MAX_QUOTE_LINES"]
 
 CITATION = re.compile(r"\[\[([^\]:]*[./][^\]:]*):(\d+)-(\d+)\]\]")
 """A citation by PATH and line range.
@@ -77,13 +78,3 @@ def _with_decorators(lines: list[str], lo: int) -> int:
     while lo > 1 and lines[lo - 2].lstrip().startswith("@"):
         lo -= 1
     return lo
-
-
-def lines_of(store: Store, path: str) -> list[str]:
-    """The file reassembled from its chunks — an exact line partition, so the
-    concatenation is the file."""
-    metas = store.chunks.read_file(path)
-    lines: list[str] = []
-    for meta in sorted(metas, key=lambda m: m.start_line):
-        lines.extend((meta.text or "").split("\n"))
-    return lines

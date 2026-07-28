@@ -104,3 +104,12 @@ def test_surprises_are_similar_UNCONNECTED_and_in_different_communities(
 def test_the_map_is_still_byte_stable(repo: Path) -> None:
     graph = load_graph(str(repo))
     assert communities_of(graph) == communities_of(load_graph(str(repo)))
+
+def test_the_full_cosine_matrix_is_not_retained(repo: Path) -> None:
+    """Surprise candidates are extracted while the cosines are computed and the
+    matrix is DISCARDED: at 10 000 files it is 400 MB of float32 per map call,
+    and everything downstream needs only top-k twins above the floor."""
+    graph = load_graph(str(repo))
+    assert not hasattr(graph, "sims")
+    assert any({left, right} == {"auth/login.py", "mirror.py"}
+               for left, right, _ in graph.twins)

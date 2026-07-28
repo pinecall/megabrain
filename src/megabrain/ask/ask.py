@@ -18,12 +18,11 @@ from pathlib import Path
 from .._provider_errors import MissingCredential
 from .._types import Content
 from ..contracts import Bundle, FlowHit
-from ..project import load_project
-from ..providers.chat import ChatProvider, resolve
+from ..converse.backend import narrator_for
+from ..events import Emit, emit_nothing
 from ..search import search
 from ..storage.locate import resolve_root
 from ._flows import matched_flows, remember_answer, served
-from .events import Emit, emit_nothing
 from .narrator import narrate
 
 __all__ = ["ask"]
@@ -51,7 +50,7 @@ def ask(start: Path | str, question: str, *, path_filter: str | None = None,
     if flows and (hit := served(root, question, flows, emit)) is not None:
         return hit["text"]
 
-    provider = _narrator(root)
+    provider = narrator_for(root)
     if provider is None:
         # Named, not a generic failure: retrieval already worked, and the only
         # thing missing is a credential the message can point at.
@@ -74,18 +73,3 @@ def _with_flows(bundle: Bundle, flows: list[FlowHit]) -> Bundle:
     citation — which is exactly how a walkthrough ends up citing a summary.
     """
     return {**bundle, "flows": flows}
-
-
-def _narrator(root: Path) -> ChatProvider | None:
-    """The model the REPOSITORY chose to narrate with.
-
-    Per project, not per shell: `megabrain.json` is committed, so everyone
-    working on that repo gets the same walkthroughs.
-
-    Routed through the registry rather than constructing one backend by name —
-    which is the whole point of having a registry, and was the reason `resolve`
-    shipped with no caller: adding the SDK lane here would otherwise have meant
-    an if-switch in the verb.
-    """
-    project = load_project(root)
-    return resolve(model=project.narrator_model, provider=project.chat_provider)

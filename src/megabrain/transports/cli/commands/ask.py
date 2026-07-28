@@ -7,7 +7,7 @@ import sys
 from typing import cast
 
 from ....ask.ask import ask
-from ....ask.events import Event
+from ....events import Event
 
 __all__ = ["register"]
 

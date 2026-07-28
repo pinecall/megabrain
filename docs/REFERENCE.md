@@ -27,7 +27,7 @@ index yet is the whole point.
 | `megabrain grep <task> [path]` | where to edit: files, symbols, exact line ranges — no model |
 | `megabrain get <file> [path]` | print one file (or one symbol) |
 | `megabrain graph [path]` | the repo as a knowledge graph |
-| `megabrain studio` | the web UI + JSON API on one port |
+| `megabrain ui` | the web UI + JSON API on one port |
 | `megabrain install` | register the MCP server with every assistant detected on this machine |
 
 ### Flags
@@ -99,7 +99,7 @@ kept being thrown away by the readers it was built for.
 
 ## HTTP API
 
-Served by `megabrain studio` — the UI at `/` and the JSON API on the same port. Every route
+Served by `megabrain ui` — the UI at `/` and the JSON API on the same port. Every route
 accepts an optional `?repo=` / `"repo"` — absent means the boot repo.
 
 | route | returns |

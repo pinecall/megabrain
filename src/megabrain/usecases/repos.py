@@ -25,7 +25,7 @@ from .._home import megabrain_home
 from ..contracts import RepoEntry
 from ..storage import Store
 from ..storage.locate import INDEX_FILE
-from ._registry import read_entries, write_entries
+from ._registry import read_entries, update_entries
 
 __all__ = ["remember", "known", "registry_path"]
 
@@ -35,18 +35,25 @@ def registry_path() -> Path:
 
 
 def remember(root: Path | str) -> None:
-    """Record a repository, preserving every other entry and every field of it."""
+    """Record a repository, preserving every other entry and every field of it.
+
+    Through `update_entries`, which holds the registry's lock across the
+    read-modify-write: two concurrent `index` runs — or this engine and v2 at
+    once — otherwise interleave and silently drop whichever entry landed first.
+    """
     path = str(Path(root).expanduser().resolve())
-    entries = read_entries(registry_path())
     with Store(Path(path)) as store:
         stats = store.stats()
-    # Merged over what was there: a field this engine does not use belongs to
-    # whoever wrote it, and dropping it is a quieter destruction than dropping
-    # the whole entry.
-    entries[path] = {**entries.get(path, {}), "path": path,
-                     "name": Path(path).name,
-                     "files": stats["files"], "chunks": stats["chunks"]}
-    write_entries(registry_path(), entries)
+
+    def merged(entries: dict[str, dict[str, object]]) -> None:
+        # Merged over what was there: a field this engine does not use belongs
+        # to whoever wrote it, and dropping it is a quieter destruction than
+        # dropping the whole entry.
+        entries[path] = {**entries.get(path, {}), "path": path,
+                         "name": Path(path).name,
+                         "files": stats["files"], "chunks": stats["chunks"]}
+
+    update_entries(registry_path(), merged)
 
 
 def known() -> list[RepoEntry]:

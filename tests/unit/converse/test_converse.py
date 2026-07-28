@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from megabrain.ask.converse.loop import MAX_ROUNDS, converse
-from megabrain.ask.events import emit_nothing
 from megabrain.chunkers.model import Chunk
+from megabrain.converse.loop import MAX_ROUNDS, converse
+from megabrain.events import emit_nothing
 from megabrain.providers.chat import Answer, ToolCall
 from megabrain.storage import Store
 

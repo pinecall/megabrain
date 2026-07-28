@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ...providers.chat import Answer, ChatProvider
-from ...storage import Store
 from ..events import Emit
+from ..providers.chat import Answer, ChatProvider
+from ..storage import Store
 from ._admits import admitted_gap
 from ._missing import FILL, missing_bodies
 

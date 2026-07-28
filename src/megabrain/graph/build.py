@@ -16,9 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .._arrays import Matrix
 from ..storage import Store
-from .semantic import SEM_EDGE_MIN, SEM_TOP_K, semantic_lane
+from .semantic import SEM_EDGE_MIN, SEM_TOP_K, Twin, semantic_lane
 
 __all__ = ["RepoGraph", "load_graph", "SEM_EDGE_MIN", "SEM_TOP_K"]
 
@@ -44,9 +43,9 @@ class RepoGraph:
     direction, because "what this needs" and "what needs this" are different
     questions and the second is the one people cannot get from reading a file.
 
-    `sims` is the full cosine matrix over `files` (None when there are no
-    skeleton vectors) — kept because SURPRISES need every pair, and the top-k
-    `sem` lane deliberately forgot the rest.
+    `twins` is every pair above the surprise floor, listed while the cosines
+    briefly existed — the full matrix is O(n²) memory and was retained for
+    exactly this, so the pairs travel and the matrix does not.
     """
 
     files: list[str]
@@ -54,11 +53,7 @@ class RepoGraph:
     out: dict[str, set[str]] = field(default_factory=_no_links)
     into: dict[str, set[str]] = field(default_factory=_no_links)
     sem: dict[str, dict[str, float]] = field(default_factory=_no_sims)
-    sims: Matrix | None = None
-    sim_files: tuple[str, ...] = ()
-    """Which file each row of `sims` belongs to — only files WITH a skeleton
-    vector are in the matrix, and pretending row i maps to files[i] would pin
-    every surprise on the wrong pair the moment one file lacks a vector."""
+    twins: tuple[Twin, ...] = ()
 
     def degree(self, relpath: str) -> int:
         return len(self.near.get(relpath, {}))
@@ -84,6 +79,6 @@ def load_graph(root: str) -> RepoGraph:
         near[target].setdefault(source, set()).add(kind)
         out[source].add(target)
         into[target].add(source)
-    sem, sims, order = semantic_lane(files, vec_paths, vectors)
+    sem, twins = semantic_lane(files, vec_paths, vectors)
     return RepoGraph(files=files, near=near, out=out, into=into,
-                     sem=sem, sims=sims, sim_files=tuple(order))
+                     sem=sem, twins=tuple(twins))

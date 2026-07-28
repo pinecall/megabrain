@@ -60,6 +60,16 @@ class EmbedCache:
         except OSError:
             temp.unlink(missing_ok=True)      # a cache that cannot write is not an error
 
+    def size(self) -> tuple[int, int]:
+        """(entries, bytes) on disk — how visible the growth is (janitor.py)."""
+        from .janitor import measured
+        return measured(self.root)
+
+    def prune(self, older_than_days: float) -> tuple[int, int]:
+        """Drop entries untouched for that many days; (removed, bytes freed)."""
+        from .janitor import swept
+        return swept(self.root, older_than_days)
+
     def _path(self, model: str, text: str) -> Path:
         digest = hashlib.sha256(f"{model}\x00{text}".encode()).hexdigest()
         # Two-character shard: a flat directory with a million entries is slow

@@ -10,8 +10,9 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Callable
 
-from ...chunkers import Chunker, FileResult, validate_partition
+from ...chunkers import FileResult, validate_partition
 from ...storage import Store
+from ..chunking import chunker_for
 from ..discover import Discovery
 from ..strategies import Registry
 
@@ -67,7 +68,7 @@ def plan(discovery: Discovery, store: Store, registry: Registry, *,
         sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
         changed = force or store.files.sha(found.relpath) != sha
         if changed:
-            result = Chunker(strategy.parse).chunk_file(found.relpath, source)
+            result = chunker_for(strategy).chunk_file(found.relpath, source)
             out.violations += bool(validate_partition(result))
             out.pending.append(Planned(found.relpath, sha, result))
         else:

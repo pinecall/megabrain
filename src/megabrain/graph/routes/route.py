@@ -13,8 +13,8 @@ from pathlib import Path
 from ...contracts import GraphPath, Hop
 from ...storage import Store
 from ...storage.locate import resolve_root
-from ..build import load_graph
 from ..symbols.resolve import resolve_node
+from ..warm import warm_graph
 from .paths import shortest_path
 from .story import tell
 
@@ -25,7 +25,7 @@ def graph_path(start: Path | str, source: str, target: str,
                embedder: object = None) -> GraphPath:
     started = time.perf_counter()
     root = resolve_root(start)
-    graph = load_graph(str(root))
+    graph = warm_graph(str(root))
     with Store(root) as store:
         one = resolve_node(store, graph.files, source, embedder)
         two = resolve_node(store, graph.files, target, embedder)

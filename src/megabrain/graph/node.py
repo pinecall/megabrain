@@ -14,10 +14,10 @@ from pathlib import Path
 from ..contracts import Neighbourhood, NodeEdge, NodeView, SemanticTie
 from ..storage import Store
 from ..storage.locate import resolve_root
-from .build import load_graph
 from .clusters.communities import communities_of
 from .clusters.labels import label_communities
 from .symbols.resolve import resolve_node
+from .warm import warm_graph
 
 __all__ = ["graph_node", "neighbourhood"]
 
@@ -27,7 +27,7 @@ def graph_node(start: Path | str, term: str, *, label: bool = False,
     """The full node view, for a TERM — a path, a filename, or a description."""
     started = time.perf_counter()
     root = resolve_root(start)
-    graph = load_graph(str(root))
+    graph = warm_graph(str(root))
     with Store(root) as store:
         relpath = resolve_node(store, graph.files, term, embedder)
         if relpath is None:
@@ -58,7 +58,7 @@ def neighbourhood(start: Path | str, relpath: str) -> Neighbourhood:
     print them would be a worse answer arrived at more slowly.
     """
     started = time.perf_counter()
-    graph = load_graph(str(resolve_root(start)))
+    graph = warm_graph(str(resolve_root(start)))
     if relpath not in graph.near:
         raise FileNotFoundError(f"{relpath} is not in this index")
     return Neighbourhood(

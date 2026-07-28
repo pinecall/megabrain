@@ -29,7 +29,7 @@ from typing import Any, Callable, Protocol
 
 from ..contracts import Bundle, Tier2File
 from ._echo import useful_terms
-from ._terms import MAX_TOKENS, prompt_for
+from ._expand_prompt import MAX_TOKENS, prompt_for
 
 __all__ = ["expand", "MAX_ROUNDS"]
 

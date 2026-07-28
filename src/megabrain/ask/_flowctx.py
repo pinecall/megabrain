@@ -7,7 +7,7 @@ not pay for it.
 
 from __future__ import annotations
 
-from ...contracts import Bundle
+from ..contracts import Bundle
 
 __all__ = ["flow_context"]
 
@@ -19,7 +19,7 @@ def flow_context(bundle: Bundle) -> str:
     them — emitting headers instead of citations, so the splicer replaces
     nothing and the answer names files and lines while showing no code.
     """
-    from ...flows import strip_chrome
+    from ..flows import strip_chrome
 
     return "\n\n".join(
         f'Previously asked: "{flow["question"]}"\n{strip_chrome(flow["text"])}'

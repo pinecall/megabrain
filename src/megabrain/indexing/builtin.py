@@ -19,7 +19,7 @@ from .edges import ModuleIndex, TsFiles, module_index, python_edges, ts_edges, t
 from .strategies import Registry, Strategy
 
 __all__ = ["PythonStrategy", "TypeScriptStrategy", "DocumentStrategy",
-           "default_registry"]
+           "default_registry", "builtin_strategy_for"]
 
 
 class PythonStrategy:
@@ -82,3 +82,9 @@ def default_registry(extra: list[Strategy] | None = None) -> Registry:
     builtin: list[Strategy] = [PythonStrategy(), TypeScriptStrategy(),
                                DocumentStrategy(), *optional_strategies()]
     return Registry(builtin, extra=extra or [])
+
+
+def builtin_strategy_for(ext: str) -> Strategy | None:
+    """The SHIPPED strategy claiming `ext` — what forge's gates measure
+    against, so a repo-local strategy can never be its own reference."""
+    return default_registry().for_path(f"x{ext}")

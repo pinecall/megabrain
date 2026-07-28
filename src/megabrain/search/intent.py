@@ -16,32 +16,40 @@ from __future__ import annotations
 
 import re
 
+from .wording import ASKING_WORDS, CHANGING_STEMS, TEST_NOUNS, WANTING_PHRASES
+
 __all__ = ["wants_tests", "is_task"]
 
 # What the sentence is FOR. An interrogative opening decides it outright:
 # "how do I add a cache header" says "add" and is still a question, and that
-# phrasing is the one most likely to fool a verb list.
+# phrasing is the one most likely to fool a verb list. The non-English openers
+# come from `wording.py` — data, so a language is a row, not a redesign.
 _ASKING = re.compile(r"^\s*(how|where|what|why|which|who|when|does|do|is|are|"
-                     r"can|should|explain|describe|show)\b", re.IGNORECASE)
+                     r"can|should|explain|describe|show|"
+                     + "|".join(ASKING_WORDS) + r")\b", re.IGNORECASE)
 
 # The verbs that name a CHANGE to the repository. Anchored to the start of a
 # clause so "where does the indexer add chunks" — a description of code that
-# adds — is not read as a request to add anything.
+# adds — is not read as a request to add anything. English keeps its measured
+# exact list; the other languages match as stems (`\w*` covers conjugation).
 _CHANGING = re.compile(
-    r"(^|[.;]\s*|\band\s+)(add|implement|create|build|write|introduce|support|"
+    r"(^|[.;]\s*|\b(?:and|y|e|et|und)\s+)"
+    r"(add|implement|create|build|write|introduce|support|"
     r"fix|change|update|modify|rename|remove|delete|drop|refactor|migrate|"
-    r"wire|hook|extend|replace|make)\b",
+    r"wire|hook|extend|replace|make|"
+    + "|".join(stem + r"\w*" for stem in CHANGING_STEMS) + r")\b",
     re.IGNORECASE)
 
 # The other way people phrase a change: "we need a way to…", "it should…".
-_WANTING = re.compile(r"\b(we|i)\s+(need|want)\b|\bshould\s+be\s+able\b",
-                      re.IGNORECASE)
+_WANTING = re.compile(r"\b(we|i)\s+(need|want)\b|\bshould\s+be\s+able\b|\b(?:"
+                      + "|".join(WANTING_PHRASES) + r")\b", re.IGNORECASE)
 
 # The noun, not the verb: "tests", "spec", "test coverage". `tested` is here
 # because "where is this behaviour tested" is the same request phrased as a
 # participle, and that phrasing is common enough to matter.
 _ASKS = re.compile(
-    r"\b(tests?|testing|tested|specs?|test[- ]?(?:case|suite|coverage|file)s?)\b",
+    r"\b(tests?|testing|tested|specs?|test[- ]?(?:case|suite|coverage|file)s?|"
+    + "|".join(TEST_NOUNS) + r")\b",
     re.IGNORECASE)
 
 # The trap this rule exists to survive: a question ABOUT the machinery that

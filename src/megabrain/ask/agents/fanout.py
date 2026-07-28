@@ -17,9 +17,9 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
+from ...events import Emit, emit_nothing
 from ...providers.chat import ChatProvider
 from ...storage.model import ChunkMeta
-from ..events import Emit, emit_nothing
 from ._pool import gather
 
 __all__ = ["Task", "run_agents"]

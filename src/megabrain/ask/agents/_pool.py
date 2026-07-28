@@ -11,8 +11,8 @@ import os
 from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError, as_completed
 from typing import TYPE_CHECKING
 
+from ...events import Emit
 from ...providers.chat import ChatProvider
-from ..events import Emit
 from ._subagent import answer_part
 
 if TYPE_CHECKING:

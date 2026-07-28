@@ -113,3 +113,29 @@ def test_a_repo_whose_index_is_gone_is_hidden_but_NOT_deleted(tmp_path: Path) ->
     write_registry({str(missing): {"path": str(missing), "name": "vanished"}})
     assert known() == []
     assert str(missing) in json.loads(registry_path().read_text(encoding="utf-8"))
+
+
+# ---- concurrent writers ----------------------------------------------------
+
+
+def test_concurrent_updates_lose_no_entry(tmp_path: Path) -> None:
+    """Two engines (or two `index` runs) write this file at once — the exact
+    scenario the module documents. Unlocked read-modify-write interleaves and
+    silently drops an entry, which is data no re-index brings back for the
+    OTHER engine's user."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from megabrain.usecases._registry import read_entries, update_entries
+
+    target = tmp_path / "registry.json"
+
+    def add(n: int) -> None:
+        def merged(entries: dict[str, dict[str, object]]) -> None:
+            time.sleep(0.005)          # widen the read-modify-write window
+            entries[f"/repo/{n}"] = {"path": f"/repo/{n}"}
+        update_entries(target, merged)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(add, range(24)))
+    assert len(read_entries(target)) == 24

@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import re
 
-from ..ask.citing._quote import lines_of
 from ..storage import Store
+from ..storage.lines import lines_of
 from .idents import identifiers
 
 __all__ = ["referenced_sites", "MAX_REFERENCED"]

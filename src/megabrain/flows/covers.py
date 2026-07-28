@@ -29,13 +29,22 @@ for exactly the rephrasings it exists to catch.
 """
 
 # Question scaffolding carries no topic: "how does X work" and "where is X
-# handled" ask the same thing about X. Only the CONTENT words decide.
+# handled" ask the same thing about X. Only the CONTENT words decide. The
+# non-English rows exist because an ASCII-era version counted `cómo` and `el`
+# as topic, and no Spanish paraphrase could ever reach the coverage bar.
 STOP = frozenset("""a an and are as at be been but by can do does doing done for
 from get gets had has have how i if in into is it its of on or our so than that
 the their then there these they this to under up upon was were what when where
-which while who why will with would you your""".split())
+which while who why will with would you your
+cómo como dónde donde qué cuál quién cuándo el la los las un una unos unas de
+del en es son está están para por con se al lo su sus y o funciona hace
+onde quem quando um uma os das dos no na em não com sem seu sua
+comment où pourquoi quel quelle qui quand le les des du au aux est sont dans
+pour sur ce cette il elle ne pas que
+wie wo warum was welche wer wann der die das den dem ein eine einen einer ist
+sind für mit von auf im am und oder nicht""".split())
 
-_WORD = re.compile(r"[a-z0-9_]+")
+_WORD = re.compile(r"[^\W\s]+", re.UNICODE)
 
 
 def content_words(text: str) -> set[str]:

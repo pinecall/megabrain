@@ -12,28 +12,24 @@ from __future__ import annotations
 
 from ...contracts import Surprise
 from ..build import RepoGraph
+from ..semantic import SURPRISE_MIN
 
 __all__ = ["surprises_of", "SURPRISE_MIN", "SURPRISE_TOP"]
 
-# Stricter than a mere semantic edge: a surprise is an ACCUSATION, and it had
-# better be sure.
-SURPRISE_MIN = 0.85
 SURPRISE_TOP = 10
 
 
 def surprises_of(graph: RepoGraph, communities: dict[str, int]) -> list[Surprise]:
-    """The strongest unconnected twins across community lines."""
-    if graph.sims is None:
-        return []
-    found: list[Surprise] = []
-    order = graph.sim_files
-    for i, left in enumerate(order):
-        for j in range(i + 1, len(order)):
-            right = order[j]
-            score = float(graph.sims[i, j])
-            if (score >= SURPRISE_MIN
-                    and right not in graph.near.get(left, {})
-                    and communities.get(left) != communities.get(right)):
-                found.append(Surprise(a=left, b=right, score=round(score, 3)))
+    """The strongest unconnected twins across community lines.
+
+    The candidates arrive on the graph already above `SURPRISE_MIN` — collected
+    by the semantic lane while the cosines existed — so the two legs left to
+    check here are the two that need the rest of the graph: no edge between the
+    pair, and different communities.
+    """
+    found = [Surprise(a=left, b=right, score=round(score, 3))
+             for left, right, score in graph.twins
+             if right not in graph.near.get(left, {})
+             and communities.get(left) != communities.get(right)]
     found.sort(key=lambda entry: (-entry["score"], entry["a"]))
     return found[:SURPRISE_TOP]

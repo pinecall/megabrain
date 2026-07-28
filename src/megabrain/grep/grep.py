@@ -28,16 +28,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..ask.converse.loop import answered
-from ..ask.events import Emit, emit_nothing
-from ..ask.prompt._candidates import candidates_of
-from ..ask.prompt._chunkblocks import chunk_blocks
 from ..contracts import Bundle
+from ..converse.candidates import candidates_of
+from ..converse.chunkblocks import chunk_blocks
+from ..converse.loop import answered
+from ..events import Emit, emit_nothing
 from ..search import search
 from ..storage import Store
 from ..storage.locate import resolve_root
+from ._prompt import GREP_PROMPT
 from .sites import sites_from
-from .words import GREP_PROMPT
 
 __all__ = ["grep"]
 
@@ -81,9 +81,9 @@ def _judged(root: Path, bundle: Bundle, task: str, emit: Emit) -> str:
     Fails OPEN: with no credential the deterministic rows are still the answer,
     so a missing key degrades the render instead of the command.
     """
-    from ..ask.ask import _narrator
+    from ..converse.backend import narrator_for
 
-    provider = _narrator(root)
+    provider = narrator_for(root)
     if provider is None:
         emit({"type": "unjudged", "reason": "no chat credential"})
         return ""

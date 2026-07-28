@@ -2,6 +2,12 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
+**`megabrain studio` is now `megabrain ui`.** The command served a web UI; "studio" was a
+product name for it that nobody typing `--help` could guess. `studio` stays as an argparse
+alias — it is in the published README and in the demo box's deploy script, and a rename
+that breaks a documented invocation is a rename that costs somebody an outage. The
+TypeScript workspace keeps its `studio/` directory name; only the verb moved.
+
 **`resolve()` shipped with no caller.** The chat registry existed, was tested, and every
 production site constructed `OpenAICompatible` by name anyway — including `ask`'s
 `_narrator`. So "adding a backend is an adapter plus an entry" was true of the registry and

@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
-__all__ = ["read_entries", "write_entries"]
+from ._lockfile import held
+
+__all__ = ["read_entries", "write_entries", "update_entries"]
 
 
 def read_entries(target: Path) -> dict[str, dict[str, Any]]:
@@ -54,3 +56,18 @@ def write_entries(target: Path, entries: dict[str, dict[str, Any]]) -> None:
     temp = target.with_suffix(".json.tmp")
     temp.write_text(json.dumps(entries, indent=1, sort_keys=True), encoding="utf-8")
     temp.replace(target)
+
+
+def update_entries(target: Path,
+                   mutate: Callable[[dict[str, dict[str, Any]]], None]) -> None:
+    """Read, mutate, write — under an OS lock, so two writers cannot interleave.
+
+    The atomic rename above protects a READER from a torn file; it does nothing
+    for two writers, whose read-modify-write windows overlap and silently drop
+    whichever entry landed first. Two `index` runs — or this engine and the one
+    it replaces — hit that for real on a file that is nobody's to regenerate.
+    """
+    with held(target):
+        entries = read_entries(target)
+        mutate(entries)
+        write_entries(target, entries)

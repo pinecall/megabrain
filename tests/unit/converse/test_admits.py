@@ -18,7 +18,7 @@ sentence, which is what makes it a reliable signal that something went wrong.
 
 from __future__ import annotations
 
-from megabrain.ask.converse._admits import admitted_gap
+from megabrain.converse._admits import admitted_gap
 
 CONFESSIONS = [
     "`dispatch!` is not shown in the provided chunks, though its behavior is implied",

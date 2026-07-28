@@ -7,9 +7,9 @@ WHEN to call it and what to do with the result — a different kind of change.
 
 from __future__ import annotations
 
+from ...events import Emit
 from ...providers.chat import ChatProvider
 from ...storage.model import ChunkMeta
-from ..events import Emit
 from .repair import broken_references, repair
 from .splice import splice
 

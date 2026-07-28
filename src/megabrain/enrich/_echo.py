@@ -1,6 +1,6 @@
 """Which proposed identifiers are worth resolving.
 
-Split from the asking (`_terms.py`) because it is a different job: that module
+Split from the asking (`_expand_prompt.py`) because it is a different job: that module
 decides what the model is TOLD, this one decides what it is BELIEVED about.
 
 The echo is the expensive failure and the reason this is code rather than a

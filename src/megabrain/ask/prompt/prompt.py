@@ -9,8 +9,8 @@ two deliverables that both depend on it.
 
 from __future__ import annotations
 
+from ...converse.chunkblocks import chunk_blocks
 from ...storage.model import ChunkMeta
-from ._chunkblocks import chunk_blocks
 
 __all__ = ["build_prompt", "RULES", "OPENING"]
 

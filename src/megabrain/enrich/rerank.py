@@ -18,7 +18,7 @@ from ..contracts import Bundle, Tier2File
 from ..providers.chat import ChatProvider
 from ._batches import RERANK_TIMEOUT, verdict_of
 from ._cards import listing
-from ._prompt import PROMPT
+from ._judge_prompt import PROMPT
 from ._verdict import ids_in
 
 __all__ = ["rerank", "judge_provider", "RERANK_MODEL"]
