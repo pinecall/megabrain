@@ -33,10 +33,18 @@ examples/
 .brainbank/
 
 # local working notes, not for public history
-REFACTOR.md
 NEXT.md
 
 # the golden HARNESS is versioned (evals/harness/); only the private corpus is not
 evals/golden.json
 evals/private/
 evals/swebench/
+
+# taskops — commit events.jsonl and NOTHING else under .taskops/
+.taskops/db.sqlite
+.taskops/db.sqlite-wal
+.taskops/db.sqlite-shm
+.taskops/GUIDE.md
+.taskops/workers/
+.taskops/trees/
+# .taskops/reports/ is COMMITTED — a written dossier is not derived state

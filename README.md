@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/megabrain/"><img src="https://img.shields.io/pypi/v/megabrain?style=flat-square&color=3776AB" alt="PyPI"></a>
+  <a href="https://pypi.org/project/megabrain/"><img src="https://img.shields.io/badge/version-1.0.0-3776AB?style=flat-square" alt="v1.0.0"></a>
   <a href="https://github.com/bernatch22/megabrain/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/bernatch22/megabrain/ci.yml?style=flat-square&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT">
   <img src="https://img.shields.io/badge/retrieval-no%20LLM%20·%20milliseconds-2ea44f?style=flat-square" alt="No LLM in the retrieval path">
@@ -22,21 +22,21 @@
 
 <br>
 
-Point megabrain at a repo and ask **"how does auth work"** in plain English. It finds all
-the related code in **milliseconds** with **no LLM** — just math on embeddings, in **one
-SQLite file**. No vector DB, no containers, no services.
+```
+$ megabrain ask "how does auth work end to end" ~/repo
+· retrieved in 12ms — 3 core, 14 related          ← deterministic, no LLM, already the answer
+· narrating over 24 chunks…                       ← one model call, code spliced VERBATIM from disk
+```
 
-Want it *explained*? `ask` adds one LLM call that narrates a walkthrough with the **real
-code spliced in from disk**, line for line. The model only ever *points* at code — it
-cannot rewrite a line, so nothing is invented.
-
-<br>
+No vector DB. No containers. No services. **One SQLite file** per repo, math on
+embeddings, and a hard rule with a test behind it: **the model can point at code,
+it can never write it.**
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bernatch22/megabrain/master/assets/studio-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/bernatch22/megabrain/master/assets/studio-light.png">
-    <img alt="megabrain studio's Ask tab on sinatra: one question served instantly from the flow cache, and below it a live synthesis — retrieval in 25 ms across 14 files, then the cited answer streaming with the real code spliced in." src="https://raw.githubusercontent.com/bernatch22/megabrain/master/assets/studio-light.png" width="900">
+    <img alt="megabrain studio: retrieval lands in 25 ms across 14 files, then the cited answer streams with the real code spliced in." src="https://raw.githubusercontent.com/bernatch22/megabrain/master/assets/studio-light.png" width="900">
   </picture>
 </p>
 
@@ -46,414 +46,212 @@ cannot rewrite a line, so nothing is invented.
   <a href="https://bernardocastro.dev/megabrain/demo/"><b>Try it live →</b></a>
 </p>
 
-<br>
-
 ---
 
-## Quickstart
-
-**Note the argument order: the question comes first, the path second — and the path
-defaults to `.`, so inside the repo you can leave it off.**
-
-### One key, nothing to configure
+## 60 seconds
 
 ```bash
 pip install megabrain
 export OPENROUTER_API_KEY=sk-or-...
 
-megabrain index ~/repo                                  # once — incremental after
-megabrain ask   "how does auth work end to end" ~/repo
+megabrain index ~/repo                       # once — incremental by content hash after
+megabrain ask  "how does auth work" ~/repo   # question FIRST, path second (defaults to .)
+megabrain install                            # wire the MCP server into Claude Code, Codex,
+                                             # Cursor, Windsurf, Gemini CLI, Antigravity
 ```
 
-That single key gets you the whole validated stack, and it is already the default:
+One key gets the whole measured stack: `pplx-embed-v1-0.6b` for retrieval (won the
+bakeoff against pplx-4b, codestral-embed, openai-3-large, bge-m3),
+`gemini-3.1-flash-lite` narrates, `gemini-3.5-flash-lite` judges. Every default is
+a measurement, not a guess → [the numbers](docs/GUIDE.md#providers-and-models).
 
-- **`perplexity/pplx-embed-v1-0.6b`** for retrieval — the measured best for code recall.
-  It beat pplx-4b, codestral-embed, openai-3-large and bge-m3 in a head-to-head bakeoff
-  (R@1 **0.864**, bundle_full **0.955**).
-- **`google/gemini-3.1-flash-lite`** narrates, **`google/gemini-3.5-flash-lite`** judges.
-  Two constants because the jobs are not the same: narration reasons about a flow in
-  prose, the judge emits a short id array. Measured over 20 mined cases × 3 repetitions,
-  3.5-lite prunes one file tighter every time — and *bigger is worse*, also measured:
-  reasoning models return empty (thinking eats the token cap) and plain
-  `gemini-3.5-flash`, five times the price, failed open at 5.6 s.
+---
 
-Every default here is a measurement, not a guess. → [the numbers](docs/GUIDE.md#providers-and-models)
+## Three verbs, three jobs
 
-### Choosing the chat backend — one switch, every lane
+"Find me this code" is **three different jobs**, and answering all three the same
+way is what makes most code-search tools feel almost useful. megabrain ships one
+deterministic retrieval core and three deliverables on top of it:
 
-Every model lane — the narrator (`ask`), `grep --why`, the judge (`--rerank`), the
-expander, the map labels — gets its backend from one switch. Two backends, each with its
-own default model:
-
-| provider | selects | default model | what it needs |
+| you are about to… | verb | what comes back | LLM? |
 |---|---|---|---|
-| *(unset)* → **`openrouter`** | any OpenAI-compatible endpoint | `google/gemini-3.1-flash-lite` narrates · `google/gemini-3.5-flash-lite` judges | `OPENROUTER_API_KEY` (or a local endpoint, no key) |
-| **`claude`** | the Claude Agent SDK (bundled Claude Code binary) | `haiku` for every lane | `pip install 'megabrain[claude]'` + a logged-in Claude Code, or `ANTHROPIC_API_KEY` |
+| **EDIT** code | `grep` | files + symbols + **exact line ranges**, zero code quoted | **no** (~50 ms) |
+| **UNDERSTAND** a flow, or copy a pattern from another repo | `ask` | the walkthrough, real code **spliced verbatim** from the index | 1 call |
+| read the **DOCS**, or get the map | `search` | ranked files, best span each, symbols — instant | **no** |
 
-Set it **per repository** — committed, so the whole team narrates on the same lane:
+### `grep` — when you are going to edit. Use this one to go FAST.
 
-```json
-{ "models": { "provider": "claude" } }
-```
-
-or **per shell**, for just you:
-
-```bash
-export MEGABRAIN_CHAT_PROVIDER=claude
-```
-
-The file beats the env var, the env var beats the default — same precedence as every other
-`megabrain.json` field, and for the same reason: a committed config travels with the clone,
-a shell setting is invisible to the next person. Retrieval is untouched either way — it
-never calls a model — and **embeddings always keep their own key**, because Anthropic has
-no embeddings API.
-
-### Narrating through the Claude Agent SDK
-
-```bash
-pip install 'megabrain[claude]'
-# then "provider": "claude" in megabrain.json, or the env var above
-export MEGABRAIN_ASK_MODEL=haiku          # optional — CLI names, not `vendor/model`
-unset ANTHROPIC_API_KEY                   # ← see below. Not optional.
-```
-
-**`ANTHROPIC_API_KEY` takes precedence over the Claude Code login, and it wins silently.**
-With one exported, the run bills that API account and never touches the local login —
-which, if the key belongs to an account with no credit, ends the call with
-`the Claude CLI refused the run: Credit balance is too low` while a perfectly good login
-sits unused. The CLI prints a warning about this and it is easy to read past. Unset the
-variable to use the local login; export it to bill that API account deliberately. Bedrock
-and Vertex are selected with the variables the SDK documents.
-
-**This lane narrates from the retrieved material without opening extra files** — the SDK
-runs its own tool loop, so `ask` answers in one pass instead of reading its way down a call
-chain. Measured on this repository, `haiku`, 24 candidates: **27 s end to end, first token
-at 14 s, 48 streamed deltas**. The HTTP lane stays the default for a reason.
-
-### Local and hybrid — Ollama embeddings, your choice of narrator
-
-The two halves are independent, and that is the useful part: **embeddings decide what your
-code touches** (they see every file), the **narrator only explains** what retrieval already
-chose. So run the embeddings locally and pick the narrator per taste:
-
-| setup | embeddings | narrator | cloud cost |
-|---|---|---|---|
-| **hybrid — subscription** | Ollama `bge-m3`, local | Claude Code login (`provider: "claude"`) | $0 beyond the subscription |
-| **hybrid — cheap cloud** | Ollama `bge-m3`, local | OpenRouter `gemini-3.1-flash-lite` | cents |
-| **fully local** | Ollama `bge-m3` | Ollama `qwen3-coder:30b` | $0, air-gapped |
-
-The hybrid with the subscription is the sweet spot if you already run Claude Code: your
-code is embedded on your own machine, and the narration bills nothing new.
-
-```bash
-pip install 'megabrain[languages,claude]'
-ollama pull bge-m3
-
-export MEGABRAIN_EMBED_BASE_URL=http://localhost:11434/v1
-export MEGABRAIN_EMBED_MODEL=bge-m3
-export MEGABRAIN_CHAT_PROVIDER=claude     # or "provider": "claude" in megabrain.json
-unset ANTHROPIC_API_KEY                   # narrate on the login, not an API account
-
-megabrain index ~/repo --force            # --force re-embeds with the new model
-megabrain ask   "how does auth work end to end" ~/repo
-```
-
-**Fully local** — zero cloud, open weights end to end, **your code never leaves the
-machine**:
-
-```bash
-pip install 'megabrain[languages]'
-ollama pull bge-m3 && ollama pull qwen3-coder:30b
-
-export MEGABRAIN_EMBED_BASE_URL=http://localhost:11434/v1
-export MEGABRAIN_EMBED_MODEL=bge-m3
-export MEGABRAIN_CHAT_BASE_URL=http://localhost:11434/v1
-export MEGABRAIN_ASK_MODEL=qwen3-coder:30b
-
-export MEGABRAIN_ASK_CTX_CHARS=105000     # ← required: see below
-export OLLAMA_CONTEXT_LENGTH=40960
-
-megabrain index ~/repo --force
-megabrain ask   "how does auth work end to end" ~/repo
-```
-
-A local endpoint needs **no key** — megabrain recognises a loopback URL and skips the
-credential check entirely.
-
-**Use a real coder model.** `qwen3-coder` is the one that holds up — the small dense
-models are not a cheaper trade-off, they cite less *and* run slower, and a
-general-purpose model of the same size does markedly worse on code.
-
-**A model without tool support still works, with less reach.** The narrator offers an
-`open_file` tool so it can follow a call chain past the retrieved chunks; a runtime that
-cannot take tools rejects the whole request (Ollama answers `HTTP 400 does not support
-tools`). megabrain notices, retires the tool for that conversation and narrates from the
-retrieved material — one `toolless` event says so, rather than the walkthrough quietly
-losing a capability. Verified end to end on Ollama with `embeddinggemma` + `gemma3:1b` and
-no cloud credential of any kind.
-
-**`MEGABRAIN_ASK_CTX_CHARS` is not optional.** The prompt budget defaults to 200 000
-characters, sized for cloud context windows, so a local model silently gets a truncated
-prompt — no error, just quietly worse answers. Compared to the cloud you lose some
-*secondary* citations, never correctness: the code you are shown is still spliced
-verbatim from disk.
-
-`bge-m3` is the local embedder to use. It matches the cloud one on the measure that
-decides whether `ask` gets the right code at all, and trails it on ranking the single
-best file first — a real trade, and a small one.
-
-**[The numbers, and the extra knob thinking models need →](docs/RECIPES.md#run-fully-local--no-keys-no-cloud)**
-
----
-
-Python, JS/TS and Markdown work out of the box. `pip install 'megabrain[languages]'`
-adds Ruby · Go · Rust · PHP · C · C++ · Java · C# — eight wheels with native code in
-them, which is why a default install does not carry them.
-Every setup, with its cost: **[Guide](docs/GUIDE.md#1-install-and-your-first-answer)**.
-
----
-
-## What you get
-
-**Retrieval that cannot hallucinate.** The search path has no LLM at all — dense chunk
-vectors fused with a file-skeleton signal and the import/call graph. It is enforced by a
-test that walks imports, not by discipline. The narrator only ever *cites* spans and the
-engine splices the verbatim bytes, so no line is ever invented. Two optional model lanes
-ride on top — [`--rerank` for order, `--expand` for recall](docs/GUIDE.md#2-the-two-ways-to-ask)
-— both off by default, both fail-open, neither inside the core path.
-
-**`ask` — the repo, explained.** One call returns a senior-engineer walkthrough of the
-whole cross-file flow, with the real code spliced in at each step. The narrator **opens
-whatever the retrieved chunks left unexplained** — the definition a call lands on, the
-test that pins the behaviour — and keeps reading until the answer is complete. Broad
-questions [fan out into parallel sub-agents](docs/GUIDE.md#2-the-two-ways-to-ask), one per
-subsystem, and a synthesizer merges their cited answers.
-
-**It learns from itself.** Every `ask` caches its walkthrough. Ask again — even reworded —
-and it serves in **~0 ms with zero LLM** (measured 27.8 s → 0.19 s), guarded by a
-byte-level sha recheck so it can never describe code that changed.
-[How it works →](docs/GUIDE.md#5-it-remembers--the-flow-cache)
-
-**A knowledge graph, for free.** The same index doubles as a navigable map: clusters, the
-core "god node" files, and the real call-path between any two files — built from AST edges
-plus embedding similarity, numpy only, no networkx.
-[What it's actually good for →](docs/GUIDE.md#4-map-the-repo-with-the-graph)
-
-**The answer is a MAP, not a wall of code.** `search` returns the files that answer the
-task, each with its best-matching span (true line numbers) and the symbols it declares —
-**~2 700 tokens against ~8 100 with bodies**, measured on a real bundle. The span already
-says which lines to open, so the code is one `--full` away when you want it and never in
-the way when you do not.
-
-**A local studio.** `megabrain studio` opens the whole engine in your browser: search,
-ask, the flow cache and the graph on a live canvas, plus a read-only code navigator
-where every identifier is a go-to-definition link.
-[Take the tour →](docs/GUIDE.md#3-the-studio)
-
-**Everywhere you work.** A terminal CLI, an MCP server inside Claude Code / Codex /
-Cursor / Windsurf / Gemini CLI / Antigravity, a Python library, and the studio.
-
----
-
-## For coding agents
-
-This is what megabrain is *for*. Dropped into an unfamiliar repo, an agent burns 10–30
-tool turns — grep, open a file, follow an import, grep again — before it writes a line,
-and the picture it assembles is still its own guess.
-
-```bash
-megabrain install    # detects Claude Code · Codex · Cursor · Windsurf · Gemini CLI · Antigravity
-```
-
-|  | by hand | one megabrain call |
-|---|---|---|
-| tool turns | 10–30 | **1** |
-| what lands in context | whole files, mostly irrelevant | **exactly the signal chunks** |
-| the cross-file story | reconstructed, unverified | **narrated, real code spliced in** |
-| asking it again later | the full re-exploration | **~0 ms, from the cache** |
-
-### Four tools, one retrieval core
-
-Three of them run the same deterministic retrieval and differ only in **what they hand
-back** — because "find me this code" is three different jobs, and answering all three the
-same way is what makes a tool feel almost useful. The fourth makes a repo answerable.
-
-| you are about to… | tool | what comes back | size |
-|---|---|---|---|
-| **EDIT** — you know roughly what to change | **`megabrain_grep`** | the files to open, the symbols in them worth opening, each one's **exact line range**. **The lanes run no model**: identifiers from your task matched against the index, plus one hop to the contracts those sites reference | a few hundred to ~2k chars, **~50 ms of lanes** |
-| **UNDERSTAND** — a mechanism, a bug, or a pattern you want to copy out of another repo | **`megabrain_ask`** | the flow narrated end to end with the **real code spliced in**, plus the definition of every helper it names and the tests that pin what it described | ~1–2k words |
-| read the **DOCS**, or get the map | **`megabrain_search`** | the files that answer, each with its best span and symbols. `content: "docs"` for prose — this is the one to reach for when a repo's README *is* the API reference | ~2 700 tokens |
-| make a repo answerable | **`megabrain_index`** | the index, incremental by content hash | — |
-
-Each `inputSchema` is generated from `contracts/tools.py`, so a parameter cannot exist on
-the wire without existing in the dispatch.
-
-### Why `grep` quotes no code, on purpose
-
-Your editor makes you open the file to change it. So a tool that pastes the body has
-billed you for reading it twice — and that is not a guess, it is why the earlier
-`megabrain_code` was **deleted**: measured across five tasks in three languages, the
-retrieval was excellent and the citation was waste.
-
-What no editor and no `grep` can give you is the **line range of the thing that matters**:
+You hand it the **task**, it hands you every file the change has to touch — with
+the exact range to jump to:
 
 ```
-$ megabrain grep "the read tool refuses non-regular files but write does not — add the guard" \
-    ~/experiments/anthropic-sdk-python
+$ megabrain grep "Option has show_envvar; add show_envvar_value" ~/click
 
-## src/anthropic/lib/tools/agent_toolset.py
-  in scope: annotations, os, re, uuid, base64, shutil, logging, subprocess, S_ISREG, …
-  L567-616  beta_read_tool — the guard to copy for non-regular file rejection
-  L619-634  beta_write_tool — add the non-regular file guard here to match read tool
-
-## tests/lib/tools/test_agent_toolset.py
-  in scope: annotations, os, sys, base64, Any, cast, Path, Required, get_args, …
-  L340-345  test_edit_binary_raises_tool_error — add a test case here for writing to a non-regular file
+## src/click/core.py
+  in scope: os, typing, ParamType, …
+  L2944-3023  Option.__init__ — declare the new keyword argument
+  L3106-3130  Option.get_help_extra — where the flag must be read, or it does nothing
+## src/click/types.py
+  L1045-1050  OptionHelpExtra — the TypedDict that gains a key
+## tests/test_options.py
+  L758-766    test_show_envvar — the test to imitate
 ```
 
-That is the real output, trimmed to the first two of five files (the whole answer is
-1 690 characters, 8 rows). `grep -r "regular file"` finds the string; this finds the
-**place with no matching string at all** — `beta_write_tool`, which is the whole point,
-because the code you have to change is the code that does not yet mention the thing. The
-`in scope:` line is what the file already has imported, so you know whether the guard's
-helper (`S_ISREG`, here) needs an import added.
+Three things `grep -rn` structurally cannot do:
 
-**And the lanes run no model to do it.** That was measured after being built the wrong
-way round: on click's `show_envvar_value` task the deterministic lanes alone returned 10 of 11
-rows in **0.05 s**, while adding a model pass took **1.3 s** — 26× — for one extra row and
-a note on each. A tool that stands in for `grep` cannot charge a model call by default.
-`--why` / `why: true` buys that row back: it is the one no literal search can reach, whose
-text never contains the task's own words.
+1. **It resolves a match to the symbol containing it.** "Line 2952" becomes
+   "`Option.__init__`, L2944-3023" — a place to *jump*, not a place to start reading.
+2. **It reaches the site with no matching string.** `OptionHelpExtra`'s text never
+   contains `show_envvar` — it is found by following the return type the sites
+   already declare. Miss it and you ship a flag that parses, stores, and never
+   shows up. **Coverage: 7/7 sites vs grep's 6/7**, and the missed one is always
+   this kind.
+3. **It quotes no code, on purpose.** Your editor opens the file to edit it — a
+   tool that pastes the body bills you for reading it twice. Measured on the whole
+   job (find + read): **4,074 tokens vs 20,715** for grep+windows (5.1×), vs
+   **110,499** (27×) when the hit lands in a 3,600-line module.
 
-Two honest caveats about that number. The ~50 ms is the **lanes**; the wall clock also
-carries one round trip to embed your task (content-addressed, so a repeated one is free)
-and Python's startup. And a task that names **no identifier the index knows** would return
-zero rows — measured across ten repositories, eight of ten tasks phrased as pure outcome
-did exactly that — so that case alone falls back to the model pass rather than answering
-empty. Fast and wrong is worse than a second and right.
+The lanes run **no model** (that is the whole reason it can stand in for `grep`);
+`--why` adds one call for a note per row. Name the identifiers you already know —
+"Option has show_envvar; add X" beats "make the help show env values", measured 4×.
 
-The split of labour inside is deliberate: the model names the symbol, the **engine** reads
-the line range out of the symbol table. Asking a model for line numbers was measured and
-rejected — unnumbered, its ranges "landed a few lines off and cut functions mid-body".
+### `ask` — when you need to understand. NOT when you're about to edit your own code.
 
-**The test suite counts as a place to look, and in JS it used to be invisible.** A mocha or
-jest file declares its units by *calling* a function with a label and a closure, which the
-grammar reads as an expression statement — so express's `test/res.attachment.js` was
-indexed with two symbols, both `require` bindings, and since a match resolves to the
-symbol *containing* it, no row could land inside any test file in a JS repository. Those
-blocks are symbols now (express: **3.9 → 12.3 symbols per file**), and every row respects
-one quota: **all of the implementation, a sample of the tests** — `sendFile` has three
-implementation sites and 44 cases, and the reader needs one example, not forty-four.
+The flow narrated end to end, the real bytes spliced at every citation, plus —
+deterministically, no extra model call — the definition of every helper the prose
+names and **the tests that pin the behaviour** (the one 1,600 lines away that your
+change breaks and nobody cited). The narrator *opens files* the retrieved chunks
+left unexplained and keeps reading until the answer is complete: **19 tool calls
+by hand vs 6**, on a 1,220-file repo.
 
-If you indexed a repo before this, a plain `megabrain index` picks it up with **zero
-embedding calls** — symbols cost a parse, so re-extracting them is free.
+Where it shines: **understanding a mechanism in a big repo you don't know, or
+copying a pattern out of another project.** `megabrain ask ~/other-repo "how does
+their retry loop classify errors"` is the fastest way to steal a design correctly.
 
-**Measured against the `grep` it replaces**, on click, express and sinatra at pinned
-commits: the same job costs **4 074 tokens against 20 715** (5.1×) — or against 110 499
-(27×) when the hit lands in a 3 600-line module and you read the file. Coverage **7 of 7
-sites against 6 of 7**, and the one grep cannot reach is the one that breaks the change: a
-`TypedDict` whose text never contains the string you searched for. Latency is a tie
-(milliseconds either way — the saving is tokens and turns, and anyone selling you speed
-here is selling you nothing).
+Where it's the wrong tool: **right before an edit in your own repo.** Your agent
+will `Read` the files before touching them anyway — it must — so an `ask` answer
+puts the same code in context **twice**, and a context with two copies of the
+truth is how an LLM gets confused about which one it's editing. About to edit →
+`grep`. Need the story → `ask`.
 
-**[The tables, the method, and where it is biased →](docs/BENCHMARKS.md)** — reproduce with
-`./benchmarks/setup.sh && python benchmarks/measure.py`.
+The prose is narration; the **code is verbatim**. Check the first against the second.
 
-### Why `search` is never the input for an edit
+### `search` — instant, zero LLM, and the docs reader
 
-`search` hands you chunks straight from the index with no model in the loop, which makes it
-the fastest and the most honest of the three — and unusable for a change. It **ranks what
-exists**, so when the bug is a missing call, an unset flag or an absent guard, the very
-thing you need is the one thing it cannot rank. Reach for it to read a repo's docs
-(`content: "docs"`) or to get your bearings; reach for `grep` to edit.
+Embeddings straight from the index: the files that answer, each with its best
+span (true line numbers) and its symbols. **~2,700 tokens vs ~8,100 with bodies**;
+the span already says which lines to open. `--full` inlines the code,
+`content: "docs"` searches the indexed markdown — when a repo's README *is* the
+API reference, this is the verb.
 
-> **Put this in your agent's rules:** about to change code in an indexed repo →
-> `megabrain_grep`, not `grep`. Want to understand a mechanism or copy a pattern from
-> another project → `megabrain_ask`. Reading documentation → `megabrain_search` with
-> `content: "docs"`. Never chain one call per sub-question: one call covers a task.
+Two opt-in model lanes ride on top, both fail-open, neither in the core path:
+`--rerank` (order — a judge drops vocabulary-only look-alikes, never a file) and
+`--expand` (recall — a model names the identifiers your wording missed, the
+**symbol table** resolves them; a name it can't resolve is dropped, not guessed).
 
-[Every parameter →](docs/REFERENCE.md#mcp-tools) ·
-[Wiring recipes →](docs/RECIPES.md#give-your-coding-agent-the-whole-repo)
+One honest limit: `search` **ranks what exists**. When the bug is a missing call
+or an absent guard, the thing you need is the one thing it cannot rank — that's
+`grep`'s job (it finds the site the change lands in, not the string).
 
----
-
-## Commands
-
-Nine verbs. The query comes first and the path is optional — `[path]` may be **any
-sub-path inside an indexed repo**, and retrieval is scoped to files under it.
-
-```bash
-megabrain index  [path]                        # build / update the index (incremental)
-megabrain scan   [path]                        # census only: what WOULD index, and skips
-megabrain search "retry logic" [path]          # the code map, no LLM
-megabrain search "retry logic" --full          #   …with the code bodies inline
-megabrain ask    "how does X work" [path]      # narrated walkthrough + real code
-megabrain grep   "add a retry to X" [path]     # where to edit: files, symbols, line ranges
-megabrain get    path/to/file.py [path]        # one file, or one symbol
-megabrain graph  [path]                        # the repo as a knowledge graph
-megabrain studio                               # the web UI + JSON API on :2137
-megabrain install                              # register the MCP server with your assistants
-```
-
-[Every command and flag →](docs/REFERENCE.md#cli)
-
-### `megabrain.json` — what a repository decides about itself
-
-Optional, committed, and visible on purpose: the dot marks what you ignore, and this is
-the file meant to be found and edited by whoever clones the repo.
-
-```json
-{
-  "ignore":  ["dist", "vendor/**"],
-  "gitignore": true,
-  "queries": ["how does the retry policy work?"],
-  "models":  {"narrator": "google/gemini-3.1-flash-lite",
-              "rerank":   "google/gemini-3.5-flash-lite"}
-}
-```
-
-An explicit argument beats the file, the file beats the environment, the environment beats
-the built-in default. A config that TRAVELS is the point: an env var lives in one shell
-and is invisible to everyone else, which is how a repo ends up indexed differently by two
-people on the same team. Nothing here is required, and a malformed field is ignored on its
-own without taking the rest of the file down. [Every field →](docs/REFERENCE.md#config-files)
+> **Drop this in your agent's rules:** about to change code in an indexed repo →
+> `megabrain_grep`, not grep. Understanding a mechanism or copying a pattern →
+> `megabrain_ask`. Reading docs → `megabrain_search` with `content: "docs"`.
+> One call covers a task — never one call per sub-question.
 
 ---
 
 ## Measured, not vibes
 
-Against [claude-context](https://github.com/zilliztech/claude-context) (Zilliz), the
-closest open-source peer — same repo, same 22 hand-labelled questions, both at their best:
+Against [claude-context](https://github.com/zilliztech/claude-context) (Zilliz),
+same repo, same 22 hand-labelled questions, both at their best:
 
 |  | megabrain | claude-context |
 |---|---|---|
 | **R@1** | **0.864** | 0.818 |
 | **R@5** | **1.000** | 0.909 |
-| search latency | **~22 ms** warm | ~1400 ms |
+| search latency | **~22 ms** warm | ~1,400 ms |
 | vector store | **one SQLite file** | Milvus + etcd + MinIO |
-| narrated answer | **yes** — real code spliced in | no (returns chunks) |
+| narrated answer | **yes** — code spliced verbatim | no (chunks) |
 
-The golden set is ours, on a corpus megabrain was tuned against — treat the absolute
-numbers as home-field and run it yourself.
-[Full method, caveats and the embedding bakeoff →](ARCHITECTURE.md#8-evidence-where-the-numbers-live)
+The golden set is ours — treat the absolutes as home-field and
+[run it yourself](docs/BENCHMARKS.md): `./benchmarks/setup.sh && python benchmarks/measure.py`,
+pinned commits, ground truth stated by symbol so it can't rot.
+
+**It also learns from itself.** Every `ask` caches its walkthrough; a repeat —
+even reworded — serves in ~0 ms with zero LLM (measured 27.8 s → 0.19 s), guarded
+by byte-level sha rechecks so it can never describe code that changed.
+
+**And the same index is a knowledge graph, free.** Communities, the god-node
+files, the real call-path between any two files — numpy over the AST edges
+indexing already extracted. `megabrain graph . --from a.py --to b.py --code`.
+
+---
+
+## Backends: one switch, every model lane
+
+| provider | default model | needs |
+|---|---|---|
+| *(default)* OpenAI-compatible | `gemini-3.1-flash-lite` narrates · `3.5-flash-lite` judges | `OPENROUTER_API_KEY`, or a local endpoint (no key) |
+| `claude` — the Claude Agent SDK | `haiku`, every lane | `megabrain[claude]` + a logged-in Claude Code |
+
+```json
+{ "models": { "provider": "claude" } }   // megabrain.json — committed, travels with the clone
+```
+
+The file beats `MEGABRAIN_CHAT_PROVIDER`, the env var beats the default. One
+switch moves **every** lane — narrator, `grep --why`, judge, expander, graph
+labels. ⚠️ `ANTHROPIC_API_KEY` silently beats the Claude Code login — unset it to
+narrate on the subscription. Embeddings always keep their own key (Anthropic has
+no embeddings API).
+
+**Local & hybrid** — the halves are independent: embeddings see your code, the
+narrator only explains what retrieval chose.
+
+| setup | embeddings | narrator | cloud cost |
+|---|---|---|---|
+| hybrid, subscription | Ollama `bge-m3` | Claude Code login | **$0** beyond it |
+| hybrid, cheap cloud | Ollama `bge-m3` | `gemini-3.1-flash-lite` | cents |
+| fully local | Ollama `bge-m3` | Ollama `qwen3-coder:30b` | $0, air-gapped |
+
+A loopback URL needs no key. A local model without tool support still narrates
+(the `open_file` tool is retired for that conversation, announced, never silent).
+Set `MEGABRAIN_ASK_CTX_CHARS=105000` for local windows — the default is sized for
+the cloud. [Full local recipe →](docs/RECIPES.md#run-fully-local--no-keys-no-cloud)
+
+---
+
+## Commands
+
+```bash
+megabrain index  [path]                    # build/update — incremental by sha256
+megabrain scan   [path]                    # census: what WOULD index, every skip named
+megabrain search "retry logic" [path]      # the map, no LLM   (--full · --docs · --rerank · --expand)
+megabrain ask    "how does X work" [path]  # the walkthrough, code spliced verbatim
+megabrain grep   "add a retry to X" [path] # where to edit: files, symbols, line ranges
+megabrain get    file.py --symbol name     # one file, or one symbol
+megabrain graph  [path]                    # communities · god nodes · call paths
+megabrain studio                           # web UI + JSON API on :2137
+megabrain install                          # MCP into every assistant on the machine
+```
+
+Python · JS/TS · Markdown out of the box; `megabrain[languages]` adds Ruby, Go,
+Rust, PHP, C, C++, Java, C#. Three runtime dependencies total (`numpy`,
+`tree_sitter`, `tree_sitter_typescript`) — the thinness is a feature. Every file
+in the engine is ≤100 lines and every function ≤30, **enforced by a test**, like
+the rest of the hard rules: no LLM in retrieval, SQL only in `storage/`, chunks
+are an exact line partition, the model never emits code.
 
 ---
 
 ## Docs
 
-- **[Guide](docs/GUIDE.md)** — the tour, front to back: setup → search vs ask → the studio
-  → the graph → the flow cache → MCP → new file types → tuning
-- **[Recipes](docs/RECIPES.md)** — "I want to ___": private repos, team knowledge bases,
-  public demos, custom file types, cost and speed
-- **[Reference](docs/REFERENCE.md)** — every CLI flag, MCP tool, HTTP route and env var
-- **[Benchmarks](docs/BENCHMARKS.md)** — the token measurements, reproducible
-- **[Architecture](ARCHITECTURE.md)** — how it's built and **why**: the locked design
-  rules and the experiments behind them
-- **[Contributing](CONTRIBUTING.md)** — the best first PR is a new language
-- **[Changelog](CHANGELOG.md)** — what changed, and why
+[Guide](docs/GUIDE.md) — the tour ·
+[Recipes](docs/RECIPES.md) — "I want to ___" ·
+[Reference](docs/REFERENCE.md) — every flag, tool, route, env var ·
+[Benchmarks](docs/BENCHMARKS.md) — reproducible ·
+[Architecture](ARCHITECTURE.md) — the locked rules and the experiments behind them ·
+[Contributing](CONTRIBUTING.md) — best first PR: a new language
 
 <br>
-
----
 
 <p align="center"><sub>MIT · github.com/bernatch22/megabrain</sub></p>
