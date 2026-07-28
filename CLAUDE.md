@@ -12,9 +12,10 @@ Reference implementation to imitate: `~/experiments/anthropic-sdk-python` (index
 
 ## STATUS — read this before touching anything
 
-**Phases 0–15 are done, gated and committed.** What remains is phase 16
-(`forge/`), phase 17 (algorithm work), and two lanes named under "Not yet
-ported" below. The plan text after this section is unchanged from when it was
+**Phases 0–16 are done, gated and committed** (phase 16 — `forge/` — landed
+2026-07-28: coverage forge + trust store + specialize/ab_gate, 24 offline
+tests). What remains is phase 17 (algorithm work) and issue mode, named under
+"Not yet ported" below. The plan text after this section is unchanged from when it was
 written — read it for the *reasoning*, not for the current state.
 
 ### Verify the state yourself before trusting this section
@@ -83,8 +84,6 @@ set them before touching anything under `search/`, `chunkers/` or
 
 ### Not yet ported (known, deliberate, not a regression)
 
-- **`forge/`** — the chunkers the engine writes for itself, gated by the
-  partition oracle. Phase 16, untouched.
 - **Issue mode** — the long-query lane (BM25 sparse entity-ID matching +
   traceback/identifier grounding pins for bug-report-shaped queries). It
   reweights, so it needs no new shape: one more `Lane` beside `TestPenalty` and
@@ -696,12 +695,12 @@ non-empty.** Both benefits, no drift.
 `bernardocastro.dev/services/megabrain/` passes (every assertion in it came
 from a real outage).
 
-### Phase 16 — forge — NOT STARTED (the only phase left before 17)
+### Phase 16 — forge ✅ DONE (2026-07-28) — `forge/` + `indexing/trust.py`; the model writes a PARSER (v3's Chunker owns the partition), the oracle still gates it
 
 `coverage` (LLM, partition-gated) + `specialize` + `ab_gate` (both no-LLM).
 Last because it depends on `chunkers` + `indexing` + `providers/chat`.
 
-### Phase 17 — **algorithm improvements** (only after full parity) — NOT STARTED, and not eligible until 16 lands
+### Phase 17 — **algorithm improvements** (only after full parity) — NOT STARTED; 16 landed, so eligibility now hangs on issue mode + a re-verified golden corpus (local reads bundle_full 0.77 — corpus drift, see REFACTOR.md)
 
 **Do not touch the algorithm before phase 16's gate is green.** Refactoring and
 re-tuning at the same time makes a regression unattributable — you will not know

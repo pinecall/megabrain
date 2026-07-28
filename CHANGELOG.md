@@ -2,6 +2,58 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
+**Phase 16 — `forge/` is ported: megabrain writes its own chunkers again.**
+`megabrain forge` detects extensions nothing can index, has the repository's
+chat backend write a PARSING strategy for them (v3's `Chunker` owns the
+partition, so the model writes `parse -> Parsed`, not chunking policy), accepts
+it only when the oracle passes on EVERY matching file (partition clean, no
+raising parser, line-accurate symbols — ≤3 repair rounds with the failure
+report fed back), and installs it sha-trust-gated: `~/.megabrain/trust.json`
+belongs to the user, so a cloned repo shipping `.megabrain/strategies/` gets
+nothing executed until vetted here, and any edit after approval silently
+revokes it. `index_repo` now loads trusted repo-local strategies on every run.
+The specialize toolkit came with it — `detect_specialization`, the lit-2000
+baseline (three lines now: `budget` is data the pipeline honours), and the
+`ab_gate` champion-vs-challenger judge with its anti-micro-chunking teeth —
+install-only-on-measured-WIN, no model anywhere in it.
+
+**The REFACTOR.md audit's P0/P1 findings are fixed** (items 1–9, each landed
+test-first; the golden gate is byte-identical before and after):
+
+- **`converse/` is a package now, and `grep/` no longer imports `ask/` at all.**
+  The shared model loop (`open_file`), the candidate/chunk-block prompt
+  building and the backend resolution moved out of `ask/` to neutral ground;
+  `lines_of` moved beside the other Store readers (`storage/lines.py`),
+  `import_surface` in with its only consumer (`grep/surface.py`), the event
+  vocabulary to a top-level `events.py`. Two new architecture tests pin the
+  boundary in both directions.
+- **The rate limiter works behind nginx** — `megabrain ui --trust-proxy`
+  meters by the first `X-Forwarded-For` hop (off by default: on a
+  directly-exposed box the header lets callers mint identities) — **and its
+  caller map is bounded**: departed callers are swept once per window instead
+  of accumulating one dict entry per address forever.
+- **The judge's wall is one deadline for the whole lane**, not a fresh 30 s
+  per batch (k staggered slow batches used to cost ~k×wall), and its thread
+  pool is capped at 4.
+- **`~/.megabrain/registry.json` writes hold an OS lock** across the
+  read-modify-write — two concurrent `index` runs (or v2 and v3 at once) can
+  no longer interleave and silently drop another engine's entry.
+- **The graph no longer keeps the O(n²) cosine matrix** (400 MB at 10 k
+  files): surprise candidates are extracted block-wise while the cosines
+  briefly exist and travel as `RepoGraph.twins`. Served graph views are
+  cached per index-file stat (`graph/warm.py`), so the studio's Graph tab
+  stops rebuilding the world per click.
+- **`megabrain cache` / `megabrain cache prune --older-than N`** — the
+  embedding cache finally reports its size and can be swept (mtime-based,
+  never automatic: deleting cache during an index is how you pay twice).
+- **The deterministic query classifiers speak Spanish, Portuguese, French and
+  German** (`search/wording.py` — the tables are data), and the flow cache's
+  coverage check is unicode-aware (`búsqueda` no longer splits into `b` +
+  `squeda`). Other languages keep the safe conservative default, now
+  documented.
+- The three prompt modules share one naming convention
+  (`_judge_prompt`/`_expand_prompt`/`grep/_prompt`).
+
 **`megabrain studio` is now `megabrain ui`.** The command served a web UI; "studio" was a
 product name for it that nobody typing `--help` could guess. `studio` stays as an argparse
 alias — it is in the published README and in the demo box's deploy script, and a rename

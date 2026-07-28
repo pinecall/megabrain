@@ -28,6 +28,8 @@ index yet is the whole point.
 | `megabrain get <file> [path]` | print one file (or one symbol) |
 | `megabrain graph [path]` | the repo as a knowledge graph |
 | `megabrain ui` | the web UI + JSON API on one port |
+| `megabrain forge [path]` | write, validate and install a chunking strategy for file types nothing can index — the one model call is gated by the partition oracle |
+| `megabrain cache [prune]` | the embedding cache: report its size, or sweep entries untouched for `--older-than` days (never automatic) |
 | `megabrain install` | register the MCP server with every assistant detected on this machine |
 
 ### Flags
@@ -62,6 +64,11 @@ index yet is the whole point.
 | | `--token T` | require `Authorization: Bearer T` (default `$MEGABRAIN_API_TOKEN`) |
 | | `--readonly` | serve queries but refuse to index, so a public box cannot be billed by a visitor |
 | | `--rate-limit N` | at most N requests per minute per caller |
+| | `--trust-proxy` | meter by the first `X-Forwarded-For` hop — only behind a reverse proxy you control; off by default because on a directly-exposed box the header lets callers mint identities |
+| `forge` | `--ext EXT` | only this extension (e.g. `sql`) |
+| | `--dry-run` | validate and print the code, install nothing |
+| | `--attempts N` | generate-validate-repair rounds (default 3) |
+| | `--model M` | code-gen model (`$MEGABRAIN_FORGE_MODEL`, else the narrator's) |
 | `install` | `--list` | show what's detected and where, change nothing |
 | | `--platform NAME` | only this one (`claude` · `codex` · `antigravity` · `cursor` · `windsurf` · `gemini`); written even if undetected |
 | | `--remove` | unregister megabrain, leaving every other server in place |
@@ -199,6 +206,14 @@ Deleting an index: `rm -rf <repo>/.megabrain`. There is no command for it, on pu
 | `hub_damping(d)` | `1/log2(1+d)` | what a vote through a file of degree `d` is worth |
 | `PLUMBING_TOLL` / `HUB_TOLL` | `4` / `3 + (d − floor)` | route transit cost for `__init__.py` and tests / for a hub |
 | `--no-labels` | off | skip the cached LLM community-labelling call |
+
+**Query-language coverage.** The deterministic query classifiers — the test
+penalty's `wants_tests`, task detection (`is_task`), and the flow cache's
+coverage stop-list — key on words in **English, Spanish, Portuguese, French
+and German** (`search/wording.py`; the tables are data, adding a language is
+rows). In any other language they fall back to the conservative default:
+nothing lies, but the test down-weight never stands down, tasks are answered
+as questions, and the flow cache attaches instead of serving verbatim.
 
 **Languages.** Always on: **Python** (`.py .pyi`), **TypeScript/JavaScript**
 (`.ts .tsx .js .jsx .mjs .cjs`) and **Markdown** (`.md .markdown .mdx`). With

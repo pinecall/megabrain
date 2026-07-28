@@ -48,9 +48,12 @@ L3  chunkers/       content → chunks (partition-guaranteed)
     search/         scoring · bundle · render — deterministic
     graph/          build · clusters · routes · symbols
 L4  enrich/         opt-in model lanes, contract: Bundle → Bundle, fail-open
+    converse/       the shared model loop (open_file), prompt building,
+                    backend resolution — neutral ground between the verbs
     ask/            the narrated walkthrough
     grep/           the edit surface — no model in the lanes
     flows/          the cached-walkthrough lane
+    forge/          strategies the machine writes (oracle-gated) or measures
 L5  usecases/       the verbs no feature owns + re-exports
     transports/     cli/ · mcp/ · http/ (+ built studio) · install/
 ```
@@ -64,8 +67,10 @@ Two deliberate placements worth naming:
 - **`grep/` is a top-level package**, not a submodule of `ask/`, so "grep's
   lanes call no model" is an *importable* fact a test can check — `ask/`
   imports a chat provider by design, so nothing inside it can be fenced.
-  (Its verb still borrows `ask/` internals for the `--why` lane — a known
-  layering debt, see [REFACTOR.md](REFACTOR.md) §P0.)
+  What the two verbs share — the open_file conversation loop, the
+  candidate/chunk-block prompt building, the backend resolution — lives in
+  **`converse/`**, which imports neither verb; `grep/` never imports `ask/`
+  at all, and both facts are architecture tests.
 
 Packaging is **by domain, not by layer** (`docs/DOMAINS.md`): each verb lives
 beside its own logic (`search/search.py`, `grep/grep.py`), and `usecases/`
@@ -333,8 +338,12 @@ bundle:        rank_files (STABLE sort) ─► tiers ─► floors (append-only)
 
 - **`build`** — the in-memory `RepoGraph`: structural lanes (`near`/`out`/
   `into`, kinds preserved) + the **semantic lane** (top-3 skeleton-cosine
-  twins ≥ 0.80, sparse on purpose; the full cosine matrix is retained because
-  surprises need every pair).
+  twins ≥ 0.80, sparse on purpose). The full cosine matrix is **never
+  retained**: at 10 000 files it is 400 MB per map, so the pairs the
+  surprises need (≥ `SURPRISE_MIN`) are extracted block-wise while the
+  cosines briefly exist and travel on the graph as `twins`. Served views go
+  through `warm.warm_graph`, cached per index-file stat, so the studio's
+  Graph tab stops paying a full rebuild per click.
 - **`clusters/`** — label propagation with `hub_damping = 1/log2(1+d)`
   (measured on a 1 210-file corpus: undamped, 97.5 % of files collapsed into
   one community), semantic ties at half a structural vote (`SEM_WEIGHT =
@@ -430,7 +439,8 @@ retrieve ─► converse loop (open_file, ≤5 rounds) ─► stream-splice
 - **`stream.Splicer`** holds the undecidable tail (`PARTIAL` — a `[[3:70` cut
   by a delta boundary cannot be unprinted) and drops unterminated fences at
   flush, because `splice` only removes fences that close.
-- **`converse/`** — the open_file loop, bounded (`MAX_ROUNDS = 5`) and
+- **`converse/`** (top-level, shared with `grep --why`) — the open_file loop,
+  bounded (`MAX_ROUNDS = 5`) and
   fail-open. `_toolless` recognises "this backend cannot take tools" (a 4xx
   with known tells, never a 500 — a blanket retry would buy a second outage)
   and retires the field for the whole conversation. `_admits`/`_filled` grant
@@ -462,6 +472,31 @@ with them at index time; near-duplicate questions replace rather than
 accumulate. `strip_chrome()` removes block headers before a flow is shown to
 a model — shown the format, the model imitates it and the splicer has nothing
 left to replace.
+
+### `forge/` — strategies the machine writes or measures
+
+The one place a model writes CODE, and it happens exactly once, at forge time.
+`megabrain forge` censuses the extensions nothing can index (`detect` — no
+model), has the repo's chat backend write a *parsing* strategy for them — in
+v3 the model writes `parse -> Parsed` and the engine's `Chunker` owns the
+partition, a strictly smaller trust surface than v2's whole-chunker codegen —
+and accepts it only when the ORACLE passes on every matching file: partition
+clean, no raising parser, line-accurate symbols; failures feed a ≤3-round
+repair loop. The vetted source installs to `.megabrain/strategies/<ext>.py`
+with its sha recorded in the user-owned trust store (`indexing/trust.py`) —
+`index_repo` then loads it on every run, a clone's unvetted file loads as
+nothing, and an edit after approval silently revokes the trust. `exec` of
+vetted code is the package's accepted risk, and it is stated, gated and
+logged rather than hidden.
+
+Specialization — re-chunking a file the engine already covers — gets a second,
+EMPIRICAL gate (`ab_gate`, no model): neutral probe spans from the file itself,
+champion-vs-challenger over throwaway indexed copies, rank-aware IoU + hit@k,
+a granularity floor that rejects micro-chunking before any indexing, and
+install only on a measured WIN over the lit-2000 baseline (`budget` is data
+`chunker_for` honours, which is what made that baseline three lines). The
+model-written specialization path was removed in v2 after losing to that free
+recipe on four repos — the port keeps the verdict.
 
 ### `grep/` — the edit surface
 
@@ -496,7 +531,12 @@ it cannot be off by one, and a qualified name beats the base class).
 - **HTTP** — threaded stdlib server, no framework, no async twin of the
   engine. Routes are pure `Request → Reply` functions; `security.Guard`
   enforces token / read-only (`WRITING_PATHS` listed, not inferred) / a
-  sliding-window rate limit; `build_server` **refuses** a non-loopback bind
+  sliding-window rate limit whose caller map is swept (departed callers are
+  forgotten after a window — an attacker must not be able to grow it) and
+  whose caller identity can be the first `X-Forwarded-For` hop behind a
+  proxy the operator declared (`--trust-proxy`; off by default, because on
+  a directly-exposed box the header mints identities); `build_server`
+  **refuses** a non-loopback bind
   without a token — indexing is a write endpoint that reads any path the
   process can. SSE frames are single-line JSON terminated by the blank line
   (the whole protocol), chunked and flushed per frame; HEAD is answered
@@ -517,7 +557,9 @@ it cannot be off by one, and a qualified name beats the base class).
   replacement with comments preserved, broken configs reported rather than
   overwritten. The shared `~/.megabrain/registry.json` is **co-owned with
   v2**: both shapes read, foreign metadata survives writes, dead entries are
-  hidden but never deleted — a shared file is nobody's to garbage-collect.
+  hidden but never deleted — a shared file is nobody's to garbage-collect —
+  and every read-modify-write holds an OS lock (`usecases/_lockfile.py`), so
+  two concurrent `index` runs cannot interleave and drop an entry.
 
 ---
 
@@ -543,8 +585,6 @@ Recorded so absence reads as a decision, not an accident:
 - **Issue mode** (v2's long-query lane: BM25 entity-IDs + traceback pins) is
   not yet ported. It doesn't fire on the golden set — which is why parity
   holds without it — and it lands as one more `Lane` beside `TestPenalty`.
-- **`forge/`** (self-authored chunkers, partition-oracle-gated `exec` of
-  generated code) is not yet ported.
 - **ANN indexing** is deferred until a corpus demands it.
 - The golden corpus is **private**; the harness is committed. External
   validity via a public benchmark is roadmap, not architecture.
