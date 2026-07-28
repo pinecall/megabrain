@@ -17,7 +17,8 @@ __all__ = ["resolve", "default_providers"]
 
 def resolve(providers: Sequence[ChatProvider] | None = None, *,
             model: str | None = None,
-            timeout: float | None = None) -> ChatProvider | None:
+            timeout: float | None = None,
+            provider: str | None = None) -> ChatProvider | None:
     """The ONE place a model lane gets its backend. Every lane calls this.
 
     None rather than an exception: a caller that only wants retrieval must be
@@ -30,21 +31,28 @@ def resolve(providers: Sequence[ChatProvider] | None = None, *,
     three batches through the narrator's settings took 16 s for a JSON array
     of integers.
 
+    `provider` is the REPOSITORY'S choice, already read from `megabrain.json`
+    (`models.provider`, which beats the env var — a committed file travels,
+    a shell setting is invisible to the next clone). None means the file said
+    nothing and the env var decides; the empty string means the same.
+
     Constructing a backend by name at a call site is the bug this signature
     retired: the narrator followed MEGABRAIN_CHAT_PROVIDER while rerank,
     expand and the map labels kept billing the endpoint — silently, because
     every one of those lanes is fail-open and just kept working.
     """
     candidates = (providers if providers is not None
-                  else default_providers(model, timeout=timeout))
-    for provider in candidates:
-        if provider.available():
-            return provider
+                  else default_providers(model, timeout=timeout,
+                                         provider=provider))
+    for backend in candidates:
+        if backend.available():
+            return backend
     return None
 
 
 def default_providers(model: str | None = None, *,
-                      timeout: float | None = None) -> list[ChatProvider]:
+                      timeout: float | None = None,
+                      provider: str | None = None) -> list[ChatProvider]:
     """The registry, in preference order.
 
     The SDK backend comes first and is still not the default: it self-gates on
@@ -59,6 +67,7 @@ def default_providers(model: str | None = None, *,
     # eats half of it — handed through, the judge's 30 s starved every SDK
     # call and the fail-open lane went dark silently. The SDK backend keeps
     # its own bound, and a wall that needs the real number asks the provider.
-    return [ClaudeProvider(model=model),
+    chosen = None if not provider else provider == "claude"
+    return [ClaudeProvider(model=model, chosen=chosen),
             OpenAICompatible(model=model) if timeout is None
             else OpenAICompatible(model=model, timeout=timeout)]

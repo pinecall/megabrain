@@ -63,16 +63,16 @@ def _expanded(bundle: Bundle, root: Path, state: SearchState,
     """Widen through the expander lane, resolving names against the SAME index.
 
     Shares the repo's `rerank` model rather than adding a second knob: both
-    lanes want the same thing from a model — a cheap, fast opinion over text a
-    deterministic pipeline already chose — and a repo that configured neither
-    gets neither, which is the honest default.
+    lanes want the same cheap, fast opinion over text a deterministic pipeline
+    already chose — and a repo that configured neither gets neither.
     """
     from ..enrich.expand import expand as widen
     from ..enrich.rerank import judge_provider
     from ..project import load_project
     from .bundle.widen import term_entries
 
-    provider = judge_provider(load_project(root).rerank_model)
+    proj = load_project(root)
+    provider = judge_provider(proj.rerank_model, provider=proj.chat_provider)
     if provider is None:
         return bundle
 
@@ -95,5 +95,6 @@ def _judged(bundle: Bundle, root: Path) -> Bundle:
     from ..enrich.rerank import rerank as judge
     from ..project import load_project
 
-    provider = judge_provider(load_project(root).rerank_model)
+    proj = load_project(root)
+    provider = judge_provider(proj.rerank_model, provider=proj.chat_provider)
     return judge(bundle, provider) if provider is not None else bundle

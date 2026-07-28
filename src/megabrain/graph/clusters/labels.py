@@ -54,7 +54,9 @@ def _ask(root: str, store: Store, graph: RepoGraph, communities: dict[str, int],
     # The registry, not a named backend: one switch moves every lane, and this
     # one was left behind once already (the narrator followed it, the labels
     # kept billing the endpoint — silently, because this path is fail-open).
-    provider = resolve(model=load_project(root).narrator_model, timeout=TIMEOUT)
+    project = load_project(root)
+    provider = resolve(model=project.narrator_model, timeout=TIMEOUT,
+                       provider=project.chat_provider)
     if provider is None:
         return {}
     try:

@@ -27,7 +27,8 @@ MAX_TOKENS = 300
 
 
 
-def judge_provider(model: str | None = None) -> ChatProvider | None:
+def judge_provider(model: str | None = None, *,
+                   provider: str | None = None) -> ChatProvider | None:
     """A provider tuned for JUDGING, not for narrating.
 
     The default and its measurements live in `_models`; a repository overrides
@@ -43,7 +44,8 @@ def judge_provider(model: str | None = None) -> ChatProvider | None:
     """
     from ..providers.chat import resolve
 
-    return resolve(model=model or RERANK_MODEL, timeout=RERANK_TIMEOUT)
+    return resolve(model=model or RERANK_MODEL, timeout=RERANK_TIMEOUT,
+                   provider=provider)
 
 
 def rerank(bundle: Bundle, provider: ChatProvider) -> Bundle:

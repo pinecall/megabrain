@@ -94,6 +94,16 @@ every one of those lanes is fail-open, so nothing ever said so. `judge_provider`
 labels resolve through the registry now; `resolve(model=…, timeout=…)` carries each lane's
 own tuning, so the judge keeps the model its measurements were taken on.
 
+**The switch is per-repository now, not only per-shell.** `megabrain.json` gains
+`models.provider` (`"claude"` for the SDK, anything else keeps the endpoint), and the file
+beats `MEGABRAIN_CHAT_PROVIDER` — the same precedence as every other field, for the same
+reason: a committed config travels with the clone, a shell setting is invisible to the
+next person and is how one repo narrates on two different backends for two people on the
+same team. `resolve(provider=…)` carries the resolved choice; the env var still works for
+one shell when the file says nothing. Defaults per backend: `claude` → `haiku` on every
+lane; the endpoint keeps its measured pair (`gemini-3.1-flash-lite` narrates,
+`gemini-3.5-flash-lite` judges).
+
 **And the judge's wall learned whose backend it is bounding.** First live run on the SDK
 lane: `judge: None` on every call — `verdict_of` bounds each batch with
 `future.result(timeout=30)`, a number measured on HTTP, and a CLI spawn eats ~14 s before

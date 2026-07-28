@@ -461,9 +461,14 @@ export MEGABRAIN_RERANK_MODEL=…                   # the judge, independently
 Better than either: commit them, so the whole team gets the same walkthroughs.
 
 ```json
-{ "models": { "narrator": "google/gemini-3.1-flash-lite",
+{ "models": { "provider": "openrouter",
+              "narrator": "google/gemini-3.1-flash-lite",
               "rerank":   "google/gemini-3.5-flash-lite" } }
 ```
+
+`provider` picks the BACKEND for every model lane at once: `claude` narrates through the
+Claude Agent SDK (default model `haiku`, extra `megabrain[claude]`), anything else keeps
+the OpenAI-compatible endpoint. The committed file beats `MEGABRAIN_CHAT_PROVIDER`.
 
 | ask model | one ask | ≈ cost | notes |
 |---|---|---|---|

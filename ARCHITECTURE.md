@@ -358,7 +358,8 @@ over the local Claude Code login and wins silently** — a key for an account wi
 ends the call with "Credit balance is too low" while a working login sits unused, behind a
 CLI warning that is easy to read past. Unset it to narrate on the local login; export it to
 bill that API account deliberately.
-**Opt in with `MEGABRAIN_CHAT_PROVIDER=claude`**; unlike v2 it is never preferred
+**Opt in per repo (`megabrain.json` `models.provider: "claude"`, which beats the env var —
+committed config travels) or per shell (`MEGABRAIN_CHAT_PROVIDER=claude`)**; unlike v2 it is never preferred
 automatically, because a backend that took over on the machine that happened to `pip
 install` the extra would move the measured numbers with nothing in the output to say which
 lane produced them. **The switch moves every model lane at once** — narrator, `grep --why`,

@@ -138,7 +138,7 @@ never has to know which branch answered to know the answer ended.
 | `MEGABRAIN_CHAT_MODEL` | `anthropic/claude-sonnet-4.5` | the chat model when nothing more specific applies |
 | `MEGABRAIN_CHAT_BASE_URL` | `https://openrouter.ai/api/v1` | point chat at a native API or a local server |
 | `MEGABRAIN_CHAT_API_KEY` | falls back to `OPENROUTER_API_KEY` | key for a non-OpenRouter chat endpoint |
-| `MEGABRAIN_CHAT_PROVIDER` | — | `claude` narrates through the Claude Agent SDK (extra `megabrain[claude]`) instead of an HTTP endpoint. Opt-in only; anything else keeps the OpenAI-compatible lane |
+| `MEGABRAIN_CHAT_PROVIDER` | — | `claude` moves EVERY model lane (narrator, `grep --why`, judge, expander, labels) to the Claude Agent SDK (extra `megabrain[claude]`); anything else keeps the OpenAI-compatible lane. `megabrain.json` `models.provider` beats this var |
 | `ANTHROPIC_API_KEY` | — | read by the Claude Agent SDK, **not** by megabrain. It **takes precedence over the local Claude Code login** — unset it to narrate on that login, export it to bill an API account |
 | `MEGABRAIN_ASK_MODEL` | `google/gemini-3.1-flash-lite` | the narration model |
 | `MEGABRAIN_RERANK_MODEL` | `google/gemini-3.5-flash-lite` | the judge lane's model — measured separately, because narration reasons in prose and the judge emits a short id array |
@@ -161,7 +161,7 @@ never silently mismatch.
 
 | path | what it is |
 |---|---|
-| **`<repo>/megabrain.json`** | what the repository decides about ITSELF: `ignore` · `gitignore` · `queries` · `models` (`narrator` · `rerank`). **Visible, not a dotfile** — it is committed and meant to be found and edited by whoever clones the repo, while `.megabrain/` beside it is machine state nobody reads. The dot marks what you ignore |
+| **`<repo>/megabrain.json`** | what the repository decides about ITSELF: `ignore` · `gitignore` · `queries` · `models` (`provider` · `narrator` · `rerank`). **Visible, not a dotfile** — it is committed and meant to be found and edited by whoever clones the repo, while `.megabrain/` beside it is machine state nobody reads. The dot marks what you ignore |
 | `<repo>/.gitignore` | **also read, and on by default**: what the repo already declared is not its source. shipway compiles into `bin/`, which the universal exclude list cannot cover (`bin/` is real code in a Python or Rust project) — 122 of its 196 indexed files were that output, giving every `src/` symbol a compiled twin. Set `"gitignore": false` where the repo ignores real source (measured: megabrain-v2's own `evals/`) |
 | `<repo>/.megabrain/db.sqlite` | **the whole index** — chunks, vectors, symbols, edges, cards, flows |
 | `<repo>/.megabrainignore` | legacy, still read: patterns to skip, one per line. Merged with `megabrain.json`'s `ignore` |
@@ -174,7 +174,8 @@ never silently mismatch.
   "ignore":  ["dist", "vendor/**"],
   "gitignore": true,
   "queries": ["how does the retry policy work?"],
-  "models":  { "narrator": "google/gemini-3.1-flash-lite",
+  "models":  { "provider": "claude",
+               "narrator": "google/gemini-3.1-flash-lite",
                "rerank":   "google/gemini-3.5-flash-lite" }
 }
 ```

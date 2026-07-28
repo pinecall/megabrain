@@ -8,7 +8,8 @@ of it, and which models narrate and judge.
       "ignore":  ["dist", "vendor/**"],
       "gitignore": true,
       "queries": ["how does the retry policy work?"],
-      "models":  {"narrator": "google/gemini-3.1-flash-lite",
+      "models":  {"provider": "claude",
+                  "narrator": "google/gemini-3.1-flash-lite",
                   "rerank":   "google/gemini-3.5-flash-lite"}
     }
 
@@ -62,6 +63,10 @@ class Project:
     """
     narrator_model: str = NARRATOR_MODEL
     rerank_model: str = RERANK_MODEL
+    chat_provider: str = ""
+    """Which backend EVERY model lane uses: `claude` for the Agent SDK, else
+    the OpenAI-compatible endpoint. Empty = nobody chose, the endpoint wins.
+    Committed in `models.provider` so the whole team narrates on one lane."""
     malformed: bool = False
     """True when a config file exists but could not be read.
 
@@ -87,4 +92,7 @@ def load_project(root: Path | str) -> Project:
         or os.environ.get("MEGABRAIN_ASK_MODEL") or NARRATOR_MODEL,
         rerank_model=models.get("rerank")
         or os.environ.get("MEGABRAIN_RERANK_MODEL") or RERANK_MODEL,
+        chat_provider=(models.get("provider")
+                       or os.environ.get("MEGABRAIN_CHAT_PROVIDER")
+                       or "").strip().lower(),
         malformed=malformed)

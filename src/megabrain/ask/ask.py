@@ -87,4 +87,5 @@ def _narrator(root: Path) -> ChatProvider | None:
     shipped with no caller: adding the SDK lane here would otherwise have meant
     an if-switch in the verb.
     """
-    return resolve(model=load_project(root).narrator_model)
+    project = load_project(root)
+    return resolve(model=project.narrator_model, provider=project.chat_provider)

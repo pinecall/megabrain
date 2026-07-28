@@ -9,6 +9,7 @@ this adapter.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -292,6 +293,77 @@ def test_the_router_carries_the_project_model_to_the_backend() -> None:
 def test_it_satisfies_the_protocol_structurally() -> None:
     """No base class to inherit: the right shape IS a provider."""
     assert isinstance(ClaudeProvider(sdk=FakeSDK()), ChatProvider)
+
+
+# ---- megabrain.json ----------------------------------------------------------
+
+
+def _repo_with(tmp_path: "Path", config: str) -> "Path":
+    (tmp_path / "megabrain.json").write_text(config, encoding="utf-8")
+    return tmp_path
+
+
+def test_the_committed_config_selects_the_backend_without_any_env(
+        tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) -> None:
+    """`{"models": {"provider": "claude"}}` travels with the repo. An env var
+    lives in one shell — which is how the same repo narrates on two different
+    backends for two people on the same team."""
+    monkeypatch.setattr("megabrain.providers.chat.claude.find_spec",
+                        lambda _name: object())
+    root = _repo_with(tmp_path, '{"models": {"provider": "claude"}}')
+    from megabrain.project import load_project
+    from megabrain.providers.chat import resolve
+
+    chosen = resolve(model=None, provider=load_project(root).chat_provider)
+    assert chosen is not None and chosen.name == "claude"
+
+
+def test_the_committed_config_beats_the_shell(
+        tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stated precedence: the file beats the environment. A repo that
+    committed `openrouter` narrates on it even in a shell that opted into
+    claude — same walkthroughs for everyone who clones."""
+    monkeypatch.setenv("MEGABRAIN_CHAT_PROVIDER", "claude")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "a-real-key")
+    root = _repo_with(tmp_path, '{"models": {"provider": "openrouter"}}')
+    from megabrain.project import load_project
+    from megabrain.providers.chat import resolve
+
+    chosen = resolve(model=None, provider=load_project(root).chat_provider)
+    assert chosen is not None and chosen.name == "openai-compatible"
+
+
+def test_no_config_anywhere_keeps_the_endpoint(
+        tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "a-real-key")
+    from megabrain.project import load_project
+    from megabrain.providers.chat import resolve
+
+    project = load_project(tmp_path)
+    assert project.chat_provider == ""
+    chosen = resolve(model=None, provider=project.chat_provider)
+    assert chosen is not None and chosen.name == "openai-compatible"
+
+
+def test_the_env_var_still_works_when_the_file_says_nothing(
+        tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MEGABRAIN_CHAT_PROVIDER", "claude")
+    from megabrain.project import load_project
+
+    assert load_project(tmp_path).chat_provider == "claude"
+
+
+def test_the_judge_follows_the_committed_provider(
+        tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) -> None:
+    """One switch, all lanes — including when the switch is the FILE."""
+    monkeypatch.setattr("megabrain.providers.chat.claude.find_spec",
+                        lambda _name: object())
+    _repo_with(tmp_path, '{"models": {"provider": "claude"}}')
+    from megabrain.enrich.rerank import judge_provider
+    from megabrain.project import load_project
+
+    chosen = judge_provider(provider=load_project(tmp_path).chat_provider)
+    assert chosen is not None and chosen.name == "claude"
 
 
 # ---- failure -----------------------------------------------------------------

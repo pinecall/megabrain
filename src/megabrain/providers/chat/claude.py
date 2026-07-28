@@ -1,20 +1,15 @@
 """The Claude Agent SDK as a chat backend.
 
-Narration only. The SDK runs its OWN tool loop, so there is no pending call to
-hand back to `converse` — this backend answers on the first pass, which is the
-fail-open the narrator already documents, and the walkthrough is written from
-the material retrieval chose rather than from files the model went and opened.
-That is a real difference from the OpenAI-compatible lane, and the reason this
-one is opt-in rather than preferred.
+Narration only: the SDK runs its OWN tool loop, so there is no pending call to
+hand back to `converse` — this backend answers on the first pass (the fail-open
+the narrator documents) from the material retrieval chose, never from files the
+model went and opened. Credentials are whatever the local Claude Code install
+resolves; note ANTHROPIC_API_KEY silently beats the login when both exist.
 
-Credentials are whatever the local Claude Code install resolves. Set
-ANTHROPIC_API_KEY — or the Bedrock/Vertex variables the SDK documents — to be
-explicit about which account pays.
-
-Opt in with MEGABRAIN_CHAT_PROVIDER=claude. Deliberately not automatic: a
-backend that took over because a package happened to be importable would move
-the retrieval numbers on whichever machine installed it, with nothing in the
-output to say which lane produced them.
+Opt in per repo (`megabrain.json` `models.provider: "claude"`) or per shell
+(MEGABRAIN_CHAT_PROVIDER=claude). Deliberately not automatic: a backend that
+took over because a package happened to be importable would move the measured
+numbers with nothing in the output to say which lane produced them.
 """
 
 from __future__ import annotations
@@ -32,8 +27,8 @@ from .base import Answer, OnDelta
 __all__ = ["ClaudeProvider", "TIMEOUT"]
 
 TIMEOUT = 300.0
-"""Seconds one narration may take. Every call spawns the bundled binary, which
-is ~18s of process start before a token arrives — generous, and still bounded."""
+"""Seconds one narration may take: every call spawns the bundled binary, ~18s
+of process start before a token arrives — generous, and still bounded."""
 
 
 class ClaudeProvider:
@@ -43,24 +38,29 @@ class ClaudeProvider:
     loop underneath it would open files nothing ever spliced."""
 
     def __init__(self, *, sdk: ClaudeSDK | None = None,
-                 model: str | None = None, timeout: float = TIMEOUT) -> None:
-        """`sdk` is the injection seam, the same shape as the HTTP transport:
-        an optional dependency stays testable by being a constructor argument
-        rather than an import statement halfway down a function."""
+                 model: str | None = None, timeout: float = TIMEOUT,
+                 chosen: bool | None = None) -> None:
+        """`sdk` is the injection seam, the same shape as the HTTP transport.
+        `chosen` is the opt-in ALREADY RESOLVED — the router sets it when a
+        `megabrain.json` named its backend, and the committed file beats the
+        shell; None means the env var is the only voice left."""
         self._sdk = sdk
         self._model = _resolvable(model)
         self.timeout = timeout
+        self._opted = chosen
 
     @property
     def model(self) -> str:
         return self._model
 
     def available(self) -> bool:
-        """Opted into, and actually installed. Both halves matter: a backend
-        that claimed availability without the package would be chosen by the
-        router and fail at the first ask instead of here."""
-        chosen = os.environ.get("MEGABRAIN_CHAT_PROVIDER", "").strip().lower()
-        if chosen != self.name:
+        """Opted into, and actually installed — a backend claiming availability
+        without the package would fail at the first ask instead of here."""
+        if self._opted is None:
+            env = os.environ.get("MEGABRAIN_CHAT_PROVIDER", "").strip().lower()
+            if env != self.name:
+                return False
+        elif not self._opted:
             return False
         return self._sdk is not None or find_spec("claude_agent_sdk") is not None
 

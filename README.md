@@ -79,15 +79,40 @@ That single key gets you the whole validated stack, and it is already the defaul
 
 Every default here is a measurement, not a guess. → [the numbers](docs/GUIDE.md#providers-and-models)
 
-### Narrating through the Claude Agent SDK
+### Choosing the chat backend — one switch, every lane
 
-An alternative to the chat endpoint: drive the bundled Claude Code binary instead of
-OpenRouter. Retrieval is untouched — it never calls a model — and embeddings keep their own
-key, because Anthropic has no embeddings API.
+Every model lane — the narrator (`ask`), `grep --why`, the judge (`--rerank`), the
+expander, the map labels — gets its backend from one switch. Two backends, each with its
+own default model:
+
+| provider | selects | default model | what it needs |
+|---|---|---|---|
+| *(unset)* → **`openrouter`** | any OpenAI-compatible endpoint | `google/gemini-3.1-flash-lite` narrates · `google/gemini-3.5-flash-lite` judges | `OPENROUTER_API_KEY` (or a local endpoint, no key) |
+| **`claude`** | the Claude Agent SDK (bundled Claude Code binary) | `haiku` for every lane | `pip install 'megabrain[claude]'` + a logged-in Claude Code, or `ANTHROPIC_API_KEY` |
+
+Set it **per repository** — committed, so the whole team narrates on the same lane:
+
+```json
+{ "models": { "provider": "claude" } }
+```
+
+or **per shell**, for just you:
+
+```bash
+export MEGABRAIN_CHAT_PROVIDER=claude
+```
+
+The file beats the env var, the env var beats the default — same precedence as every other
+`megabrain.json` field, and for the same reason: a committed config travels with the clone,
+a shell setting is invisible to the next person. Retrieval is untouched either way — it
+never calls a model — and **embeddings always keep their own key**, because Anthropic has
+no embeddings API.
+
+### Narrating through the Claude Agent SDK
 
 ```bash
 pip install 'megabrain[claude]'
-export MEGABRAIN_CHAT_PROVIDER=claude     # opt-in; never selected on its own
+# then "provider": "claude" in megabrain.json, or the env var above
 export MEGABRAIN_ASK_MODEL=haiku          # optional — CLI names, not `vendor/model`
 unset ANTHROPIC_API_KEY                   # ← see below. Not optional.
 ```
@@ -105,9 +130,36 @@ runs its own tool loop, so `ask` answers in one pass instead of reading its way 
 chain. Measured on this repository, `haiku`, 24 candidates: **27 s end to end, first token
 at 14 s, 48 streamed deltas**. The HTTP lane stays the default for a reason.
 
-### Fully local — Ollama for both halves, zero cloud
+### Local and hybrid — Ollama embeddings, your choice of narrator
 
-Air-gapped, $0, open weights end to end, and **your code never leaves the machine**:
+The two halves are independent, and that is the useful part: **embeddings decide what your
+code touches** (they see every file), the **narrator only explains** what retrieval already
+chose. So run the embeddings locally and pick the narrator per taste:
+
+| setup | embeddings | narrator | cloud cost |
+|---|---|---|---|
+| **hybrid — subscription** | Ollama `bge-m3`, local | Claude Code login (`provider: "claude"`) | $0 beyond the subscription |
+| **hybrid — cheap cloud** | Ollama `bge-m3`, local | OpenRouter `gemini-3.1-flash-lite` | cents |
+| **fully local** | Ollama `bge-m3` | Ollama `qwen3-coder:30b` | $0, air-gapped |
+
+The hybrid with the subscription is the sweet spot if you already run Claude Code: your
+code is embedded on your own machine, and the narration bills nothing new.
+
+```bash
+pip install 'megabrain[languages,claude]'
+ollama pull bge-m3
+
+export MEGABRAIN_EMBED_BASE_URL=http://localhost:11434/v1
+export MEGABRAIN_EMBED_MODEL=bge-m3
+export MEGABRAIN_CHAT_PROVIDER=claude     # or "provider": "claude" in megabrain.json
+unset ANTHROPIC_API_KEY                   # narrate on the login, not an API account
+
+megabrain index ~/repo --force            # --force re-embeds with the new model
+megabrain ask   "how does auth work end to end" ~/repo
+```
+
+**Fully local** — zero cloud, open weights end to end, **your code never leaves the
+machine**:
 
 ```bash
 pip install 'megabrain[languages]'
@@ -121,7 +173,7 @@ export MEGABRAIN_ASK_MODEL=qwen3-coder:30b
 export MEGABRAIN_ASK_CTX_CHARS=105000     # ← required: see below
 export OLLAMA_CONTEXT_LENGTH=40960
 
-megabrain index ~/repo --force            # --force re-embeds with the new model
+megabrain index ~/repo --force
 megabrain ask   "how does auth work end to end" ~/repo
 ```
 
