@@ -33,6 +33,21 @@ class TextBlock:
 
 
 @dataclass
+class ResultMessage:
+    """The CLI's own verdict on the run. `subtype` is NOT the error.
+
+    Observed against claude-agent-sdk 0.2.128: a refused run arrives as
+    subtype='success', is_error=True, result='Credit balance is too low' — and
+    the SDK then raises carrying the SUBTYPE, so the only actionable sentence
+    in the exchange is the one in `result`.
+    """
+
+    subtype: str = "success"
+    is_error: bool = False
+    result: str = ""
+
+
+@dataclass
 class Options:
     """What `ClaudeAgentOptions` was asked for, kept verbatim for assertions."""
 

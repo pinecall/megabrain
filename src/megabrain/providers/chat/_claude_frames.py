@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator, cast
 
+from ..._provider_errors import ProviderError
 from .base import Answer, OnDelta
 
 __all__ = ["drain"]
@@ -36,6 +37,9 @@ async def drain(stream: AsyncIterator[Any], on_delta: OnDelta | None) -> Answer:
             streamed = streamed or bool(text)
         elif kind == "AssistantMessage" and not streamed:
             text = _blocks(message)
+        elif kind == "ResultMessage":
+            _require_success(message)
+            text = ""
         else:
             text = ""
         if text:
@@ -43,6 +47,26 @@ async def drain(stream: AsyncIterator[Any], on_delta: OnDelta | None) -> Answer:
             if on_delta is not None:
                 on_delta(text)
     return Answer(text="".join(parts), finish_reason=finish)
+
+
+def _require_success(message: Any) -> None:
+    """The CLI's verdict, raised while it still says something useful.
+
+    MEASURED against claude-agent-sdk 0.2.128: a refused run arrives as
+    `subtype='success'`, `is_error=True`, `result='Credit balance is too low'`,
+    and the SDK then raises quoting the SUBTYPE — so the exception reaching the
+    caller reads "returned an error result: success" and the one actionable
+    sentence is thrown away. `is_error` is the flag; the subtype is not.
+
+    Raised rather than returned for the same reason `_frames._require_no_error`
+    does it: a refusal also arrives as ordinary assistant text, and returning it
+    puts an outage in the walkthrough as if the model had narrated it.
+    """
+    if not getattr(message, "is_error", False):
+        return
+    reason = str(getattr(message, "result", "") or "").strip()
+    raise ProviderError(f"the Claude CLI refused the run: {reason}"
+                        if reason else "the Claude CLI refused the run")
 
 
 def _event(message: Any, finish: str) -> tuple[str, str]:

@@ -59,6 +59,33 @@ Tested entirely offline with no `claude-agent-sdk` installed anywhere: the SDK i
 constructor-injected seam, the same shape as the HTTP transport, and the fake duck-types
 the message classes by name exactly as the provider dispatches them.
 
+**Then it was run against the real SDK, and the offline suite had missed three things** —
+which is the lesson this repository already wrote down and had to learn again: a green
+suite proves nothing about a module that talks to something external until a real
+request/response pair has been read.
+
+- **A refused run reported the word "success".** `claude-agent-sdk` 0.2.128 delivers a
+  refusal as `ResultMessage(subtype='success', is_error=True, result='Credit balance is
+  too low')` and then raises quoting the **subtype** — so the exception read
+  `returned an error result: success` and the only actionable sentence in the exchange was
+  discarded. `drain` checks `is_error` now (never the subtype: every healthy run also ends
+  `subtype='success'`) and raises `the Claude CLI refused the run: <reason>`. The refusal
+  also arrives as ordinary assistant text, so it is raised rather than returned —
+  otherwise an outage is quoted back to the reader as if the model had narrated it.
+- **`ANTHROPIC_API_KEY` silently beats the local Claude Code login.** With one exported
+  the run bills that API account and never touches the login, so a depleted key fails
+  every narration while a working login sits unused — behind a CLI warning that is easy to
+  read past. Now documented in the README, ARCHITECTURE and the env-var table. The first
+  draft of those docs said "set `ANTHROPIC_API_KEY` to be explicit about which account
+  pays", which is actively the wrong advice for anyone narrating on their local login.
+- **One test depended on the extra NOT being installed.** It passed on every clean machine
+  and went red the moment the SDK was installed to run this very check — the "whose shell
+  ran it" failure `hermetic_env` exists to prevent, one variable to the left. The absence
+  is forced through `sys.modules` now.
+
+**Measured end to end** on this repository, `haiku`, 24 candidates: 27 s total, first token
+at 14 s, 48 streamed deltas, citations spliced verbatim. The HTTP lane stays the default.
+
 ## Unreleased — a JS repository stops hiding its tests
 
 **`megabrain_grep` was returning three rows on express and thirty on click, and

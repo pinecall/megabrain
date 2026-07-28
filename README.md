@@ -89,13 +89,21 @@ key, because Anthropic has no embeddings API.
 pip install 'megabrain[claude]'
 export MEGABRAIN_CHAT_PROVIDER=claude     # opt-in; never selected on its own
 export MEGABRAIN_ASK_MODEL=haiku          # optional — CLI names, not `vendor/model`
+unset ANTHROPIC_API_KEY                   # ← see below. Not optional.
 ```
 
-Credentials are whatever the local Claude Code install resolves; set `ANTHROPIC_API_KEY`
-(or the Bedrock/Vertex variables the SDK documents) to be explicit about which account
-pays. **This lane narrates from the retrieved material without opening extra files** — the
-SDK runs its own tool loop, so `ask` answers in one pass instead of reading its way down a
-call chain — and each call spawns a subprocess, so expect seconds before the first token.
+**`ANTHROPIC_API_KEY` takes precedence over the Claude Code login, and it wins silently.**
+With one exported, the run bills that API account and never touches the local login —
+which, if the key belongs to an account with no credit, ends the call with
+`the Claude CLI refused the run: Credit balance is too low` while a perfectly good login
+sits unused. The CLI prints a warning about this and it is easy to read past. Unset the
+variable to use the local login; export it to bill that API account deliberately. Bedrock
+and Vertex are selected with the variables the SDK documents.
+
+**This lane narrates from the retrieved material without opening extra files** — the SDK
+runs its own tool loop, so `ask` answers in one pass instead of reading its way down a call
+chain. Measured on this repository, `haiku`, 24 candidates: **27 s end to end, first token
+at 14 s, 48 streamed deltas**. The HTTP lane stays the default for a reason.
 
 ### Fully local — Ollama for both halves, zero cloud
 

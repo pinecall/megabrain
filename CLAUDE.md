@@ -176,12 +176,28 @@ release, and the eventual merge to `master` is an ordinary merge — no
 
 **Version continuity (non-negotiable):**
 
-- v2 is `1.0.0`. v3 breaks public contracts → the next release is **`2.0.0`**.
-- **Never reset to `0.1.0`.** PyPI versions are permanent and monotonic. A
-  reset makes the package unpublishable at that number forever.
+- ⚠️ **CORRECTED 2026-07-28. This section used to say "v2 is `1.0.0`, so v3
+  releases as `2.0.0`". Both halves were wrong, and the mistake was checking
+  `_version.py` instead of the registry.** `_version.py` says `1.0.0` because
+  somebody bumped it locally; **`1.0.0` was never published and never tagged**.
+  Verify, don't remember:
+
+  ```bash
+  curl -s https://pypi.org/pypi/megabrain/json | python3 -c \
+    "import json,sys; print(json.load(sys.stdin)['info']['version'])"   # 0.18.6
+  git tag | sort -V | tail -1                                           # v0.18.6
+  ```
+
+- **The published latest is `0.18.6`, so the next release is `0.19.0`** — a
+  minor, because v3 breaks public contracts and 0.x is where a breaking change
+  takes the minor. There is no `2.0.0` to talk about until 1.0.0 actually
+  ships. A local `_version.py` is a claim; PyPI and `git tag` are the record.
+- **Never reset the version DOWN.** PyPI versions are permanent and monotonic;
+  a number that has shipped can never be reused. The number only goes up.
 - The version lives in exactly one place: `src/megabrain/_version.py`, read by
-  `pyproject.toml` dynamically. Nowhere else.
-- `CHANGELOG.md` gets a `## 2.0.0 — <thematic title>` section. The GitHub
+  `pyproject.toml` dynamically. Nowhere else. It currently **overstates** what
+  is published — reconcile it with `0.19.0` before tagging.
+- `CHANGELOG.md` gets a `## 0.19.0 — <thematic title>` section. The GitHub
   release notes are EXTRACTED from it, never written twice.
 - Do not delete `.github/workflows/*`. `release.yml` already invokes `ci.yml`
   via `workflow_call` so the tagged commit is gated — that mechanism exists
@@ -709,7 +725,7 @@ Protocol, one hypothesis per PR:
 ## 7. Forbidden
 
 - `git init` in this directory. Ever. (§0)
-- Resetting the version below `1.0.0`.
+- Resetting the version below what PyPI already serves (`0.18.6`).
 - Deleting `.github/workflows/` or the `workflow_call` gate chain.
 - Adding a runtime dependency. The three (`numpy`, `tree_sitter`,
   `tree_sitter_typescript`) are a product feature.
@@ -742,5 +758,5 @@ Protocol, one hypothesis per PR:
 - [ ] The studio builds from `studio/` and boots; the 25-assertion smoke passes.
 - [ ] `ARCHITECTURE.md` and `AGENTS.md` describe v3, not v2. A doc that lies is
       a bug.
-- [ ] `CHANGELOG.md` has a `## 2.0.0 — <title>` section written from the real
+- [ ] `CHANGELOG.md` has a `## 0.19.0 — <title>` section written from the real
       diff, including what was intentionally dropped.

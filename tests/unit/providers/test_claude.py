@@ -8,6 +8,8 @@ this adapter.
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from megabrain._provider_errors import ProviderError
@@ -17,6 +19,7 @@ from tests.unit.providers.fake_claude import (
     AssistantMessage,
     FakeSDK,
     HangingSDK,
+    ResultMessage,
     TextBlock,
     capped,
     delta,
@@ -244,6 +247,40 @@ def test_an_sdk_failure_surfaces_as_a_provider_error() -> None:
         ClaudeProvider(sdk=sdk).stream_chat(_body())
 
 
+def test_a_refused_run_reports_the_reason_the_cli_gave() -> None:
+    """MEASURED against claude-agent-sdk 0.2.128, and the reason this is here.
+
+    A run the CLI refuses arrives as `ResultMessage(subtype='success',
+    is_error=True, result='Credit balance is too low')` — and the SDK then
+    raises `Claude Code returned an error result: success`, quoting the
+    SUBTYPE. Passed through, the one thing the user can act on ("your credit
+    balance") is replaced by the word "success" in an error message.
+    """
+    sdk = FakeSDK([AssistantMessage([TextBlock("Credit balance is too low")]),
+                   ResultMessage(subtype="success", is_error=True,
+                                 result="Credit balance is too low")])
+    with pytest.raises(ProviderError, match="Credit balance is too low"):
+        ClaudeProvider(sdk=sdk).stream_chat(_body())
+
+
+def test_a_normal_result_message_is_not_mistaken_for_a_failure() -> None:
+    """`is_error` is the flag, not `subtype`: every healthy run also ends in a
+    `ResultMessage(subtype='success')`, so switching on the subtype would fail
+    every call that worked."""
+    sdk = FakeSDK([delta("the real answer"), ResultMessage(subtype="success")])
+    assert ClaudeProvider(sdk=sdk).stream_chat(_body()).text == "the real answer"
+
+
+def test_a_refusal_is_not_returned_as_the_walkthrough() -> None:
+    """The refusal also arrives as ordinary assistant text. Returned, it becomes
+    the answer — which is how an outage gets quoted back to the reader as if the
+    model had narrated it."""
+    sdk = FakeSDK([AssistantMessage([TextBlock("Credit balance is too low")]),
+                   ResultMessage(is_error=True, result="Credit balance is too low")])
+    with pytest.raises(ProviderError):
+        ClaudeProvider(sdk=sdk).stream_chat(_body())
+
+
 def test_a_stalled_cli_is_bounded_instead_of_waited_on() -> None:
     """Every call spawns the bundled binary, and it can stall. Unbounded, one
     narration hangs the caller's process with no way back."""
@@ -251,8 +288,17 @@ def test_a_stalled_cli_is_bounded_instead_of_waited_on() -> None:
         ClaudeProvider(sdk=HangingSDK(), timeout=0.2).stream_chat(_body())
 
 
-def test_the_missing_package_names_how_to_install_it() -> None:
-    """The one error a user can act on themselves."""
+def test_the_missing_package_names_how_to_install_it(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """The one error a user can act on themselves.
+
+    The absence is FORCED, never assumed. Written to rely on the extra simply
+    not being installed, this test passed on every clean machine and failed the
+    moment anyone ran `pip install 'megabrain[claude]'` — a result that depends
+    on whose environment ran it, which is exactly what `hermetic_env` exists to
+    prevent. A `None` in `sys.modules` is the documented way to fail an import.
+    """
+    monkeypatch.setitem(sys.modules, "claude_agent_sdk", None)
     with pytest.raises(ProviderError, match=r"megabrain\[claude\]"):
         ClaudeProvider().stream_chat(_body())
 

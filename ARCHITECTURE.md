@@ -353,8 +353,11 @@ take 16 s. A repository overrides either in `megabrain.json`'s `models`, which b
 
 **The Claude Agent SDK backend** (`providers/chat/claude.py`, extra `megabrain[claude]`)
 is the second entry. It drives the bundled Claude Code binary rather than an HTTP endpoint,
-so credentials are whatever that install resolves — set `ANTHROPIC_API_KEY`, or the
-Bedrock/Vertex variables the SDK documents, to be explicit about which account pays.
+so credentials are whatever that install resolves. **`ANTHROPIC_API_KEY` takes precedence
+over the local Claude Code login and wins silently** — a key for an account with no credit
+ends the call with "Credit balance is too low" while a working login sits unused, behind a
+CLI warning that is easy to read past. Unset it to narrate on the local login; export it to
+bill that API account deliberately.
 **Opt in with `MEGABRAIN_CHAT_PROVIDER=claude`**; unlike v2 it is never preferred
 automatically, because a backend that took over on the machine that happened to `pip
 install` the extra would move the measured numbers with nothing in the output to say which
