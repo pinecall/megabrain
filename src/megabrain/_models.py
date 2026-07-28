@@ -8,12 +8,18 @@ it gets when it says nothing.
 
 from __future__ import annotations
 
-__all__ = ["NARRATOR_MODEL", "RERANK_MODEL"]
+__all__ = ["NARRATOR_MODEL", "RERANK_MODEL", "CLAUDE_NARRATOR_MODEL"]
 
 # The narration default. Measured against the alternatives: the fastest and
 # cheapest tier at comparable quality, because retrieval already guarantees
 # completeness and the model only narrates and points.
 NARRATOR_MODEL = "google/gemini-3.1-flash-lite"
+
+# The narration default on the Claude Agent SDK lane, which shares no namespace
+# with the one above: `google/…` is an aggregator's spelling and the bundled CLI
+# resolves its own names. Same reasoning as NARRATOR_MODEL — retrieval already
+# guarantees completeness, so the cheapest tier narrates it.
+CLAUDE_NARRATOR_MODEL = "haiku"
 
 # The judge's, separate because the jobs are not the same: narration reasons
 # about a flow in prose, the judge emits a short id array. Measured over 20

@@ -9,9 +9,10 @@ of it and never underneath.
 from __future__ import annotations
 
 from .base import Answer, ChatProvider, OnDelta, ToolCall
+from .claude import ClaudeProvider
 from .config import ChatConfig
 from .openai_compat import OpenAICompatible
 from .router import default_providers, resolve
 
 __all__ = ["ChatProvider", "Answer", "ToolCall", "OnDelta", "ChatConfig",
-           "OpenAICompatible", "resolve", "default_providers"]
+           "OpenAICompatible", "ClaudeProvider", "resolve", "default_providers"]

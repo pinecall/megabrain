@@ -1,5 +1,64 @@
 # Changelog
 
+## Unreleased — the registry gets its second backend, and its first caller
+
+**`resolve()` shipped with no caller.** The chat registry existed, was tested, and every
+production site constructed `OpenAICompatible` by name anyway — including `ask`'s
+`_narrator`. So "adding a backend is an adapter plus an entry" was true of the registry and
+false of the program. Routing `_narrator` through `resolve()` is what made the claim
+executable; it also surfaced the reason nobody had: `resolve()` took no arguments, so
+routing through it would have silently dropped whatever `megabrain.json` committed as its
+narrator and used the built-in default instead. `resolve(model=…)` /
+`default_providers(model)` carry it now.
+
+**The Claude Agent SDK backend is ported** (`providers/chat/claude.py`, extra
+`megabrain[claude]`) — the last of v2's providers that v3 had not brought over. It drives
+the bundled Claude Code binary rather than an HTTP endpoint, so credentials are whatever
+that install resolves; `ANTHROPIC_API_KEY` (or the Bedrock/Vertex variables the SDK
+documents) says explicitly which account pays. The v2 note about needing
+`npm install -g @anthropic-ai/claude-code` is obsolete: the SDK bundles the binary.
+
+**Opt-in, deliberately unlike v2.** v2 auto-preferred `claude` whenever the package was
+importable. That means the machine that ran `pip install 'megabrain[claude]'` for an
+unrelated reason starts narrating on a different lane, with different latency, and nothing
+in the output says so — a measurement that moves because of an install is a measurement
+nobody can reproduce. `MEGABRAIN_CHAT_PROVIDER=claude` and nothing else selects it.
+
+**It narrates without opening files, and that is stated rather than hidden.** The SDK runs
+its own tool loop, so there is no pending call to hand back to `converse` — this backend
+returns text on the first pass, which is the fail-open the narrator already documents. The
+walkthrough is written from what retrieval chose. Reporting a tool call the narrator could
+never complete would have been the alternative, and it would have been a lie in the shape
+of a feature.
+
+**The async seam, which is where the design work went.** The SDK is async end to end and
+this engine has no async twin — a hard rule with a test behind it. `asyncio.run` cannot
+bridge them: it raises the moment a loop is already running in the calling thread, which is
+exactly what happens when the HTTP transport narrates from inside a route. `_claude_sdk.py`
+owns **one thread with one loop** for the process and submits work with
+`run_coroutine_threadsafe`, which works either way, gives the sync side a real wall-clock
+bound, and re-raises the coroutine's exception with its traceback. A timeout **cancels** the
+future rather than abandoning it: a run left going holds its CLI subprocess open, so one
+narration per timeout would leak one process per timeout.
+
+Three smaller things the tests pinned, each one a way to be wrong quietly:
+
+- **A namespaced model never reaches the CLI.** The project narrator default is
+  `google/gemini-3.1-flash-lite`, read from `megabrain.json` and meaningless to a binary
+  that resolves its own names. Passed through, every narration would have failed on the
+  model rather than on the mismatch — so a name with a slash falls back to `haiku`.
+- **The whole-block fallback does not double-count.** Modern builds emit the deltas *and*
+  the assembled message; counting both returns every answer twice. Older builds emit no
+  `StreamEvent` at all, so dropping the fallback would return the empty string with nothing
+  to say why. The guard is what makes both true at once.
+- **An SDK failure surfaces as `ProviderError`.** Left raw it reached callers as some
+  SDK-internal exception nothing catches by kind — and the lanes that fail open on a
+  provider being down would not have.
+
+Tested entirely offline with no `claude-agent-sdk` installed anywhere: the SDK is a
+constructor-injected seam, the same shape as the HTTP transport, and the fake duck-types
+the message classes by name exactly as the provider dispatches them.
+
 ## Unreleased — a JS repository stops hiding its tests
 
 **`megabrain_grep` was returning three rows on express and thirty on click, and

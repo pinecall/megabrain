@@ -337,7 +337,7 @@ The LLM is a narrator that can only **point**, never paste:
 `MEGABRAIN_CHAT_BASE_URL` points it anywhere, and a loopback URL needs no key —
 `_local.is_local_url` is why, after a version that refused to run against Ollama for want
 of a credential. `router.resolve()` probes a registry in order rather than branching at
-call sites, so adding a backend is an adapter plus an entry; today the registry holds one.
+call sites, so adding a backend is an adapter plus an entry; the registry holds two.
 `stream_chat(with_tools=True)` accumulates fragmented `delta.tool_calls` for the
 function-calling loop in `ask/converse/` and `ask/agents/`.
 
@@ -351,10 +351,28 @@ price, failed open at 5.6 s. Sharing one model between the two jobs is what made
 take 16 s. A repository overrides either in `megabrain.json`'s `models`, which beats
 `MEGABRAIN_ASK_MODEL` / `MEGABRAIN_RERANK_MODEL`, which beat the constants.
 
-**Not ported from v2: the Claude Agent SDK provider.** v2 drove the Claude Code CLI, so a
-logged-in subscription narrated on Claude Code credits with no key at all. The
-`megabrain[claude]` extra is still declared in pyproject and nothing selects it. Tracked,
-not dropped.
+**The Claude Agent SDK backend** (`providers/chat/claude.py`, extra `megabrain[claude]`)
+is the second entry. It drives the bundled Claude Code binary rather than an HTTP endpoint,
+so credentials are whatever that install resolves — set `ANTHROPIC_API_KEY`, or the
+Bedrock/Vertex variables the SDK documents, to be explicit about which account pays.
+**Opt in with `MEGABRAIN_CHAT_PROVIDER=claude`**; unlike v2 it is never preferred
+automatically, because a backend that took over on the machine that happened to `pip
+install` the extra would move the measured numbers with nothing in the output to say which
+lane produced them.
+
+Two consequences worth knowing before choosing it. **It narrates without opening files:**
+the SDK runs its own tool loop, so there is no pending call to hand back to `converse`, and
+this lane returns text on the first pass — the fail-open the narrator already documents.
+The walkthrough is written from what retrieval chose, not from files the model went and
+read. And **every call spawns a subprocess** (~18 s before a token arrives), bounded at 300 s.
+
+The async/sync seam is the part with teeth. The SDK is async end to end and this engine has
+no async twin, so `_claude_sdk.py` owns **one thread with one loop** for the process and
+submits work with `run_coroutine_threadsafe`. `asyncio.run` cannot do this job: it raises
+the moment a loop is already running in the calling thread, which is exactly what happens
+when the HTTP transport narrates from inside a route. A timeout cancels the future rather
+than abandoning it — a run left going holds its CLI subprocess open, and one narration per
+timeout would be one process per timeout.
 
 **Embeddings never use this switch** — they have their own config and their own key vars,
 because the two routinely point at different places (embeddings at a hosted model, chat at

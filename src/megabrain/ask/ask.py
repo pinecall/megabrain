@@ -19,7 +19,7 @@ from .._provider_errors import MissingCredential
 from .._types import Content
 from ..contracts import Bundle, FlowHit
 from ..project import load_project
-from ..providers.chat import ChatProvider, OpenAICompatible
+from ..providers.chat import ChatProvider, resolve
 from ..search import search
 from ..storage.locate import resolve_root
 from ._flows import matched_flows, remember_answer, served
@@ -81,6 +81,10 @@ def _narrator(root: Path) -> ChatProvider | None:
 
     Per project, not per shell: `megabrain.json` is committed, so everyone
     working on that repo gets the same walkthroughs.
+
+    Routed through the registry rather than constructing one backend by name —
+    which is the whole point of having a registry, and was the reason `resolve`
+    shipped with no caller: adding the SDK lane here would otherwise have meant
+    an if-switch in the verb.
     """
-    provider = OpenAICompatible(model=load_project(root).narrator_model)
-    return provider if provider.available() else None
+    return resolve(model=load_project(root).narrator_model)

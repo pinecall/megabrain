@@ -139,6 +139,18 @@ warn_unused_ignores = false     # off: would fight pyright's ignores
 warn_redundant_casts = false    # idem
 files = ["src/megabrain"]
 
+[[tool.mypy.overrides]]
+# The Claude Agent SDK is an OPTIONAL extra: `pip install 'megabrain[claude]'`.
+# A gate that demanded it installed would make the type check depend on a
+# backend most installs never use — and the provider is written so that the
+# package being absent is a normal, handled state (a named ProviderError, not
+# an ImportError reaching the caller). The surface it exposes is pinned by our
+# own Protocol in `_claude_sdk.py`, so the shape is still checked; what is
+# unchecked is only whether the real module matches it, which no stub of ours
+# could honestly promise either.
+module = ["claude_agent_sdk"]
+ignore_missing_imports = true
+
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.10"          # the OLDEST supported, not the newest

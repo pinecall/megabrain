@@ -91,9 +91,15 @@ set them before touching anything under `search/`, `chunkers/` or
   `LexicalBoost`. It does not fire on the golden set, which is why parity holds
   without it — but it is the gap between golden-set parity and full behavioural
   parity with v2.
-- **The Claude Agent SDK chat provider** — v2 narrated on a logged-in Claude Code
-  subscription with no key. The `megabrain[claude]` extra is still declared and
-  nothing selects it.
+The **Claude Agent SDK chat provider** is now ported (`providers/chat/claude.py`
++ `_claude_sdk.py` + `_claude_prompt.py` + `_claude_frames.py`, 26 tests, all
+offline). Opt-in via `MEGABRAIN_CHAT_PROVIDER=claude`, never auto-preferred —
+v2's auto-preference moved the measured numbers on whichever machine installed
+the extra. It narrates WITHOUT opening files (the SDK owns its own tool loop, so
+`converse` gets no tool calls back), and it is driven from the sync engine by one
+background thread with one loop, because `asyncio.run` raises under the HTTP
+transport's running loop. Routing it in is also what gave `resolve()` its first
+production caller: `ask/_narrator` no longer constructs a backend by name.
 
 The flow cache IS ported (`flows/`, and `storage/_flows.py`) — the earlier note
 here saying otherwise was written before phase 10.

@@ -138,6 +138,7 @@ never has to know which branch answered to know the answer ended.
 | `MEGABRAIN_CHAT_MODEL` | `anthropic/claude-sonnet-4.5` | the chat model when nothing more specific applies |
 | `MEGABRAIN_CHAT_BASE_URL` | `https://openrouter.ai/api/v1` | point chat at a native API or a local server |
 | `MEGABRAIN_CHAT_API_KEY` | falls back to `OPENROUTER_API_KEY` | key for a non-OpenRouter chat endpoint |
+| `MEGABRAIN_CHAT_PROVIDER` | — | `claude` narrates through the Claude Agent SDK (extra `megabrain[claude]`) instead of an HTTP endpoint. Opt-in only; anything else keeps the OpenAI-compatible lane |
 | `MEGABRAIN_ASK_MODEL` | `google/gemini-3.1-flash-lite` | the narration model |
 | `MEGABRAIN_RERANK_MODEL` | `google/gemini-3.5-flash-lite` | the judge lane's model — measured separately, because narration reasons in prose and the judge emits a short id array |
 | `MEGABRAIN_ASK_CTX_CHARS` | `200000` | `ask`'s candidate budget — **lower it for local models** |

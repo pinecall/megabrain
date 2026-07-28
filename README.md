@@ -79,6 +79,24 @@ That single key gets you the whole validated stack, and it is already the defaul
 
 Every default here is a measurement, not a guess. → [the numbers](docs/GUIDE.md#providers-and-models)
 
+### Narrating through the Claude Agent SDK
+
+An alternative to the chat endpoint: drive the bundled Claude Code binary instead of
+OpenRouter. Retrieval is untouched — it never calls a model — and embeddings keep their own
+key, because Anthropic has no embeddings API.
+
+```bash
+pip install 'megabrain[claude]'
+export MEGABRAIN_CHAT_PROVIDER=claude     # opt-in; never selected on its own
+export MEGABRAIN_ASK_MODEL=haiku          # optional — CLI names, not `vendor/model`
+```
+
+Credentials are whatever the local Claude Code install resolves; set `ANTHROPIC_API_KEY`
+(or the Bedrock/Vertex variables the SDK documents) to be explicit about which account
+pays. **This lane narrates from the retrieved material without opening extra files** — the
+SDK runs its own tool loop, so `ask` answers in one pass instead of reading its way down a
+call chain — and each call spawns a subprocess, so expect seconds before the first token.
+
 ### Fully local — Ollama for both halves, zero cloud
 
 Air-gapped, $0, open weights end to end, and **your code never leaves the machine**:
