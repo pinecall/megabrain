@@ -31,7 +31,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: tag matches __version__
         run: |
-          pkg=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/megabrain/__init__.py)
+          # _version.py, NOT __init__.py: the init only IMPORTS the name, so the
+          # old sed matched nothing and every tagged release failed on pkg="".
+          pkg=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/megabrain/_version.py)
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="${GITHUB_REF_NAME#v}"
             echo "tag=$tag  package=$pkg"

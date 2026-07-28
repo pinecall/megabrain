@@ -10,6 +10,9 @@ grep + Read + explore-agent crawling with one grounded answer.
 - **The tree, and the packaging argument behind it** → [docs/STRUCTURE.md](docs/STRUCTURE.md) · [docs/DOMAINS.md](docs/DOMAINS.md)
 - **Task-oriented how-tos** → [docs/RECIPES.md](docs/RECIPES.md)
 - **How it works, and why each choice is locked** → [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Known design debt, prioritized with file:line** → [REFACTOR.md](REFACTOR.md) —
+  read it BEFORE "improving" something: it also lists what looks like a smell and
+  is a decision
 - **What changed and when** → [CHANGELOG.md](CHANGELOG.md)
 
 This file is orientation only: the rules you must not break, how to verify a
@@ -107,13 +110,19 @@ The tree mirrors the pipeline; full detail in [ARCHITECTURE.md](ARCHITECTURE.md)
 | `flows/` | the cached-walkthrough lane: `cache` · `serve` · `match` · `covers` · `freshness` · `chrome`. The read path is cosine + file hashes only |
 | `enrich/` | `Bundle → Bundle`, opt-in, fail-open to the input. `rerank` = the judge (the model returns IDS, never code, and never drops a file) · `expand` = the widener (the model names identifiers, the SYMBOL TABLE resolves them) |
 | `storage/` | `store` (SQLite, the ONLY package that writes SQL) · one module per table · `_flows` · `locate` (`resolve_root` + `INDEX_FILE`, the layout in one line) |
-| `providers/` | model APIs, one folder per backend: `http/` (the shared transport) · `embeddings/` (Layer 2 — retrieval depends on it) · `chat/` (Layer 4 — nothing under `search/` may import it) · `_local` (asked by both) |
+| `providers/` | model APIs, one folder per backend: `http/` (the shared transport) · `embeddings/` (Layer 2 — retrieval depends on it) · `chat/` (Layer 4 — nothing under `search/` may import it; TWO backends behind `router.resolve()`: the OpenAI-compatible endpoint and the opt-in Claude Agent SDK, switched by `megabrain.json` `models.provider` / `MEGABRAIN_CHAT_PROVIDER`, and the switch moves EVERY model lane at once) · `_local` (asked by both) |
 | `usecases/` | the verbs that belong to no single feature (`get` `scan` `repos` `freshness` `starters`), plus a re-export of the four that live in their own packages — so every transport still has one import to reach any verb |
 | `transports/` | `cli` (one module per verb) · `mcp` (four tools; `inputSchema` GENERATED from `contracts/tools.py`) · `http` (studio + JSON API, `ui/` is the built studio bundle) · `install` (`megabrain install` — the six-assistant MCP registration table) |
 
 Runnable examples live in their own repo, `~/megabrain-examples`.
 
 ## Releases — maintainer only, never without explicit approval
+
+⚠️ **Version reality, verify against the registry, not against files**: PyPI's
+latest published is **0.18.6** and so is the last git tag. This branch declares
+`1.0.0` in `_version.py` and the README — deliberate, and **unreleased**: work
+continues here until the maintainer says ship. Never reset the number down; PyPI
+versions are permanent.
 
 1. Bump `src/megabrain/_version.py:__version__` (the ONE place; `pyproject.toml` reads it
    from there) and add a `## X.Y.Z — title`

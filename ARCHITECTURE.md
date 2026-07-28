@@ -88,10 +88,10 @@ giants → line windows). Every chunk carries a **breadcrumb**
   `treesitter/specs/` + a module in `chunkers/languages/` (13–18 lines) +
   `pip install tree_sitter_<lang>` — it auto-activates when the grammar imports, so a
   missing wheel costs that language and nothing else.
-- `php.py` — **shape-routed PHP**: modern (namespaced/PSR) files keep the generic
-  chunker; legacy-2000s procedural/mixed-HTML files take a section chunker
-  (standalone defs with their doc-banner attached, `//----` banners as headings,
-  HTML islands, QMD scored cuts).
+- PHP rides the same tree-sitter walk (`specs/optional.py::PHP_SPEC`, mixed-HTML
+  handled by the grammar). v2's shape-routed legacy-PHP section chunker was NOT
+  ported — deliberate, tracked, and re-addable as one more spec if a real legacy
+  corpus asks for it.
 - `markdown.py` — no-LLM doc chunker: score candidate cut lines (H1=100…H6=50,
   code-fence boundary=80, paragraph=20) and cut at the best score near the budget,
   so chunks are heading-aligned and never split mid-section. Headings become
@@ -134,10 +134,14 @@ auto-triggers a full re-embed on the next `index` so vectors never silently mism
   unchanged files on the next plain `index`, with no embedding calls (measured: seven
   repos, +2 000 symbols, `changed=0`). Symbols only — a change to where a file may be
   CUT still needs `--force`, because those rows carry vectors.
-- **Import/call graph** (`indexing/edges/`) — Python: `from pkg.x import Y` + call sites to
-  unique defs. TS/JS: relative imports incl. `export * from`, dynamic `import()`,
-  side-effect imports. PHP: `use` statements resolved against a namespace+declaration
-  FQCN index (PSR-4-agnostic). Edges feed **candidates and annotations only** (rule 3).
+- **Import/call graph** (`indexing/edges/`) — Python: imports (relative levels,
+  re-exports through a package `__init__`, repo-wide `self.x = ImportedClass()`
+  attribute bindings) + calls through resolved aliases. TS/JS: relative imports
+  incl. the ESM `.js → .ts` rewrite, `export * from`, dynamic `import()`. Plus the
+  language-agnostic **pin lane** (`edges/pins.py`): which test file exercises which
+  implementation file, computed from unambiguous shared symbols — the lane that
+  gives Ruby/Go/Rust repos a graph at all. Other languages chunk and search without
+  extractors. Edges feed **candidates and annotations only** (rule 3).
 
 ### 2.4 Storage, incrementality, freshness (`storage/store.py`, `indexing/indexer.py`)
 
@@ -320,15 +324,26 @@ The LLM is a narrator that can only **point**, never paste:
    out, and docs-only keeps the code from taking the slots — post-filtering a
    mixed bundle capped a docs walkthrough at whatever markdown outranked the
    code. Candidates are capped at 200K chars — one call always fits.
-2. **One streamed chat call**: the prompt forbids quoting code and requires
-   double-bracket citations — `[[3]]` (whole chunk) or `[[3:705-731]]` (line range;
-   an `L` prefix is tolerated because models mirror the prompt's `L1-172` headers).
-3. **Splice**: every citation is replaced with the **verbatim block from disk**
-   (real file, real line numbers; sub-ranges snap to enclosing symbol edges; repeats
-   dedupe to a back-reference). The CLI streams live — prose token by token, each
-   citation spliced the moment its line completes.
-4. **Fail-open**: no key, no citations, or an API error → the full unfiltered bundle.
-   Non-cited candidates are always listed in a footer (the filter is never silent).
+2. **The `open_file` conversation** (`ask/converse/`): the prompt serves the 8 best
+   chunk bodies plus a MAP of the rest, forbids quoting code, and requires
+   double-bracket citations — `[[3]]` (chunk), `[[3:705-731]]` (range), or
+   `[[path:lo-hi]]` for a file the model opened. Up to `MAX_ROUNDS = 5` rounds of
+   opening; a backend that REJECTS the tools field (Ollama's HTTP 400) has the tool
+   retired for that conversation — once, announced by a `toolless` event — and
+   narrates from the retrieved material. An answer that ADMITS it lacked a body the
+   index holds gets exactly one extra round with that body served (`_filled`).
+3. **Splice**: every citation is replaced with the **verbatim block from the index**
+   (real file, real line numbers; a point citation widens to its window; repeats
+   dedupe to a back-reference; the streaming `Splicer` holds a half-arrived
+   citation until it is decidable). Then the deterministic widenings: the
+   definition of every helper the prose names (`checks/callees`), the tests that
+   PIN the behaviour (`checks/pinned`), and a graph check on every narrated hop
+   (`checks/grounded` — a step the import/call graph cannot support is flagged
+   UNVERIFIED rather than left looking authoritative).
+4. **Fail-open**: broken references go to one bounded repair call; a repair that
+   fails drops the fragment — a missing block is a smaller lie than a path with no
+   code under it. No credential at all raises a named `MissingCredential` AFTER
+   retrieval already ran, so the caller keeps the deterministic answer.
 
 ### 4.1 Chat providers — one adapter, and one model constant per job
 
@@ -338,8 +353,8 @@ The LLM is a narrator that can only **point**, never paste:
 `_local.is_local_url` is why, after a version that refused to run against Ollama for want
 of a credential. `router.resolve()` probes a registry in order rather than branching at
 call sites, so adding a backend is an adapter plus an entry; the registry holds two.
-`stream_chat(with_tools=True)` accumulates fragmented `delta.tool_calls` for the
-function-calling loop in `ask/converse/` and `ask/agents/`.
+`_frames.read_stream` reassembles fragmented `delta.tool_calls` into `ToolCall`s on
+every turn; the function-calling loop that consumes them lives in `ask/converse/`.
 
 **Two model constants, not one** (`_models.py`), because the jobs are not the same:
 `NARRATOR_MODEL = google/gemini-3.1-flash-lite` reasons about a flow in prose,
@@ -457,7 +472,8 @@ last edited a file.
 
 ### 5.2 HTTP (`transports/http/`)
 
-Stdlib `http.server`, warm state, db-mtime auto-reload. The router is a **table** of
+Stdlib `ThreadingHTTPServer`, no framework: a thread per request calls the sync
+use-cases directly — that is the whole concurrency story. The router is a **table** of
 `(method, path) → route`, so adding an endpoint is one entry and a path that exists under
 another method answers 405 rather than 404:
 
@@ -470,9 +486,9 @@ GET  /  and  /ui/*           the studio bundle, the only prefix route
 Optional Bearer auth (`--token` / `MEGABRAIN_API_TOKEN`) on everything but `/health`,
 `/config` and the UI; `--readonly` 403s the mutating routes so a public box cannot be billed
 by a visitor; `--rate-limit N` caps requests per minute per caller. `get_code` enforces
-repo-root containment (path-traversal hardened). `/repos` merges this server's warm repos
-with the machine-global registry, so a repo indexed elsewhere comes back for the studio to
-load on click.
+repo-root containment (path-traversal hardened). `/repos` reads the machine-global
+registry (`~/.megabrain/registry.json`) with live counts, so a repo indexed elsewhere
+shows up for the studio to load on click.
 
 **PATH-SCOPE everywhere**: pass a sub-path (`~/repo/src/auth`) or `scope_path`/`path_filter`
 and retrieval is confined to files under it; the repo root is auto-detected from
@@ -563,7 +579,11 @@ src/megabrain/
                          (content-addressed) · _config _send _batching _budget
                          _oversize _wire _width _replies
         chat/            L4 — nothing under search/ may import this
-          base.py          ChatProvider Protocol · openai_compat.py · router.py
+          base.py          ChatProvider Protocol (Answer · ToolCall · OnDelta)
+          router.py        resolve(model, timeout, provider) — the ONE place every
+                           model lane gets its backend · openai_compat.py + _frames
+          claude.py        the Claude Agent SDK backend, opt-in · _claude_sdk (the
+                           one-thread-one-loop async seam) · _claude_prompt · _claude_frames
 
   L3  chunkers/        CONTENT → CHUNKS behind one partition-guaranteed contract
         cast.py          the ONE split-then-merge engine · units.py the language seam
@@ -613,7 +633,8 @@ src/megabrain/
         narrator.py · events.py · stream.py
         prompt/          what the model is HANDED: 8 bodies + a map of the rest.
                          Served all 30, it opened nothing (§5.1)
-        converse/        the open_file loop — loop.py tools.py _toolcall _flowctx
+        converse/        the open_file loop — loop.py tools.py _toolcall _toolless
+                         (a backend that rejects tools still narrates) _flowctx
                          _missing _filled _admits
         citing/          RULE 5 as a package: the model cites, the ENGINE splices.
                          citations splice _quote _window _elide _codeonly _litter
