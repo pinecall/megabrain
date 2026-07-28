@@ -35,16 +35,15 @@ def judge_provider(model: str | None = None) -> ChatProvider | None:
     is chosen to explain code well and costs seconds per call, and three
     batches through it took 16s for a JSON array of integers.
 
-    Built here rather than inherited: the lane's model and its timeout are the
-    lane's business, and sharing the narrator's meant sharing a model chosen to
-    explain code — seconds per call, for a task whose whole output is a JSON
-    array of integers.
+    Resolved through the registry, never constructed by name: this lane used to
+    build its endpoint directly, so MEGABRAIN_CHAT_PROVIDER=claude switched the
+    narrator and left the judge billing OpenRouter — silently, because the lane
+    is fail-open and just kept working. One switch, all lanes. The MODEL stays
+    the lane's own; on the SDK backend a namespaced id falls to the CLI default.
     """
-    from ..providers.chat import OpenAICompatible
+    from ..providers.chat import resolve
 
-    provider = OpenAICompatible(model=model or RERANK_MODEL,
-                                timeout=RERANK_TIMEOUT)
-    return provider if provider.available() else None
+    return resolve(model=model or RERANK_MODEL, timeout=RERANK_TIMEOUT)
 
 
 def rerank(bundle: Bundle, provider: ChatProvider) -> Bundle:

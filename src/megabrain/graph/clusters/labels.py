@@ -49,15 +49,18 @@ def label_communities(root: str, graph: RepoGraph,
 def _ask(root: str, store: Store, graph: RepoGraph, communities: dict[str, int],
          ids: list[int]) -> dict[int, str]:
     from ...project import load_project
-    from ...providers.chat import OpenAICompatible
+    from ...providers.chat import resolve
 
-    provider = OpenAICompatible(model=load_project(root).narrator_model,
-                                timeout=TIMEOUT)
-    if not provider.available():
+    # The registry, not a named backend: one switch moves every lane, and this
+    # one was left behind once already (the narrator followed it, the labels
+    # kept billing the endpoint — silently, because this path is fail-open).
+    provider = resolve(model=load_project(root).narrator_model, timeout=TIMEOUT)
+    if provider is None:
         return {}
     try:
         reply = provider.chat_text(
-            provider.model, labelling_prompt(store, graph, communities, ids),
+            getattr(provider, "model", ""),
+            labelling_prompt(store, graph, communities, ids),
             max_tokens=max(MIN_TOKENS, TOKENS_PER_COMMUNITY * len(ids)))
     except Exception:                   # noqa: BLE001 — the map renders regardless
         return {}

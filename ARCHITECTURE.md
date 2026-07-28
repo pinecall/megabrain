@@ -361,7 +361,14 @@ bill that API account deliberately.
 **Opt in with `MEGABRAIN_CHAT_PROVIDER=claude`**; unlike v2 it is never preferred
 automatically, because a backend that took over on the machine that happened to `pip
 install` the extra would move the measured numbers with nothing in the output to say which
-lane produced them.
+lane produced them. **The switch moves every model lane at once** — narrator, `grep --why`,
+the judge (`rerank`), `expand`, the map labels — because they all get their backend from
+`router.resolve(model=…, timeout=…)` and none constructs one by name. Each lane keeps its
+own model and tuning through those parameters; on the SDK backend a namespaced id falls to
+the CLI default, and a lane's HTTP-measured timeout reaches the endpoint only (a CLI spawn
+eats ~14 s before the first token, so walls that need the real number ask the provider —
+`enrich/_batches.wall_for`). Embeddings are untouched by all of this: Anthropic has no
+embeddings API, so retrieval always needs its own embed credential.
 
 Two consequences worth knowing before choosing it. **It narrates without opening files:**
 the SDK runs its own tool loop, so there is no pending call to hand back to `converse`, and

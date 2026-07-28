@@ -86,6 +86,23 @@ request/response pair has been read.
 **Measured end to end** on this repository, `haiku`, 24 candidates: 27 s total, first token
 at 14 s, 48 streamed deltas, citations spliced verbatim. The HTTP lane stays the default.
 
+**ONE switch now moves EVERY model lane.** Routing the narrator through `resolve()` had
+left three lanes constructing their endpoint by name — `rerank`'s judge, `expand` (which
+shares it) and the map labels — so `MEGABRAIN_CHAT_PROVIDER=claude` switched `ask` and
+`grep --why` and quietly left the rest billing OpenRouter. Quietly is the operative word:
+every one of those lanes is fail-open, so nothing ever said so. `judge_provider` and the
+labels resolve through the registry now; `resolve(model=…, timeout=…)` carries each lane's
+own tuning, so the judge keeps the model its measurements were taken on.
+
+**And the judge's wall learned whose backend it is bounding.** First live run on the SDK
+lane: `judge: None` on every call — `verdict_of` bounds each batch with
+`future.result(timeout=30)`, a number measured on HTTP, and a CLI spawn eats ~14 s before
+the first token. The lane failed open, silently, which is the worst way. The wall asks the
+provider now (`wall_for`): a backend that carries a `timeout` knows its own cost, one that
+does not gets the measured HTTP wall — and the router hands the lane `timeout` to the
+endpoint only, never to the subprocess. Verified live on the subscription:
+`judge: {kept: 5, of: 21}` at 47 s.
+
 ## Unreleased — a JS repository stops hiding its tests
 
 **`megabrain_grep` was returning three rows on express and thirty on click, and

@@ -223,6 +223,64 @@ def test_the_router_falls_back_to_the_endpoint_when_nobody_opted_in(
     assert chosen is not None and chosen.name == "openai-compatible"
 
 
+@pytest.mark.usefixtures("opted_in")
+def test_every_model_lane_follows_the_provider_switch(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """ONE switch, ALL lanes. The judge used to construct its endpoint by name,
+    so MEGABRAIN_CHAT_PROVIDER=claude moved the narrator and left rerank,
+    expand and the map labels billing OpenRouter — silently, because each was
+    fail-open and just kept working."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "a-real-key")
+    monkeypatch.setattr("megabrain.providers.chat.claude.find_spec",
+                        lambda _name: object())
+    from megabrain.enrich.rerank import judge_provider
+
+    chosen = judge_provider()
+    assert chosen is not None and chosen.name == "claude"
+
+
+def test_the_judge_lane_keeps_its_own_timeout(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """The judge's timeout is the lane's business — three batches through the
+    narrator's settings took 16s for a JSON array of integers. Routing through
+    the shared registry must not cost the lane its tuning."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "a-real-key")
+    from megabrain.enrich._batches import RERANK_TIMEOUT
+    from megabrain.enrich.rerank import RERANK_MODEL, judge_provider
+
+    chosen = judge_provider()
+    assert chosen is not None and chosen.name == "openai-compatible"
+    assert chosen.model == RERANK_MODEL
+    assert chosen.config.timeout == RERANK_TIMEOUT       # type: ignore[attr-defined]
+
+
+def test_a_lane_timeout_reaches_the_endpoint_but_not_the_subprocess() -> None:
+    """A lane timeout is measured on HTTP and means nothing to a backend that
+    spawns a CLI: the judge's 30 s is generous for a request and DEAD for a
+    subprocess whose start alone eats 14 — observed live, judge=None on every
+    call, silently, because the lane fails open. The endpoint takes the lane's
+    tuning; the SDK backend keeps its own bound."""
+    from megabrain.providers.chat import default_providers
+    from megabrain.providers.chat.claude import TIMEOUT as CLAUDE_TIMEOUT
+
+    sdk_lane, endpoint = default_providers(model=None, timeout=7.0)
+    assert endpoint.config.timeout == 7.0        # type: ignore[attr-defined]
+    assert sdk_lane.timeout == CLAUDE_TIMEOUT    # type: ignore[attr-defined]
+
+
+def test_the_judge_wall_follows_the_backend() -> None:
+    """`verdict_of` bounds each batch with `future.result(timeout=…)`. A wall
+    fixed at the HTTP number starves the subprocess backend even after its own
+    timeout was set right — the failure observed live."""
+    from megabrain.enrich._batches import RERANK_TIMEOUT, wall_for
+
+    assert wall_for(ClaudeProvider(sdk=FakeSDK())) == ClaudeProvider(
+        sdk=FakeSDK()).timeout
+    class NoTimeout:
+        pass
+    assert wall_for(NoTimeout()) == RERANK_TIMEOUT   # type: ignore[arg-type]
+
+
 def test_the_router_carries_the_project_model_to_the_backend() -> None:
     """`resolve()` took no arguments, so routing the narrator through it would
     have silently dropped whatever `megabrain.json` chose."""

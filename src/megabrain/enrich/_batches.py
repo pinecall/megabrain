@@ -21,10 +21,23 @@ from ._verdict import round_robin
 if TYPE_CHECKING:
     from ..contracts import Tier2File
 
-__all__ = ["verdict_of", "RERANK_BATCH", "RERANK_TIMEOUT"]
+__all__ = ["verdict_of", "wall_for", "RERANK_BATCH", "RERANK_TIMEOUT"]
 
 RERANK_BATCH = 8
 RERANK_TIMEOUT = 30.0
+
+
+def wall_for(provider: ChatProvider) -> float:
+    """How long one batch may take, asked OF THE BACKEND.
+
+    Fixed at the HTTP number, the wall starved the SDK backend even after its
+    own timeout was set right: a CLI spawn eats ~14 s before the first token,
+    so every batch died at 30 and the fail-open lane went dark — silently,
+    which is the worst way. A backend that carries a `timeout` knows its own
+    cost; one that does not gets the measured HTTP wall.
+    """
+    held = getattr(provider, "timeout", None)
+    return float(held) if held else RERANK_TIMEOUT
 
 
 class Judge(Protocol):
@@ -51,7 +64,7 @@ def verdict_of(judge: Judge, provider: ChatProvider, question: str,
                    for batch, start in zip(batches, offsets)]
         # `result(timeout)` on each, so ONE hung batch bounds the whole lane
         # rather than the sum of the batches' patience.
-        return round_robin([future.result(timeout=RERANK_TIMEOUT)
+        return round_robin([future.result(timeout=wall_for(provider))
                             for future in running])
     finally:
         # Not a `with` block: its shutdown waits, which would hold the caller
