@@ -23,8 +23,16 @@ __all__ = ["resolve_node"]
 
 
 def resolve_node(store: Store, files: list[str], term: str,
-                 embedder: object = None) -> str | None:
-    """The file `term` names, or None when the index is empty."""
+                 embedder: object = None, *, guess: bool = True) -> str | None:
+    """The file `term` names, or None when nothing certain matches.
+
+    `guess=False` stops the ladder after the CERTAIN rungs, and a caller that
+    passed a path wants exactly that: asked about `user.rb` in a repo that has
+    no such file, the meaning rung happily returns `post.rb` — an answer that
+    looks right and sends the reader to edit the wrong file. A human typing a
+    description into the CLI wants the guess; a tool whose parameter is called
+    `file` wants to be told the file is not there.
+    """
     wanted = term.strip().strip("/")
     if wanted in files:
         return wanted
@@ -33,6 +41,8 @@ def resolve_node(store: Store, files: list[str], term: str,
                    or PurePosixPath(path).stem == wanted)
     if tails:
         return tails[0]                # certainty first: a named file is not a question
+    if not guess:
+        return None
     return _closest(store, files, term, embedder) if files else None
 
 

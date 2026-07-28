@@ -82,10 +82,10 @@ megabrain install                                              # every assistant
 claude mcp add megabrain -- python3 -m megabrain.transports.mcp # or by hand
 ```
 
-**Four tools, and the smallness is deliberate.** Every tool costs the calling agent
+**Five tools, and the smallness is deliberate.** Every tool costs the calling agent
 context and a routing decision, and the host already has Read, Grep and an editor — so the
 surface carries only what megabrain alone can do. Each `inputSchema` is **generated** from
-`contracts/tools.py`, so a parameter cannot exist on the wire without existing in the
+`contracts/tools/`, so a parameter cannot exist on the wire without existing in the
 dispatch.
 
 Every tool takes `repo_path` (any sub-path works — the root is auto-detected).
@@ -95,9 +95,10 @@ Every tool takes `repo_path` (any sub-path works — the root is auto-detected).
 | **`megabrain_grep`** | WHERE TO LOOK for a change: the files to open, the symbols in them worth opening, and each one's **exact line range** from the index. **No model by default** (~50 ms) — and it quotes no code, because your editor opens the file anyway. Name the identifiers you already know. | `task` *(req)* · `scope_path` · `why` *(default `false`)* |
 | **`megabrain_ask`** | The whole flow behind a question — or behind a change you are about to make — narrated with the REAL code spliced in verbatim. The narrator **opens whatever the retrieved chunks left unexplained** and keeps reading until the answer is complete; the definition of every helper the prose names and the tests that PIN what it describes are then cited with no model call. The prose is narration, so check it against the code it quotes. | `query` *(req)* · `scope_path` · `content` |
 | **`megabrain_search`** | The task's whole edit surface as a MAP: the files that answer it ranked, each with its best span (true line numbers) and the symbols it declares, plus the anchors a change must touch and the tests that pin the behaviour. ~2 700 tokens against ~8 100 with bodies. | `task` *(req)* · `scope_path` · `content` · `bodies` *(default `false`)* · `rerank` *(default `false`)* · `expand` *(default `false`)* |
+| **`megabrain_node`** | ONE FILE'S PLACE in the repository — the half that reading the file cannot tell you. Every **dependant** and dependency with the kind of each edge, the cluster it belongs to, its **semantic twins** (files that do the same job and never import it), and the declared symbols with real line ranges. No code, on purpose. Use it before editing a file you already located, to plan the ORDER of a refactor or a port, or to answer "is this dead code". | `file` *(req)* · `label` *(default `false`)* |
 | **`megabrain_index`** | Build or refresh the index. Incremental by content hash, so a warm re-index costs seconds. | `force` *(default `false`)* |
 
-It was briefly five. `megabrain_code` and `megabrain_replace` were measured across five
+`megabrain_code` and `megabrain_replace` were measured across five
 tasks in three languages and **removed**: what carried the value was the narrator opening
 files until it had the whole flow, and that now belongs to `ask` itself; the edit machinery
 kept being thrown away by the readers it was built for.

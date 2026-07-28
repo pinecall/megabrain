@@ -23,13 +23,18 @@ __all__ = ["graph_node", "neighbourhood"]
 
 
 def graph_node(start: Path | str, term: str, *, label: bool = False,
-               embedder: object = None) -> NodeView:
-    """The full node view, for a TERM — a path, a filename, or a description."""
+               embedder: object = None, guess: bool = True) -> NodeView:
+    """The full node view, for a TERM — a path, a filename, or a description.
+
+    `guess=False` refuses the meaning-based rung of the resolution ladder: a
+    caller that passed a PATH would rather hear "not in this index" than be
+    handed the nearest file, which reads as an answer and is not one.
+    """
     started = time.perf_counter()
     root = resolve_root(start)
     graph = warm_graph(str(root))
     with Store(root) as store:
-        relpath = resolve_node(store, graph.files, term, embedder)
+        relpath = resolve_node(store, graph.files, term, embedder, guess=guess)
         if relpath is None:
             raise FileNotFoundError(f"no file in this index matches {term!r}")
         edges = store.graph.all_edges()

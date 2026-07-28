@@ -1,8 +1,4 @@
-"""What a tool call carries in — the inputs, as types.
-
-The MCP `inputSchema` is GENERATED from these (`transports/mcp/schema.py`), so a
-parameter is declared once and cannot reach the wire without existing in the
-dispatch — which is how a tool ends up advertising a flag nobody reads.
+"""The READ tools' inputs — ask, grep, search, node.
 
 The descriptions are part of the contract, not decoration: they are the only
 thing a calling agent reads before choosing arguments, and every line is a
@@ -11,29 +7,15 @@ lesson from a measured session.
 
 from __future__ import annotations
 
-from typing import Annotated, TypedDict
+from typing import Annotated
 
-from .._types import Content
+from ..._types import Content
+from ._shared import Scope, Target
 
-__all__ = ["AskParams", "GrepParams", "SearchParams", "IndexParams"]
-
-Repo = Annotated[str, "path to the indexed repo root; a path INSIDE it works "
-                      "too — the root is found from .megabrain"]
-
-Scope = Annotated[str, "optional repo-relative folder to answer from; omit for "
-                       "the whole repository. Scoping EXCLUDES everything "
-                       "outside it, so scope to a package ROOT (e.g. activejob), "
-                       "never to its src/ or lib/ subfolder — that cuts away the "
-                       "package's tests, usually the spec of what you asked about"]
+__all__ = ["AskParams", "GrepParams", "SearchParams", "NodeParams"]
 
 
-class _Target(TypedDict):
-    """Which repository. Every tool needs it; none of them guesses it."""
-
-    repo_path: Repo
-
-
-class _AskRequired(_Target):
+class _AskRequired(Target):
     query: Annotated[str, "a how/where/why question, in natural language"]
 
 
@@ -44,7 +26,7 @@ class AskParams(_AskRequired, total=False):
                                 "instead of the mechanism — one or the other"]
 
 
-class _SearchRequired(_Target):
+class _SearchRequired(Target):
     task: Annotated[str, "the feature, question or bug, in natural language. On "
                          "a bug name the STATE to track, not the symptom: 'where "
                          "could scheduled_at be lost?' returns a trace, 'why does "
@@ -71,16 +53,7 @@ class SearchParams(_SearchRequired, total=False):
                             "when the answer plainly is not in the list"]
 
 
-class IndexParams(_Target, total=False):
-    """Build or refresh a repository's index."""
-
-    force: Annotated[bool, "default false: only files whose content changed are "
-                           "re-embedded, so a warm re-index costs seconds. true "
-                           "re-embeds everything — needed after changing the "
-                           "embedding model, and wasteful otherwise"]
-
-
-class _GrepRequired(_Target):
+class _GrepRequired(Target):
     task: Annotated[str, "the CHANGE you are about to make, in the imperative, "
                          "and NAME the identifiers you already know — the flag "
                          "you extend, the sibling you copy: 'Option has "
@@ -97,3 +70,19 @@ class GrepParams(_GrepRequired, total=False):
                          "adds one model call (~1 s) for a note per row plus the "
                          "site whose text never contains the task's words — "
                          "measured, that pairing is the only 4-of-4 coverage"]
+
+
+class _NodeRequired(Target):
+    file: Annotated[str, "the file to place, as a repo-relative path or just "
+                         "its name ('user.rb', 'app/models/user.rb'). Resolved "
+                         "the way a go-to-definition jump resolves, so a bare "
+                         "filename works when the index holds exactly one"]
+
+
+class NodeParams(_NodeRequired, total=False):
+    """One file's place in the repository — edges, cluster, twins, symbols."""
+
+    label: Annotated[bool, "default false. true names the file's cluster with "
+                           "one model call (cached under the graph's "
+                           "fingerprint, so it is free after the first); false "
+                           "keeps the whole answer local and deterministic"]

@@ -2,6 +2,25 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
+**`megabrain_node` — the fifth MCP tool: what a file will BREAK.** Opening a
+file already shows what it imports and what it declares; nothing inside it says
+*who depends on it*, and that is the fact that decides whether a change is safe.
+The tool answers it in one call: every dependant and dependency with the kind of
+each edge (one row per file, kinds joined), the cluster the file belongs to, its
+**semantic twins** — files that do the same job and never import it, which is
+where a port finds the duplicate it was about to write twice — and the declared
+symbols with their real line ranges. No code is quoted, for `grep`'s reason: the
+editor opens the file anyway. The engine already computed all of it (`NodeView`,
+served by CLI and HTTP since phase 12); what was missing was the MCP slot.
+
+Two decisions worth naming. The term resolution ladder gained `guess=False`,
+which the tool uses: a parameter called `file` that silently hands back the
+*nearest* file when the path does not exist reads as an answer and sends the
+agent to edit the wrong one — the CLI keeps the guess, because a human typing
+"the scoring pipeline" wants it. And `call_tool` now names `FileNotFoundError`
+as `not_found` instead of leaving it to the protocol's last-resort catch, which
+had been reporting an ordinary missing path as an unexpected failure.
+
 **Phase 16 — `forge/` is ported: megabrain writes its own chunkers again.**
 `megabrain forge` detects extensions nothing can index, has the repository's
 chat backend write a PARSING strategy for them (v3's `Chunker` owns the

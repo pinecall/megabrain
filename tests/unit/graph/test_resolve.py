@@ -97,3 +97,19 @@ def test_an_empty_index_resolves_to_nothing(tmp_path: Path) -> None:
     build_index(tmp_path, embedder=CountingEmbedder())
     with Store(tmp_path) as store:
         assert resolve_node(store, [], "anything") is None
+
+
+def test_a_path_that_matches_nothing_is_not_guessed_at(tmp_path: Path) -> None:
+    """`guess=False` stops the ladder after the CERTAIN rungs.
+
+    The meaning rung is right for a human typing "the scoring pipeline" into
+    the CLI and wrong for a caller that passed a PATH: asked about a file the
+    repo does not have, it returns the nearest one — an answer that looks
+    right and sends the reader to edit the wrong file.
+    """
+    with Store(tmp_path) as store:
+        store.files.upsert("svc.py", "sha", "class Service", None)
+        assert resolve_node(store, ["svc.py"], "nope.py", guess=False) is None
+        # the certain rungs still answer
+        assert resolve_node(store, ["svc.py"], "svc.py", guess=False) == "svc.py"
+        assert resolve_node(store, ["a/svc.py"], "svc.py", guess=False) == "a/svc.py"

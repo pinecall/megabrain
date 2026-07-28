@@ -1,23 +1,23 @@
-"""One tool call -> the text the agent reads. A TABLE, never a chain of ifs.
+"""What each tool DOES — a table, never a chain of ifs.
 
 Each handler is three lines because it is allowed to be: the use cases hold the
-behaviour, so this layer only maps names to them and picks a renderer. That is
-the whole reason the CLI, MCP and HTTP surfaces cannot drift — none of them is
-where a decision lives.
+behaviour, so this layer only maps a name to one and picks a renderer, which is
+why the CLI, MCP and HTTP surfaces cannot drift. Turning a raised failure into
+something an agent can read is `call.py`'s job, not this file's.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable
 
-from ..._errors import MegabrainError
+from ...graph.node import graph_node
+from ...graph.render import render_node
 from ...grep.grep import grep
 from ...search.render import render
 from ...usecases import ask, build_index, search
 from . import arguments as arg
-from .answers import Answer, answer, failure, from_engine
 
-__all__ = ["call_tool"]
+__all__ = ["HANDLERS", "Handler"]
 
 Handler = Callable[[dict[str, Any]], str]
 
@@ -30,15 +30,27 @@ def _ask(args: dict[str, Any]) -> str:
 
 
 def _grep(args: dict[str, Any]) -> str:
-    """Where to look, and nothing else — the grep a coding agent actually needs.
-
-    Separate from `_ask` because the DELIVERABLE is different, not the retrieval:
-    an agent about to edit wants files, symbols and line ranges, and its editor
-    will open those files anyway — so quoting the code back is billed twice.
-    """
+    """Where to look, and nothing else. Separate from `_ask` because the
+    DELIVERABLE differs, not the retrieval: an agent about to edit wants files,
+    symbols and line ranges, and its editor opens those files anyway — so
+    quoting the code back is billed twice."""
     return grep(arg.repo(args), arg.first_of(args, "task", "query"),
                 path_filter=arg.scope(args),
                 why=arg.flag(args, "why", default=False))
+
+
+def _node(args: dict[str, Any]) -> str:
+    """One file's PLACE in the repo — the half `Read` cannot give: who depends
+    on it, which cluster it sits in, which file does the same job without
+    importing it. No code, for `grep`'s reason: the editor opens it anyway."""
+    return render_node(graph_node(
+        arg.repo(args), arg.text(args, "file"),
+        label=arg.flag(args, "label", default=False),
+        # The parameter is called `file`: a name that resolves to nothing is a
+        # mistake worth reporting, not an invitation to hand back the nearest
+        # neighbour — which reads as an answer and sends the agent to edit the
+        # wrong file. The CLI keeps the guess; a description belongs to `search`.
+        guess=False))
 
 
 def _index(args: dict[str, Any]) -> str:
@@ -63,24 +75,6 @@ HANDLERS: dict[str, Handler] = {
     "megabrain_ask": _ask,
     "megabrain_grep": _grep,
     "megabrain_search": _search,
+    "megabrain_node": _node,
     "megabrain_index": _index,
 }
-
-
-def call_tool(name: str, args: dict[str, Any]) -> Answer:
-    """Never raises for a failure anyone should expect.
-
-    An unknown tool, an argument the model left out and a repository nobody
-    indexed are all ordinary traffic on this surface, and each one is worth a
-    sentence the agent can act on rather than a traceback the host swallows.
-    """
-    handler = HANDLERS.get(name)
-    if handler is None:
-        return failure(f"no tool named {name} — megabrain serves "
-                       f"{', '.join(sorted(HANDLERS))}", "unknown_tool")
-    try:
-        return answer(handler(args))
-    except arg.Missing as err:
-        return failure(f"{name}: {err}", "bad_request")
-    except MegabrainError as err:
-        return from_engine(err)

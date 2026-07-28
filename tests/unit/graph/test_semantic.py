@@ -113,3 +113,21 @@ def test_the_full_cosine_matrix_is_not_retained(repo: Path) -> None:
     assert not hasattr(graph, "sims")
     assert any({left, right} == {"auth/login.py", "mirror.py"}
                for left, right, _ in graph.twins)
+
+def test_the_node_render_shows_twins_dependants_and_no_code(repo: Path) -> None:
+    """What the `megabrain_node` tool sells, end to end.
+
+    A port or a refactor asks three things a `Read` of the file cannot answer:
+    who breaks if I change this, which cluster moves with it, and is somebody
+    already doing this job elsewhere. `mirror.py` is the third case — it does
+    what `auth/login.py` does and imports nothing of it, so no grep for the
+    task's own words would ever surface it.
+    """
+    from megabrain.graph.node import graph_node
+    from megabrain.graph.render import render_node
+
+    text = render_node(graph_node(repo, "auth/login.py"))
+    assert "mirror.py" in text                     # the twin, edge-free
+    assert "semantic twins" in text
+    assert "imported by" in text
+    assert "```" not in text                       # never the code
