@@ -19,11 +19,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ..._provider_errors import ProviderError
 from ...providers.chat import Answer, ChatProvider
 from ...storage import Store
 from ..events import Emit
 from ._filled import filled
 from ._toolcall import assistant_turn, tool_result
+from ._toolless import RequestBody
 from .tools import TOOLS
 
 __all__ = ["answered", "converse", "MAX_ROUNDS"]
@@ -64,14 +66,22 @@ def converse(provider: ChatProvider, prompt: str, store: Store, *,
     """
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     answer = Answer(text="")
+    body = RequestBody(_body)
     for _round in range(MAX_ROUNDS):
-        answer = provider.stream_chat(_body(provider, messages), on_delta=on_delta)
+        try:
+            answer = provider.stream_chat(body(provider, messages),
+                                          on_delta=on_delta)
+        except ProviderError as error:
+            if not body.retire_tools(error):
+                raise
+            emit({"type": "toolless", "backend": getattr(provider, "name", "")})
+            continue
         if not answer.tool_calls:
             break
         messages.append(assistant_turn(answer))
         for call in answer.tool_calls:
             messages.append(tool_result(store, call, emit))
-    return filled(provider, answer, messages, store, _body, emit=emit,
+    return filled(provider, answer, messages, store, body, emit=emit,
                   on_delta=on_delta)
 
 

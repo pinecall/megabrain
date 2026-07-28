@@ -94,6 +94,22 @@ every one of those lanes is fail-open, so nothing ever said so. `judge_provider`
 labels resolve through the registry now; `resolve(model=…, timeout=…)` carries each lane's
 own tuning, so the judge keeps the model its measurements were taken on.
 
+**Fully-local narration was broken, and it was one contract line.** v2 narrated with a
+single buffered call; v3's narrator attaches `open_file` to every turn, and a runtime
+without function calling does not answer without tools — it rejects the REQUEST. Ollama
+returns `HTTP 400 does not support tools`, so `megabrain ask` against a local model died
+outright and the feature looked lost in the migration. It was not: `converse` already
+promised the fail-open ("a backend with no tool support returns its text on the first
+pass") and only ever honoured it for a backend that ACCEPTED the field and declined to use
+it. Now a refusal retires the tool for that conversation — once, so it survives `filled`'s
+extra round — and re-sends with the tool fields REMOVED rather than emptied (`tools: []` is
+still the field, and the runtimes that reject the parameter reject the empty list too). A
+`toolless` event announces it; silence would have meant the walkthrough quietly lost the
+ability to open files. The match is deliberately narrow and status-gated: a 500, a dead
+endpoint or a bad key keeps failing, because a blanket retry buys a second outage and
+reports it as a tool problem. Verified end to end on Ollama, `embeddinggemma` +
+`gemma3:1b`, no cloud credential of any kind: 29 s, real narration.
+
 **The switch is per-repository now, not only per-shell.** `megabrain.json` gains
 `models.provider` (`"claude"` for the SDK, anything else keeps the endpoint), and the file
 beats `MEGABRAIN_CHAT_PROVIDER` — the same precedence as every other field, for the same

@@ -184,6 +184,14 @@ credential check entirely.
 models are not a cheaper trade-off, they cite less *and* run slower, and a
 general-purpose model of the same size does markedly worse on code.
 
+**A model without tool support still works, with less reach.** The narrator offers an
+`open_file` tool so it can follow a call chain past the retrieved chunks; a runtime that
+cannot take tools rejects the whole request (Ollama answers `HTTP 400 does not support
+tools`). megabrain notices, retires the tool for that conversation and narrates from the
+retrieved material — one `toolless` event says so, rather than the walkthrough quietly
+losing a capability. Verified end to end on Ollama with `embeddinggemma` + `gemma3:1b` and
+no cloud credential of any kind.
+
 **`MEGABRAIN_ASK_CTX_CHARS` is not optional.** The prompt budget defaults to 200 000
 characters, sized for cloud context windows, so a local model silently gets a truncated
 prompt — no error, just quietly worse answers. Compared to the cloud you lose some
