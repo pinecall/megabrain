@@ -26,6 +26,18 @@ safe. The symbol outline is capped far below the edge lists — `routing.py`
 declares 156, and printing them buried the dependants (which only this index
 knows) under the outline (which the caller's editor gives away).
 
+Then click, express and rails, and two more shapes fell out. **Whether an
+empty edge list is evidence is a fact about the INDEX, not only the engine**:
+rails carries 3 094 Ruby edges an older engine extracted, so asking the
+registry alone made `base.rb` list eleven imports while its sibling
+`relation.rb` claimed the language had never been read — two files, one repo,
+contradictory answers. `NodeView` now carries `edges_known` and it asks both
+questions. And the **outline leads with what the file DOES**: express's
+`lib/response.js` declares 43 symbols whose first fifteen by line were all
+`const x = require(...)` — the import list again, under a heading promising
+what the file defines. Bindings sort last, so `res.status`/`res.send` survive
+the cap.
+
 **The one that was a correctness bug: silence was being reported as a finding.**
 megabrain extracts import graphs for Python and TypeScript/JavaScript only, so a
 Ruby file that another file `require`s rendered `imported by: none` — which this

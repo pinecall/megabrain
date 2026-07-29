@@ -24,8 +24,19 @@ def outline_of(symbols: list[SymbolRow]) -> list[str]:
     """
     if not symbols:
         return ["\ndeclares: nothing the index could name"]
+    ranked = sorted(symbols, key=lambda s: (_rank(str(s["kind"])), int(s["line"])))
     tail = ([f"  … {len(symbols) - MAX_SYMBOLS} more — open the file for the rest"]
             if len(symbols) > MAX_SYMBOLS else [])
     return [f"\ndeclares ({len(symbols)}):",
             *(f"  L{s['line']}-{s['end_line']}  {s['kind']} {s['name']}"
-              for s in symbols[:MAX_SYMBOLS]), *tail]
+              for s in ranked[:MAX_SYMBOLS]), *tail]
+
+
+# A binding is not an API. MEASURED on express: `lib/response.js` declares 43
+# symbols and the first fifteen by line were all `const x = require(...)` —
+# the import list again, under a heading promising what the file defines.
+_LAST = ("const", "constant", "variable", "let", "var")
+
+
+def _rank(kind: str) -> int:
+    return 1 if kind in _LAST else 0

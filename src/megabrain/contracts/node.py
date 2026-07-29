@@ -41,6 +41,14 @@ class NodeView(TypedDict):
     imported_by: list[NodeEdge]
     semantic: list[SemanticTie]
     symbols: list[SymbolRow]
+    edges_known: bool
+    """Whether an EMPTY edge list here is evidence.
+
+    False when megabrain has never read this language's imports in this index,
+    where "imported by: none" would otherwise read as dead code. A fact about
+    the index and not only about the engine: rails carries 3 094 Ruby edges an
+    older engine extracted, so absence there IS a finding while absence in a
+    freshly indexed Ruby repo is not."""
     ms: int
 
 

@@ -14,6 +14,7 @@ from pathlib import Path
 from ..contracts import Neighbourhood, NodeEdge, NodeView, SemanticTie
 from ..storage import Store
 from ..storage.locate import resolve_root
+from .capability import edges_known
 from .clusters.communities import communities_of
 from .clusters.labels import label_communities
 from .symbols.resolve import resolve_node
@@ -52,7 +53,8 @@ def graph_node(start: Path | str, term: str, *, label: bool = False,
         semantic=sorted((SemanticTie(file=other, score=round(score, 3))
                          for other, score in graph.sem.get(relpath, {}).items()),
                         key=lambda tie: (-tie["score"], tie["file"])),
-        symbols=symbols, ms=int((time.perf_counter() - started) * 1000))
+        symbols=symbols, edges_known=edges_known(relpath, edges),
+        ms=int((time.perf_counter() - started) * 1000))
 
 
 def neighbourhood(start: Path | str, relpath: str) -> Neighbourhood:

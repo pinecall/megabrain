@@ -360,11 +360,18 @@ bundle:        rank_files (STABLE sort) ─► tiers ─► floors (append-only)
   and the file's own package leads the source (twelve `docs_src/` tutorials
   outranked the four modules that build on it), the outline is capped far
   below the edge lists because it is the ONE part a plain `Read` supplies,
-  and — the correctness one — a language with no extractor renders
+  and — the correctness one — a language whose edges are unknown renders
   **`not extracted`** rather than `none`: a Ruby file another file *requires*
   read as `imported by: none`, which this tool's own description calls dead
-  code. Strategies declare `extracts_edges` as an OPTIONAL attribute (read
-  with `getattr`), so no existing or forge-generated strategy had to change.
+  code. `NodeView.edges_known` carries that, and it asks TWO questions
+  (`graph/capability.py`): does the engine extract this language, **and does
+  this index already hold edges for it** — rails carries 3 094 Ruby edges an
+  older engine wrote, so asking only the registry made one file list eleven
+  imports while its sibling claimed the language had never been read.
+  Strategies declare `extracts_edges` as an OPTIONAL attribute (read with
+  `getattr`), so no existing or forge-generated strategy had to change.
+  The outline ranks behaviour over bindings for the same reason express's
+  `lib/response.js` led with fifteen `const x = require(…)` rows.
 - **`clusters/`** — label propagation with `hub_damping = 1/log2(1+d)`
   (measured on a 1 210-file corpus: undamped, 97.5 % of files collapsed into
   one community), semantic ties at half a structural vote (`SEM_WEIGHT =

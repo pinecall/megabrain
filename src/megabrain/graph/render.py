@@ -18,7 +18,7 @@ from __future__ import annotations
 from ..contracts import NodeEdge, NodeView
 from ..search.paths import is_demo, is_test
 from ..storage import PIN_KIND
-from .capability import edges_extracted, no_edges_note
+from .capability import no_edges_note
 from .outline import outline_of
 from .relations import pinned_by, twins_of
 
@@ -31,7 +31,7 @@ the tests — never the dependant a change has to answer to."""
 def render_node(view: NodeView) -> str:
     """`# path` + cluster, both edge directions by kind, twins, the outline."""
     cluster = view["community_label"] or f"cluster {view['community']}"
-    known = edges_extracted(view["file"])
+    known = view["edges_known"]
     home = view["file"].rsplit("/", 1)[0] + "/" if "/" in view["file"] else ""
     lines = [f"# {view['file']}  ({cluster} · degree {view['degree']})"]
     if view["resolved_from"] != view["file"]:

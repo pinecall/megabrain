@@ -23,7 +23,7 @@ def _view(**over: object) -> NodeView:
         semantic=[SemanticTie(file="twin.py", score=0.91)],
         symbols=[SymbolRow(file="a.py", name="run", kind="function", line=3,
                            end_line=9, signature="def run()")],
-        ms=1)
+        edges_known=True, ms=1)
     return {**base, **over}  # type: ignore[typeddict-item,return-value]
 
 
@@ -83,7 +83,8 @@ def test_a_language_with_no_edge_extractor_says_so() -> None:
     and megabrain extracts no Ruby import graph — so the file read
     `imported by: none`, which this tool's own description calls dead code.
     Silence must not be reported as a finding."""
-    text = render_node(_view(file="app/models/user.rb", imports=[], imported_by=[]))
+    text = render_node(_view(file="app/models/user.rb", imports=[],
+                             imported_by=[], edges_known=False))
     assert "imported by: none" not in text
     assert "imports: none" not in text
     assert "not extracted" in text
@@ -152,3 +153,29 @@ def test_the_files_OWN_package_leads_the_dependants() -> None:
     text = render_node(_view(file="fastapi/routing.py", imported_by=edges))
     body = text[text.index("imported by"):]
     assert body.index("fastapi/applications.py") < body.index("docs_src/tutorial001.py")
+
+
+def test_an_index_that_HOLDS_edges_for_the_language_reports_none_as_a_finding() -> None:
+    """MEASURED on rails: the index carries 3 094 Ruby edges (an older engine
+    extracted them), so `base.rb` listed eleven imports while its sibling
+    `relation.rb` — which genuinely has none — claimed the language was never
+    read. Two files, one repo, contradictory answers. Whether absence is
+    evidence is a fact about THIS INDEX, not only about the current engine."""
+    text = render_node(_view(file="app/models/user.rb", imports=[],
+                             imported_by=[], edges_known=True))
+    assert "imports: none" in text
+    assert "not extracted" not in text
+
+
+def test_the_outline_leads_with_what_the_file_DOES() -> None:
+    """MEASURED on express: `lib/response.js` declared 43 symbols and the first
+    fifteen were all `const x = require(...)` — the import list again, under a
+    heading promising what the file defines."""
+    symbols = [SymbolRow(file="a.js", name=f"dep{n}", kind="const", line=n,
+                         end_line=n, signature="") for n in range(20)]
+    symbols.append(SymbolRow(file="a.js", name="send", kind="function",
+                             line=90, end_line=99, signature="function send()"))
+    text = render_node(_view(symbols=symbols))
+    outline = text[text.index("declares"):]
+    assert "function send" in outline, "the API must survive the cap"
+    assert outline.index("function send") < outline.index("dep0")
