@@ -63,6 +63,13 @@ class Registry:
         self._strategies = [*extra, *builtin]
 
     @property
+    def strategies(self) -> tuple[Strategy, ...]:
+        """What this registry routes to, in precedence order — so a caller can
+        ASK what the engine can do rather than keep its own copy of the list
+        and let the two drift."""
+        return tuple(self._strategies)
+
+    @property
     def extensions(self) -> tuple[str, ...]:
         """Every extension this registry can handle — what discovery walks for."""
         return tuple(dict.fromkeys(e for s in self._strategies for e in s.exts))

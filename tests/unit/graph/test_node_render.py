@@ -179,3 +179,18 @@ def test_the_outline_leads_with_what_the_file_DOES() -> None:
     outline = text[text.index("declares"):]
     assert "function send" in outline, "the API must survive the cap"
     assert outline.index("function send") < outline.index("dep0")
+
+
+def test_the_not_extracted_note_names_the_languages_that_ACTUALLY_have_graphs() -> None:
+    """The note is what an agent reads to decide whether absence is evidence.
+    It listed two languages while five have extractors, so it understated the
+    engine — and a note that is wrong about itself is not worth trusting."""
+    from megabrain.indexing.builtin import default_registry
+
+    note = render_node(_view(file="x.rs", imports=[], imported_by=[],
+                             edges_known=False))
+    with_graphs = {ext for s in default_registry().strategies
+                   for ext in s.exts if getattr(s, "extracts_edges", False)}
+    for ext in (".rb", ".go", ".php", ".py", ".ts"):
+        if ext in with_graphs:
+            assert ext in note, f"{ext} has a graph and the note omits it"

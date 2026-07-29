@@ -32,10 +32,19 @@ def edges_known(relpath: str, edges: list[tuple[str, str, str]]) -> bool:
 def no_edges_note() -> str:
     """What to print instead of "none" for a language megabrain cannot read.
 
-    "none" is a finding; silence is not, and the node tool's own description
-    reads an empty dependant list as dead code. Only a language whose imports
-    are actually extracted may report empty as a fact.
+    "none" is a finding; silence is not, and the node tool\'s own description
+    reads an empty dependant list as dead code. The languages are ASKED of the
+    registry rather than listed here: the note is what a reader trusts to
+    decide whether absence is evidence, and it named two while five had
+    extractors — a note wrong about itself is worth nothing.
     """
-    return ("not extracted — megabrain reads import graphs for Python and "
-            "TypeScript/JavaScript; this file's language has none yet, so "
-            "absence here is NOT evidence that nothing depends on it")
+    return (f"not extracted — megabrain reads import graphs for "
+            f"{_with_graphs()}; this file's language has none yet, so absence "
+            f"here is NOT evidence that nothing depends on it")
+
+
+def _with_graphs() -> str:
+    exts = sorted({ext for strategy in default_registry().strategies
+                   for ext in strategy.exts
+                   if getattr(strategy, "extracts_edges", False)})
+    return ", ".join(exts)
