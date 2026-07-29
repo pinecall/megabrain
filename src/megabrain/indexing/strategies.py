@@ -12,26 +12,7 @@ from typing import Protocol, Sequence, runtime_checkable
 
 from ..chunkers import Parsed
 
-__all__ = ["Strategy", "Registry", "EDGE_SCHEMA"]
-
-# Bumped whenever an edge extractor changes or a language gains one. Edges are
-# derived data with no embedding cost, but the indexer only revisits files
-# whose bytes changed — so without a version marker, a repository indexed by an
-# older engine keeps its stale graph forever, and only a full re-embed (which
-# costs real money) would fix it.
-#
-# The marker is stamped BY WHATEVER WRITES EDGES, and only after it wrote them.
-# It states "the edges in this index were built by schema N"; a pass that
-# extracted none and stamped it anyway told every future pass the graph was
-# current, which disables the exact rebuild the marker exists to trigger.
-#
-# Bumped whenever the extractor learns to see an edge it could not before, which
-# makes every stored index rebuild its graph once. 4 resolved a DOTTED receiver
-# (`import a.b` then `a.b.run()`); 5 one dispatched through an ATTRIBUTE
-# (`session.audio_processor.interrupt()`); 6 a symbol RE-EXPORTED by a package
-# `__init__` (`from ..storage import PIN_KIND`, defined in `storage/_graph.py`),
-# where the dependency existed in two hops and the graph held only the first.
-EDGE_SCHEMA = 6
+__all__ = ["Strategy", "Registry"]
 
 
 @runtime_checkable
@@ -45,6 +26,12 @@ class Strategy(Protocol):
     `edges` returns None for content with no dependency graph. Documents have
     no imports, and returning an empty list instead would claim they were
     examined and found to have none.
+
+    OPTIONAL, not a member below: `extracts_edges = True` declares that this
+    language HAS an import graph — "nothing depends on this" versus "nobody
+    looked", which an empty list cannot express (a Ruby file another file
+    requires rendered `imported by: none`). Read with `getattr(…, False)`, so
+    a strategy that never heard of it stays a Strategy.
     """
 
     exts: tuple[str, ...]

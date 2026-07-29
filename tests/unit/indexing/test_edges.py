@@ -261,7 +261,7 @@ def test_a_second_pass_over_unchanged_files_does_not_rebuild_the_graph(repo: Pat
 
 def test_the_schema_is_stamped_only_after_edges_are_written(repo: Path) -> None:
     from megabrain.indexing.indexer import index_repo
-    from megabrain.indexing.strategies import EDGE_SCHEMA
+    from megabrain.indexing.schema import EDGE_SCHEMA
     from megabrain.storage import Store
     from tests.unit.indexing.fake import CountingEmbedder
 

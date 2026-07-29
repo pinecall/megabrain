@@ -13,7 +13,28 @@ symbols with their real line ranges. No code is quoted, for `grep`'s reason: the
 editor opens the file anyway. The engine already computed all of it (`NodeView`,
 served by CLI and HTTP since phase 12); what was missing was the MCP slot.
 
-Two decisions worth naming. The term resolution ladder gained `guess=False`,
+Then it was run against **fastapi and rails**, and every shape below is what
+those two broke. Dependants are split from **pins** — a test that fixes the
+behaviour is not code that breaks, and counting them together reported 96
+dependants for `routing.py` where 52 import it; the pins are now a COUNT, since
+whoever changes the file runs the suite rather than reading 44 paths. Source
+leads tests and examples, and within the source the file's own package leads:
+twelve `docs_src/` tutorials had been listed above the four `fastapi/` modules
+that build on it, and the cap was ALPHABETICAL, so a repo whose source sorts
+after its specs would lose exactly the rows that decide whether a change is
+safe. The symbol outline is capped far below the edge lists — `routing.py`
+declares 156, and printing them buried the dependants (which only this index
+knows) under the outline (which the caller's editor gives away).
+
+**The one that was a correctness bug: silence was being reported as a finding.**
+megabrain extracts import graphs for Python and TypeScript/JavaScript only, so a
+Ruby file that another file `require`s rendered `imported by: none` — which this
+tool's own description reads as dead code. Those sections now say **`not
+extracted`** and why. Strategies declare the capability with an OPTIONAL
+`extracts_edges` attribute read through `getattr`, so nothing existing — or
+forge-generated — had to change to stay a Strategy.
+
+Two more decisions worth naming. The term resolution ladder gained `guess=False`,
 which the tool uses: a parameter called `file` that silently hands back the
 *nearest* file when the path does not exist reads as an answer and sends the
 agent to edit the wrong one — the CLI keeps the guess, because a human typing

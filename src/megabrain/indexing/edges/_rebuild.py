@@ -1,9 +1,8 @@
 """The edge pass: which files get their graph rebuilt, and when.
 
 Edges are DERIVED data with no embedding cost, which is why they get their own
-pass rather than riding along with the expensive one. The two are decoupled in
-both directions: re-chunking a file rebuilds its edges, and bumping the edge
-schema rebuilds every file's edges without re-embedding a single chunk.
+pass. The two are decoupled in both directions: re-chunking a file rebuilds its
+edges, and bumping the edge schema rebuilds every file's without re-embedding.
 """
 
 from __future__ import annotations
@@ -12,7 +11,8 @@ from typing import Sequence
 
 from ...storage import Store
 from ..passes.plan import Planned
-from ..strategies import EDGE_SCHEMA, Registry, Strategy
+from ..schema import EDGE_SCHEMA
+from ..strategies import Registry, Strategy
 from .pins import PIN_SCHEMA, write_pin_edges
 
 __all__ = ["graph_passes", "write_edges"]
@@ -29,10 +29,10 @@ def graph_passes(store: Store, registry: Registry, sources: dict[str, str],
 
     `rewriting` is the condition that was MISSING, and its absence silently
     deleted every pin in the repository: `write_edges` swaps a file's rows with
-    `replace_edges`, which drops ALL of that file's outgoing edges — and a test
+    `replace_edges`, dropping ALL of that file's outgoing edges — and a test
     file's outgoing edges include its pins. An EDGE_SCHEMA bump rewrites every
-    file while no content moved, so on click 352 edges became 262, all 90 lost
-    ones pins, taking out `exercising_tests` with no error anywhere.
+    file while no content moved, so on click 352 edges became 262, the 90 lost
+    ones all pins, taking out `exercising_tests` with no error anywhere.
 
     Read BEFORE the extractor runs, from the same two facts `_targets` uses: it
     clears the marker itself, and reports a COUNT — while a file rewritten to

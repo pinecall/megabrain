@@ -24,6 +24,7 @@ __all__ = ["PythonStrategy", "TypeScriptStrategy", "DocumentStrategy",
 
 class PythonStrategy:
     exts: tuple[str, ...] = (".py", ".pyi")
+    extracts_edges = True
 
     def parse(self, relpath: str, source: str) -> Parsed:
         return python_parser.parse(relpath, source)
@@ -47,6 +48,7 @@ class TypeScriptStrategy:
     """
 
     exts: tuple[str, ...] = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+    extracts_edges = True
 
     def parse(self, relpath: str, source: str) -> Parsed:
         return typescript.parse(relpath, source)
@@ -64,6 +66,7 @@ class DocumentStrategy:
     list would claim it was examined and found to have none."""
 
     exts: tuple[str, ...] = (".md", ".markdown", ".mdx")
+    extracts_edges = False
 
     def parse(self, relpath: str, source: str) -> Parsed:
         return markdown.parse(relpath, source)

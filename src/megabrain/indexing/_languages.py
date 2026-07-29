@@ -26,6 +26,10 @@ class GrammarStrategy:
     touching the indexer.
     """
 
+    extracts_edges = False
+    """No import graph yet — and SAID so, because a reader cannot tell an
+    unexamined language from a file nothing depends on."""
+
     def __init__(self, exts: tuple[str, ...],
                  parse: Callable[[str, str], Parsed]) -> None:
         self.exts = exts

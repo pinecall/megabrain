@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from .discover import discover
 from .indexer import index_repo
-from .strategies import EDGE_SCHEMA, Registry, Strategy
+from .schema import EDGE_SCHEMA
+from .strategies import Registry, Strategy
 
 __all__ = ["index_repo", "discover", "Strategy", "Registry", "EDGE_SCHEMA"]

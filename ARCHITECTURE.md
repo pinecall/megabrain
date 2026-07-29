@@ -353,7 +353,18 @@ bundle:        rank_files (STABLE sort) ─► tiers ─► floors (append-only)
   reason. Term resolution is a ladder — exact path, filename tail, then
   MEANING — and the MCP tool passes `guess=False` to stop before the last
   rung: a parameter called `file` that silently returns the *nearest* file
-  reads as an answer and sends the agent to edit the wrong one.
+  reads as an answer and sends the agent to edit the wrong one. Every other
+  shape of the render was forced by a real repository (fastapi, rails): pins
+  are split from dependants (a test fixing behaviour is not code that
+  breaks — it inflated `routing.py` to 96), source leads tests and examples
+  and the file's own package leads the source (twelve `docs_src/` tutorials
+  outranked the four modules that build on it), the outline is capped far
+  below the edge lists because it is the ONE part a plain `Read` supplies,
+  and — the correctness one — a language with no extractor renders
+  **`not extracted`** rather than `none`: a Ruby file another file *requires*
+  read as `imported by: none`, which this tool's own description calls dead
+  code. Strategies declare `extracts_edges` as an OPTIONAL attribute (read
+  with `getattr`), so no existing or forge-generated strategy had to change.
 - **`clusters/`** — label propagation with `hub_damping = 1/log2(1+d)`
   (measured on a 1 210-file corpus: undamped, 97.5 % of files collapsed into
   one community), semantic ties at half a structural vote (`SEM_WEIGHT =
