@@ -223,7 +223,8 @@ as questions, and the flow cache attaches instead of serving verbatim.
 the registry adds each one only if its grammar imports, so a missing wheel costs that
 language and nothing else.
 
-Structural **edges** are extracted for Python and TypeScript/JavaScript. The others
+Structural **edges** are extracted for Python, TypeScript/JavaScript, **Ruby, Go and
+PHP**. The others
 chunk, search and outline without a graph: retrieval never depended on it, and the graph
 is an annotation lane an extractor can be added to later.
 

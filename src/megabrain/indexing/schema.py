@@ -23,5 +23,9 @@ __all__ = ["EDGE_SCHEMA"]
 # 4 resolved a DOTTED receiver (`import a.b` then `a.b.run()`); 5 one dispatched
 # through an ATTRIBUTE (`session.audio_processor.interrupt()`); 6 a symbol
 # RE-EXPORTED by a package `__init__`, where the dependency existed in two hops
-# and the graph held only the first.
-EDGE_SCHEMA = 6
+# and the graph held only the first; 7 the RUBY, GO and PHP graphs v2 shipped
+# and the rewrite dropped — every Ruby repository indexed by v3 until now holds
+# zero Ruby edges, and `megabrain_node` read that as "nothing depends on this";
+# 8 the PATHLESS `autoload :Const` modern Rails wires its namespaces with,
+# which neither engine resolved — Zeitwerk derives the file from the constant.
+EDGE_SCHEMA = 8

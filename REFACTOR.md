@@ -136,6 +136,21 @@ a prompt: `enrich/_prompt.py` → `_judge_prompt.py`, `enrich/_terms.py` →
 
 ## P2 — product debt (the road already named) — OPEN
 
+### 9b. `LexicalBoost` recomputes the repo's identifier tokens per query [SCALE]
+
+Found while gating the Ruby/Go/PHP edge port (2026-07-29), and **not caused by
+it** — an A/B on the same index with the previous commit reads the same number.
+Refreshing the golden corpus's index moved p50 from **63 ms to 151 ms**, and a
+profile puts ~145 ms of that in `search/paths.ident_tokens`, called 5 731 times
+per query from `LexicalBoost.apply`: every file path and symbol name is
+re-tokenised on every query, with two `re` calls each and no memoisation.
+
+It is pure input→output over data that only changes at index time, so the fix
+is a cache on `SearchState` (built once beside the matrices, like the flow and
+BM25 lanes v2 cached there) or a precomputed column. **Fix before phase 17** —
+a 2.4× latency regression that arrives silently when an index is refreshed is
+exactly the shape of thing an algorithm experiment would be blamed for.
+
 ### 10. `grep` → `map` [naming]
 
 The deliverable is a **map of the task's edit surface**; the verb name

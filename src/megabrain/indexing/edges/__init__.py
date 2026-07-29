@@ -12,10 +12,17 @@ file-skeleton signal, so adding an extractor is additive by construction.
 
 from __future__ import annotations
 
+from ._gopkg import GoPackages, go_packages
+from .go import go_edges
+from .php import PhpClasses, php_classes, php_edges
 from .pins import PIN_SCHEMA, write_pin_edges
 from .python import ModuleIndex, module_index, python_edges
+from .ruby import RubyFiles, ruby_edges, ruby_files
 from .typescript import TsFiles, ts_edges, ts_files
 
 __all__ = ["ModuleIndex", "module_index", "python_edges",
            "TsFiles", "ts_edges", "ts_files",
+           "RubyFiles", "ruby_files", "ruby_edges",
+           "GoPackages", "go_packages", "go_edges",
+           "PhpClasses", "php_classes", "php_edges",
            "write_pin_edges", "PIN_SCHEMA"]

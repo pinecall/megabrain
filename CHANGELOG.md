@@ -2,6 +2,34 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
+**The Ruby, Go and PHP import graphs are ported — v2 had them and the rewrite
+dropped all three.** Found by `megabrain_node` reporting `imported by: none` on
+a Rails file, which its own description calls dead code. `indexing/edges/` gains
+`ruby.py` (require / require_relative / autoload, resolved through the load-path
+candidates that actually occur — repo `lib/`, the file's own directory for
+`test_helper`, and a sub-gem's `*/lib/` in a monorepo), `go.py` + `_goimports.py`
+(two lanes: in-repo imports pinned to the file DEFINING the used name, plus the
+same-package sibling calls Go needs no import for at all — that IS most of a Go
+repo's structure) and `php.py` (`use` statements resolved PSR-4-agnostically
+from the real `namespace` + declarations, group-use expanded, a bare trait
+`use` resolved in the file's own namespace).
+
+Wiring them is now **data**: a language is a row in `_languages.py` and an
+`EdgeLane` is two functions, where v2 grew each graph by subclassing. Rust, C,
+C++, Java and C# still have none — v2 had none either — and they say so
+(`extracts_edges`).
+
+**And one thing neither engine had: the PATHLESS `autoload :Const`.** Modern
+Rails wires whole namespaces with it — Zeitwerk derives the file from the
+constant — so `activerecord/lib/active_record.rb` resolved almost nothing.
+It now underscores the constant against the declaring file's own namespace
+directory, and that one file went from a handful of imports to **83**.
+
+`EDGE_SCHEMA` 6 → 8, so every stored index rebuilds its graph once. All 71
+registered repositories were re-indexed: rails 3 155 → 5 444 edges, sinatra
+71 → 220, graphify +225, the Python/TS repos unchanged. Golden gate unchanged
+(R@1 0.91 · bundle_full 0.77).
+
 **`megabrain_node` — the fifth MCP tool: what a file will BREAK.** Opening a
 file already shows what it imports and what it declares; nothing inside it says
 *who depends on it*, and that is the fact that decides whether a change is safe.
