@@ -17,7 +17,7 @@
   <a href="https://github.com/bernatch22/megabrain/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/bernatch22/megabrain/ci.yml?style=flat-square&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT">
   <img src="https://img.shields.io/badge/retrieval-no%20LLM%20·%20milliseconds-2ea44f?style=flat-square" alt="No LLM in the retrieval path">
-  <img src="https://img.shields.io/badge/MCP-5%20tools-000000?style=flat-square" alt="MCP ready">
+  <img src="https://img.shields.io/badge/MCP-4%20tools-000000?style=flat-square" alt="MCP ready">
 </p>
 
 <br>
@@ -264,7 +264,7 @@ Any OpenAI-compatible endpoint works for either half (`MEGABRAIN_EMBED_BASE_URL`
 
 ---
 
-## MCP: five tools, wired in one command
+## MCP: four tools, wired in one command
 
 ```bash
 megabrain install       # Claude Code · Codex · Cursor · Windsurf · Gemini CLI · Antigravity
@@ -275,12 +275,14 @@ megabrain install       # Claude Code · Codex · Cursor · Windsurf · Gemini C
 | `megabrain_grep` | the edit surface: files, symbols, exact line ranges — no model |
 | `megabrain_ask` | the narrated walkthrough, code spliced verbatim |
 | `megabrain_search` | the map (or the docs): files, best spans, symbols — no model |
-| `megabrain_node` | one file's place: who depends on it, its cluster, its twins — no model |
 | `megabrain_index` | build/refresh — incremental, seconds when warm |
 
-Five on purpose: every tool costs the calling agent context and a routing
-decision — `node` earned its slot by answering the one question a `Read` of
-the file cannot, *who breaks if I change this*. The schemas are **generated from the typed contracts**, so a parameter
+Four on purpose: every tool costs the calling agent context and a routing
+decision. A fifth, `megabrain_node`, shipped and was **removed** after an A/B
+on two real fixes — it answered who imports a file, which the graph already
+serves over CLI and HTTP, and on the tasks that decided it that was either the
+wrong question or a shortcut that skipped the context where the right
+abstraction lived. The schemas are **generated from the typed contracts**, so a parameter
 cannot reach the wire without existing in the dispatch — and every description
 is a lesson from a measured session, because it's the only documentation the
 agent ever reads.

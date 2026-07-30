@@ -48,12 +48,6 @@ class GrammarStrategy:
         self._parse = parse
         self._lane = lane
 
-    @property
-    def extracts_edges(self) -> bool:
-        """Whether an empty edge list for this language is EVIDENCE. A reader
-        cannot tell an unexamined language from a file nothing depends on, so
-        the answer is carried rather than guessed."""
-        return self._lane is not None
 
     def parse(self, relpath: str, source: str) -> Parsed:
         return self._parse(relpath, source)

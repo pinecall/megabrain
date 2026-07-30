@@ -109,7 +109,7 @@ the engine gains no dependency. Verified against **captured real payloads**
 | `ChunkRef` vs `ChunkHit` | load-bearing: a tier-2 `best_chunk` carries **no score** — the *file* was ranked, not that span. Modelling that as one optional field lets a scoreless span reach code that sorts by score |
 | `PruneResult`, `FileView`, `ScanReport`, `RepoEntry`, `HostRow/HostResult` | the flat projection, `get` (with the `stale` flag — the indexed text is what the ranking saw), `scan` (every skip with its reason), the registry, `install` |
 | `GraphMap` / `NodeView` / `Neighbourhood` / `GraphPath` (`Hop`, `HopCode`, `CodeSnip`) | the graph as drawn vs as read; `GraphPath.chain/meet/meet_kind` is the honesty field — a shared callee is a meeting, not a flow |
-| `AskParams`, `GrepParams`, `SearchParams`, `NodeParams`, `IndexParams` (`contracts/tools/`, split read vs write) | the MCP `inputSchema` is **generated** from these — one definition, and every `Annotated` description is agent-facing documentation distilled from measured sessions |
+| `AskParams`, `GrepParams`, `SearchParams`, `IndexParams` (`contracts/tools/`, split read vs write) | the MCP `inputSchema` is **generated** from these — one definition, and every `Annotated` description is agent-facing documentation distilled from measured sessions |
 
 Optionality is spelled with the **`total=False` split, never `NotRequired`**:
 under `from __future__ import annotations` TypedDict can't see the marker and
@@ -344,34 +344,6 @@ bundle:        rank_files (STABLE sort) ─► tiers ─► floors (append-only)
   cosines briefly exist and travel on the graph as `twins`. Served views go
   through `warm.warm_graph`, cached per index-file stat, so the studio's
   Graph tab stops paying a full rebuild per click.
-- **`node`/`render`** — one file's place, and the surface `megabrain_node`
-  serves: both edge directions with the kind of each (`import` vs `call`, one
-  row per FILE with its kinds joined — the same rule the map's links use,
-  because a file that both imports and calls is ONE dependant and a doubled
-  count argues against a safe change), the cluster, the semantic twins, and
-  the declared symbols with real spans. It quotes no code, for `grep`'s
-  reason. Term resolution is a ladder — exact path, filename tail, then
-  MEANING — and the MCP tool passes `guess=False` to stop before the last
-  rung: a parameter called `file` that silently returns the *nearest* file
-  reads as an answer and sends the agent to edit the wrong one. Every other
-  shape of the render was forced by a real repository (fastapi, rails): pins
-  are split from dependants (a test fixing behaviour is not code that
-  breaks — it inflated `routing.py` to 96), source leads tests and examples
-  and the file's own package leads the source (twelve `docs_src/` tutorials
-  outranked the four modules that build on it), the outline is capped far
-  below the edge lists because it is the ONE part a plain `Read` supplies,
-  and — the correctness one — a language whose edges are unknown renders
-  **`not extracted`** rather than `none`: a Ruby file another file *requires*
-  read as `imported by: none`, which this tool's own description calls dead
-  code. `NodeView.edges_known` carries that, and it asks TWO questions
-  (`graph/capability.py`): does the engine extract this language, **and does
-  this index already hold edges for it** — rails carries 3 094 Ruby edges an
-  older engine wrote, so asking only the registry made one file list eleven
-  imports while its sibling claimed the language had never been read.
-  Strategies declare `extracts_edges` as an OPTIONAL attribute (read with
-  `getattr`), so no existing or forge-generated strategy had to change.
-  The outline ranks behaviour over bindings for the same reason express's
-  `lib/response.js` led with fifteen `const x = require(…)` rows.
 - **`clusters/`** — label propagation with `hub_damping = 1/log2(1+d)`
   (measured on a 1 210-file corpus: undamped, 97.5 % of files collapsed into
   one community), semantic ties at half a structural vote (`SEM_WEIGHT =
@@ -550,7 +522,7 @@ it cannot be off by one, and a qualified name beats the base class).
   (0 / 1 engine / 2 usage / 130 interrupt). Deltas stream to stdout, the
   retrieval trace to stderr, so `> answer.md` stays clean. `ui` carries
   `studio` as an alias (published READMEs keep working).
-- **MCP** — five tools (`grep`, `ask`, `search`, `node`, `index`), JSON-RPC
+- **MCP** — four tools (`grep`, `ask`, `search`, `index`), JSON-RPC
   over stdio, schemas **generated** from `contracts/tools/`, `tools/list`
   answerable without importing numpy (pinned by a subprocess test),
   notifications never answered, malformed lines skipped rather than fatal.

@@ -29,7 +29,6 @@ Pick by what you need NEXT, not by what you are curious about:
 - megabrain_grep — you are about to EDIT and do not know where. The files and symbols the change lands in, with exact line ranges. No model, ~50 ms.
 - megabrain_search — ONE call MAPS a task's whole edit surface: the files that answer it, each with its best span and the symbols it declares. No code by default (the map is a third of the tokens and the span says which lines to open); pass `bodies: true` to read the code inline.
 - megabrain_ask — the flow narrated across subsystems, real code spliced in. The CODE is verbatim; the PROSE is narration, so verify its claims against that code.
-- megabrain_node — you already HAVE the file and need to know what changing it breaks: its dependants, its cluster, and the files that do the same job without importing it. That is the half reading the file cannot tell you.
 - megabrain_index — build or refresh the index; nothing else answers until it has run once.
 
 One call per TASK, not per facet. If something seems missing, re-read the render first — the key finding is usually in the first files.

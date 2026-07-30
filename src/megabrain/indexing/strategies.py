@@ -27,11 +27,6 @@ class Strategy(Protocol):
     no imports, and returning an empty list instead would claim they were
     examined and found to have none.
 
-    OPTIONAL, not a member below: `extracts_edges = True` declares that this
-    language HAS an import graph — "nothing depends on this" versus "nobody
-    looked", which an empty list cannot express (a Ruby file another file
-    requires rendered `imported by: none`). Read with `getattr(…, False)`, so
-    a strategy that never heard of it stays a Strategy.
     """
 
     exts: tuple[str, ...]
@@ -61,13 +56,6 @@ class Registry:
         # extension, not just claim an unhandled one. An extension point that
         # only works for types nobody handles yet is barely an extension point.
         self._strategies = [*extra, *builtin]
-
-    @property
-    def strategies(self) -> tuple[Strategy, ...]:
-        """What this registry routes to, in precedence order — so a caller can
-        ASK what the engine can do rather than keep its own copy of the list
-        and let the two drift."""
-        return tuple(self._strategies)
 
     @property
     def extensions(self) -> tuple[str, ...]:

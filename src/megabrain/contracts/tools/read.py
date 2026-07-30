@@ -12,7 +12,7 @@ from typing import Annotated
 from ..._types import Content
 from ._shared import Scope, Target
 
-__all__ = ["AskParams", "GrepParams", "SearchParams", "NodeParams"]
+__all__ = ["AskParams", "GrepParams", "SearchParams"]
 
 
 class _AskRequired(Target):
@@ -71,18 +71,3 @@ class GrepParams(_GrepRequired, total=False):
                          "site whose text never contains the task's words — "
                          "measured, that pairing is the only 4-of-4 coverage"]
 
-
-class _NodeRequired(Target):
-    file: Annotated[str, "the file to place, as a repo-relative path or just "
-                         "its name ('user.rb', 'app/models/user.rb'). Resolved "
-                         "the way a go-to-definition jump resolves, so a bare "
-                         "filename works when the index holds exactly one"]
-
-
-class NodeParams(_NodeRequired, total=False):
-    """One file's place in the repository — edges, cluster, twins, symbols."""
-
-    label: Annotated[bool, "default false. true names the file's cluster with "
-                           "one model call (cached under the graph's "
-                           "fingerprint, so it is free after the first); false "
-                           "keeps the whole answer local and deterministic"]

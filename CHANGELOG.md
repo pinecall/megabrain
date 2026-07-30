@@ -30,7 +30,28 @@ registered repositories were re-indexed: rails 3 155 → 5 444 edges, sinatra
 71 → 220, graphify +225, the Python/TS repos unchanged. Golden gate unchanged
 (R@1 0.91 · bundle_full 0.77).
 
-**`megabrain_node` — the fifth MCP tool: what a file will BREAK.** Opening a
+**`megabrain_node` shipped and was REMOVED in the same cycle.** It answered
+who imports a file — dependants, cluster, semantic twins — which the graph
+already served over CLI (`graph --node`) and HTTP, both of which stay. What
+removed it was an A/B against the same tasks without it, on two real fixes:
+
+- On a Rails bug it returned ONE dependant and changed no decision. The
+  consumer that could break was a mixin mutating the job's state through a
+  `super` chain, and no import graph contains that; the suite is what proved
+  the change safe.
+- On an attrs fix it did inform the design — but the same list came from one
+  `grep` of the imports, and the run that had it was not faster.
+- Worse, it has a cost the other tools do not: going straight to the site
+  skips the file the concept comes FROM. In the Rails duel the run that read
+  its way there found the shared triple in `core.rb` and factored it; the run
+  that jumped straight in duplicated it.
+
+The surface is back to four. Removed with it: `NodeParams`, the node render
+(`graph/{render,relations,outline,capability}.py`), `NodeView.edges_known`,
+the `guess` rung of node resolution and the `extracts_edges` strategy flag —
+every one of them existed only to serve that tool.
+
+**What the fifth tool was, for the record.** Opening a
 file already shows what it imports and what it declares; nothing inside it says
 *who depends on it*, and that is the fact that decides whether a change is safe.
 The tool answers it in one call: every dependant and dependency with the kind of

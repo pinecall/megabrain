@@ -20,8 +20,8 @@ __all__ = ["call_tool"]
 
 def call_tool(name: str, args: dict[str, Any]) -> Answer:
     """Never raises for a failure anyone should expect — an unknown tool, a
-    missing argument, an unindexed repo and a path the index lacks are all
-    ordinary traffic, each worth a sentence the agent can act on."""
+    missing argument and an unindexed repo are all ordinary traffic, each worth
+    a sentence the agent can act on rather than a traceback the host swallows."""
     handler = HANDLERS.get(name)
     if handler is None:
         return failure(f"no tool named {name} — megabrain serves "
@@ -30,10 +30,5 @@ def call_tool(name: str, args: dict[str, Any]) -> Answer:
         return answer(handler(args))
     except arg.Missing as err:
         return failure(f"{name}: {err}", "bad_request")
-    except FileNotFoundError as err:
-        # Expected traffic: a path the index does not hold is the same failure
-        # HTTP answers as a 404. Left to the protocol's last-resort catch, it
-        # reached the agent as "unexpected".
-        return failure(f"{name}: {err}", "not_found")
     except MegabrainError as err:
         return from_engine(err)

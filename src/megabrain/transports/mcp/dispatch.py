@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ...graph.node import graph_node
-from ...graph.render import render_node
 from ...grep.grep import grep
 from ...search.render import render
 from ...usecases import ask, build_index, search
@@ -39,20 +37,6 @@ def _grep(args: dict[str, Any]) -> str:
                 why=arg.flag(args, "why", default=False))
 
 
-def _node(args: dict[str, Any]) -> str:
-    """One file's PLACE in the repo — the half `Read` cannot give: who depends
-    on it, which cluster it sits in, which file does the same job without
-    importing it. No code, for `grep`'s reason: the editor opens it anyway."""
-    return render_node(graph_node(
-        arg.repo(args), arg.text(args, "file"),
-        label=arg.flag(args, "label", default=False),
-        # The parameter is called `file`: a name that resolves to nothing is a
-        # mistake worth reporting, not an invitation to hand back the nearest
-        # neighbour — which reads as an answer and sends the agent to edit the
-        # wrong file. The CLI keeps the guess; a description belongs to `search`.
-        guess=False))
-
-
 def _index(args: dict[str, Any]) -> str:
     report = build_index(arg.repo(args), force=arg.flag(args, "force", default=False))
     return (f"# megabrain index — {report['files']} files · "
@@ -75,6 +59,5 @@ HANDLERS: dict[str, Handler] = {
     "megabrain_ask": _ask,
     "megabrain_grep": _grep,
     "megabrain_search": _search,
-    "megabrain_node": _node,
     "megabrain_index": _index,
 }

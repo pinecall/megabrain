@@ -25,7 +25,7 @@ __all__ = ["EDGE_SCHEMA"]
 # RE-EXPORTED by a package `__init__`, where the dependency existed in two hops
 # and the graph held only the first; 7 the RUBY, GO and PHP graphs v2 shipped
 # and the rewrite dropped — every Ruby repository indexed by v3 until now holds
-# zero Ruby edges, and `megabrain_node` read that as "nothing depends on this";
+# zero Ruby edges, so nothing that reads the graph could see a Ruby dependency;
 # 8 the PATHLESS `autoload :Const` modern Rails wires its namespaces with,
 # which neither engine resolved — Zeitwerk derives the file from the constant.
 EDGE_SCHEMA = 8

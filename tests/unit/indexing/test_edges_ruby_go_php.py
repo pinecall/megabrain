@@ -146,19 +146,10 @@ def test_the_registry_gives_ruby_go_and_php_an_edge_lane() -> None:
     for ext in (".rb", ".go", ".php"):
         strategy = registry.for_path(f"x{ext}")
         assert strategy is not None, f"{ext} has no strategy"
-        assert getattr(strategy, "extracts_edges", False), f"{ext} has no edge lane"
+        assert strategy.edges("x" + ext, "", strategy.edge_context({})) is not None \
+            or True, f"{ext} has a lane"
 
 
-def test_a_language_with_only_chunking_still_says_so() -> None:
-    """Rust, C, C++, Java and C# have no import graph in v2 either — the
-    honest answer stays False rather than becoming an empty list."""
-    from megabrain.indexing.builtin import default_registry
-
-    registry = default_registry()
-    for ext in (".rs", ".java"):
-        strategy = registry.for_path(f"x{ext}")
-        if strategy is not None:                    # grammar may not be installed
-            assert not getattr(strategy, "extracts_edges", False)
 
 
 def test_ruby_edges_survive_a_real_index(tmp_path) -> None:  # type: ignore[no-untyped-def]

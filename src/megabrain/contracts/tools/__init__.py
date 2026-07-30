@@ -11,8 +11,8 @@ one that changes the index, `_shared.py` for the arguments every tool takes.
 from __future__ import annotations
 
 from ._shared import Repo, Scope, Target
-from .read import AskParams, GrepParams, NodeParams, SearchParams
+from .read import AskParams, GrepParams, SearchParams
 from .write import IndexParams
 
-__all__ = ["AskParams", "GrepParams", "SearchParams", "NodeParams",
-           "IndexParams", "Repo", "Scope", "Target"]
+__all__ = ["AskParams", "GrepParams", "SearchParams", "IndexParams",
+           "Repo", "Scope", "Target"]

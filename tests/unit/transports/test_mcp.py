@@ -1,4 +1,4 @@
-"""The MCP surface: five tools, one dispatch, JSON-RPC over stdio.
+"""The MCP surface: four tools, one dispatch, JSON-RPC over stdio.
 
 Driven the way a host drives it — a JSON-RPC message in, a response object out
 — because the protocol handling IS the surface. Calling the use cases directly
@@ -57,7 +57,7 @@ def _text(result: dict[str, Any]) -> str:
 
 # ── the surface ──────────────────────────────────────────────────────────
 
-def test_the_agent_sees_exactly_the_five_tools() -> None:
+def test_the_agent_sees_exactly_the_four_tools() -> None:
     """Every tool costs the calling agent context and a routing decision, so the
     surface stays the shortest one that closes the loop. The three read tools are
     split by DELIVERABLE over one retrieval core: where to edit (`grep`), the
@@ -72,8 +72,7 @@ def test_the_agent_sees_exactly_the_five_tools() -> None:
     for this task, and where they are.
     """
     assert {tool.name for tool in TOOLS} == {
-        "megabrain_ask", "megabrain_grep", "megabrain_search", "megabrain_node",
-        "megabrain_index"}
+        "megabrain_ask", "megabrain_grep", "megabrain_search", "megabrain_index"}
 
 
 def test_every_schema_is_generated_from_its_contract() -> None:
@@ -250,71 +249,4 @@ def test_listing_the_tools_does_not_load_numpy() -> None:
     assert out.stdout.strip() == "False"
 
 
-# ── megabrain_node ───────────────────────────────────────────────────────
 
-def test_node_answers_who_depends_on_this_file(repo: Path) -> None:
-    """The half `Read` cannot supply. Opening `util.py` shows what it imports;
-    nothing inside it says that `svc.py` needs it, and that is what decides
-    whether a change is safe."""
-    text = _text(_call("megabrain_node", repo_path=str(repo), file="util.py"))
-    assert "util.py" in text
-    assert "svc.py" in text                    # the dependant, found for free
-    assert "imported by" in text
-
-
-def test_node_lists_the_declared_symbols_with_their_spans(repo: Path) -> None:
-    text = _text(_call("megabrain_node", repo_path=str(repo), file="svc.py"))
-    assert "Service.handle" in text or "handle" in text
-    assert "L" in text                         # real line ranges, not names alone
-
-
-def test_node_resolves_a_bare_filename(repo: Path) -> None:
-    """The caller has a name, not always a repo-relative path — the same
-    resolution the navigator uses."""
-    text = _text(_call("megabrain_node", repo_path=str(repo), file="svc.py"))
-    assert "svc.py" in text
-
-
-def test_node_quotes_no_code(repo: Path) -> None:
-    """Same rule as grep: the caller's editor opens the file, so a body pasted
-    here is billed twice. This tool sells the EDGES, not the source."""
-    text = _text(_call("megabrain_node", repo_path=str(repo), file="svc.py"))
-    assert "return util.run(request)" not in text
-    assert "```" not in text
-
-
-def test_node_says_so_when_nothing_matches(repo: Path) -> None:
-    result = _call("megabrain_node", repo_path=str(repo), file="nope.py")
-    assert result.get("isError")
-    assert "nope.py" in _text(result)
-
-
-def test_node_needs_a_file(repo: Path) -> None:
-    result = _call("megabrain_node", repo_path=str(repo))
-    assert result.get("isError")
-    assert "file" in _text(result)
-
-
-def test_a_file_outside_the_index_is_a_NAMED_failure(repo: Path) -> None:
-    """`call_tool` must name it, not leave it to the protocol's last-resort
-    catch. A path that is not in the index is ordinary traffic — the same
-    failure the HTTP surface already answers as a 404 — and the agent needs
-    the sentence, not a generic "unexpected error"."""
-    from megabrain.transports.mcp.call import call_tool
-
-    result = call_tool("megabrain_node", {"repo_path": str(repo),
-                                          "file": "app/models/user.rb"})
-    assert result.failed
-    assert "not_found" in result.text and "user.rb" in result.text
-
-
-def test_the_instructions_route_between_the_tools_that_exist() -> None:
-    """The instructions are the only megabrain text an agent is guaranteed to
-    see, so a tool missing from them is a tool it never learns to reach — and
-    a tool NAMED there that does not exist is worse. They drifted once already
-    (they still said "two tools" with three shipped)."""
-    from megabrain.transports.mcp.protocol import INSTRUCTIONS
-
-    named = {name for name in (t.name for t in TOOLS) if name in INSTRUCTIONS}
-    assert named == {tool.name for tool in TOOLS}, \
-        "every shipped tool is routed to, and nothing else is named"

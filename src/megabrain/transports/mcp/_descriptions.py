@@ -9,9 +9,7 @@ measured session — not documentation ABOUT the surface, the surface.
 
 from __future__ import annotations
 
-__all__ = ["ASK", "GREP", "NODE", "SEARCH", "INDEX"]
-
-from ._node_description import NODE
+__all__ = ["ASK", "GREP", "SEARCH", "INDEX"]
 
 ASK = (
          "The whole flow behind a how/where/why question, or behind the change "
