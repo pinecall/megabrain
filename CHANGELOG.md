@@ -2,6 +2,25 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
+**The grep map now shows the ORIGIN of the state — the fix for why three A/B
+duels in a row produced the less-factored fix.** On rails#57197 the agent
+handed megabrain's map never read `core.rb`, where `set` DERIVES
+`scheduled_at` from `wait:`, and duplicated the state triple; the agent that
+traced by hand landed there every time and factored. Two causes, both fixed:
+
+- *Deterministic:* `outermost` kept the outer of two nested rows — right for a
+  closure inside a test, wrong for the wrapper module every Ruby file has.
+  rails' `core.rb` wraps 217 lines in `module ActiveJob` (under `MAX_SPAN`),
+  so the module contained every match and swallowed `Core#set`; the whole
+  file rendered as one un-jumpable "mentions it" row. A CONTAINER now never
+  beats a declaration inside it (`_no_swallowing`) — the same rule the
+  callees lane already applied. The rails map now names `Core.set`,
+  `serialize`, `deserialize` and `retry_job` deterministically.
+- *The `why` pass:* `GREP_PROMPT` gains the ORIGIN rule — include the symbol
+  that ASSIGNS each value the change carries, opening files until the `=` is
+  found, because that file usually shares no words with the task and no
+  search ranks it. Pinned by `tests/unit/grep/test_prompt.py`.
+
 **The Ruby, Go and PHP import graphs are ported — v2 had them and the rewrite
 dropped all three.** Found by `megabrain_node` reporting `imported by: none` on
 a Rails file, which its own description calls dead code. `indexing/edges/` gains

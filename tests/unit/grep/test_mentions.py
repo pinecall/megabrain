@@ -142,3 +142,40 @@ def test_a_nested_closure_is_not_a_second_site(tmp_path) -> None:
                    line=7, end_line=7, signature=None, decorators=(), doc=None)])
         found = mentioned_sites(store, "show_envvar")
     assert "Option.get_help_extra.inner" not in {s for _, s, _, _ in found}
+
+
+def test_a_wrapping_module_does_not_swallow_the_method_that_matches(tmp_path) -> None:
+    """MEASURED on rails, and it is why every Ruby row was useless. Ruby wraps
+    every file in `module ActiveJob`, and core.rb's module spans 217 lines —
+    under MAX_SPAN, so it is jumpable, it contains every match, and `outermost`
+    then DROPS `Core#set` in its favour. Three A/B duels ran with the origin of
+    the state rendered as a whole-module row nobody can jump to; the fix that
+    duplicated state was written from exactly that map. A CONTAINER never beats
+    the declaration inside it — that is the `callees` lane's rule already."""
+    body = "\n".join([
+        "module ActiveJob",                       # 1
+        "  module Core",                          # 2
+        "    def set(options)",                   # 3
+        "      self.scheduled_at = options[:wait]",  # 4
+        "    end",                                # 5
+        "  end",                                  # 6
+        "end",                                    # 7
+    ])
+    with Store(tmp_path) as store:
+        store.files.upsert("core.rb", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="core.rb", name="ActiveJob", kind="module", line=1,
+                   end_line=7, signature=None, decorators=(), doc=None),
+            Symbol(file="core.rb", name="ActiveJob.Core", kind="module", line=2,
+                   end_line=6, signature=None, decorators=(), doc=None),
+            Symbol(file="core.rb", name="ActiveJob.Core.set", kind="method", line=3,
+                   end_line=5, signature=None, decorators=(), doc=None),
+        ])
+        store.chunks.insert([Chunk(file="core.rb", kind="module", name="ActiveJob",
+                                   part=None, start_line=1, end_line=7, text=body,
+                                   breadcrumb="core.rb")], None)
+        found = mentioned_sites(store, "keep scheduled_at when the enqueue defers")
+    names = {symbol for _, symbol, _, _ in found}
+    assert "ActiveJob.Core.set" in names, "the method, not the module wrapper"
+    assert "ActiveJob" not in names
+    assert "ActiveJob.Core" not in names

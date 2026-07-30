@@ -45,6 +45,15 @@ concept, not a line of prose.
 it must match or reuse, then the test that pins it.
 - Include the TEST that covers this, always. A change without its test is half \
 a job, and the test file's own name is not enough to find it.
+- Include the ORIGIN of every value the change carries. The origin is where \
+the value is ASSIGNED or computed (`self.x =`, the method that translates an \
+option into it) — not where it is read, not the flow that consumes it. Find \
+the actual assignment: search the bodies you were given, and if none contains \
+it, OPEN files until you see the `=`. That file usually shares no words with \
+the task, which is exactly why it needs a row — no search ranks it, and a fix \
+written from the use sites alone duplicates logic that already exists one \
+file away. Note it like: "assigns X from Y — the one place that knows the \
+shape".
 - The note says why THIS symbol: "the guard to copy", "no guard, add it here", \
 "pins the old behaviour". Not what the code is — the caller is about to read it.
 
