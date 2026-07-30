@@ -93,3 +93,125 @@ def test_it_does_not_hop_TWICE(tmp_path) -> None:
 def test_no_sites_means_no_hops(tmp_path) -> None:
     with repo(tmp_path) as store:
         assert referenced_sites(store, []) == []
+
+
+def test_a_same_file_helper_OUTSIDE_the_shown_spans_is_a_row(tmp_path) -> None:
+    """MEASURED on rails#52478. The map named `assert_enqueued_with` L436-482;
+    the behaviour lived in `prepare_args_for_assertion`, a private helper the
+    site CALLS, 300 lines below in the same 800-line file — and the same-file
+    rule dropped it ("the reader is already there"). The reader is pointed at
+    a LINE RANGE, not a file: a helper outside every shown span is as
+    invisible as another file, and re-finding it cost the agent three calls.
+    """
+    body = "def assert_enqueued_with(job):\n    prepare_args_for_assertion(job)\n"
+    helper = "def prepare_args_for_assertion(args):\n    return args\n"
+    with Store(tmp_path) as store:
+        store.files.upsert("test_helper.py", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="test_helper.py", name="assert_enqueued_with", kind="function",
+                   line=1, end_line=2, signature=None, decorators=(), doc=None),
+            Symbol(file="test_helper.py", name="prepare_args_for_assertion",
+                   kind="function", line=400, end_line=402, signature=None,
+                   decorators=(), doc=None),
+        ])
+        store.chunks.insert([
+            Chunk(file="test_helper.py", kind="function", name="assert_enqueued_with",
+                  part=None, start_line=1, end_line=2, text=body,
+                  breadcrumb="test_helper.py"),
+            Chunk(file="test_helper.py", kind="function",
+                  name="prepare_args_for_assertion", part=None, start_line=400,
+                  end_line=402, text=helper, breadcrumb="test_helper.py"),
+        ], None)
+        found = referenced_sites(
+            store, [("test_helper.py", "assert_enqueued_with", 1, 2)])
+    assert ("test_helper.py", "prepare_args_for_assertion", 400, 402) in found
+
+
+def test_a_same_file_helper_INSIDE_a_shown_span_stays_dropped(tmp_path) -> None:
+    """The original rule's true half: a helper the reader is already looking
+    at is not a second place to go."""
+    body = ("def outer():\n    inner()\n\n"
+            "def inner():\n    return 1\n")
+    with Store(tmp_path) as store:
+        store.files.upsert("mod.py", "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="mod.py", name="outer", kind="function", line=1,
+                   end_line=2, signature=None, decorators=(), doc=None),
+            Symbol(file="mod.py", name="inner", kind="function", line=4,
+                   end_line=5, signature=None, decorators=(), doc=None),
+        ])
+        store.chunks.insert([
+            Chunk(file="mod.py", kind="module", name="mod", part=None,
+                  start_line=1, end_line=5, text=body, breadcrumb="mod.py"),
+        ], None)
+        # The map already shows L1-5 of this file: inner lives inside it.
+        found = referenced_sites(store, [("mod.py", "mod", 1, 5)])
+    assert ("mod.py", "inner", 4, 5) not in found
+
+
+def test_the_cap_is_shared_round_robin_not_first_come(tmp_path) -> None:
+    """MEASURED on rails#52478, end to end: the lane found
+    `prepare_args_for_assertion` when run over its site alone — and the full
+    map never showed it, because sites from files EARLIER in the map had
+    already spent all `MAX_REFERENCED` rows. A cap consumed in map order
+    starves exactly the site the reader asked about; one reference per site
+    per round keeps the cap and spreads it.
+    """
+    hoarder = "def hoarder():\n    " + "\n    ".join(
+        f"helper_number_{n}()" for n in range(8)) + "\n"
+    starved = "def starved():\n    the_one_that_matters()\n"
+    with Store(tmp_path) as store:
+        for path in ("a.py", "b.py", "lib.py"):
+            store.files.upsert(path, "sha", "", None)
+        symbols = [Symbol(file="lib.py", name=f"helper_number_{n}", kind="function",
+                          line=10 + n * 3, end_line=11 + n * 3, signature=None,
+                          decorators=(), doc=None) for n in range(8)]
+        symbols += [
+            Symbol(file="a.py", name="hoarder", kind="function", line=1,
+                   end_line=9, signature=None, decorators=(), doc=None),
+            Symbol(file="b.py", name="starved", kind="function", line=1,
+                   end_line=2, signature=None, decorators=(), doc=None),
+            Symbol(file="lib.py", name="the_one_that_matters", kind="function",
+                   line=90, end_line=92, signature=None, decorators=(), doc=None),
+        ]
+        store.symbols.insert(symbols)
+        store.chunks.insert([
+            Chunk(file="a.py", kind="function", name="hoarder", part=None,
+                  start_line=1, end_line=9, text=hoarder, breadcrumb="a.py"),
+            Chunk(file="b.py", kind="function", name="starved", part=None,
+                  start_line=1, end_line=2, text=starved, breadcrumb="b.py"),
+        ], None)
+        found = referenced_sites(store, [("a.py", "hoarder", 1, 9),
+                                         ("b.py", "starved", 1, 2)])
+    assert len(found) <= 6
+    assert ("lib.py", "the_one_that_matters", 90, 92) in found, \
+        "the second site's one reference must survive the first site's eight"
+
+
+def test_within_a_site_references_come_in_READING_order(tmp_path) -> None:
+    """`identifiers()` returns a set, so which of a site's references won the
+    round-robin slot was a hash accident. The body's own order is the ranking
+    the reader would build: what the site touches first, first."""
+    body = ("def site():\n"
+            "    first_thing_it_calls()\n"
+            "    second_thing_it_calls()\n"
+            "    third_thing_it_calls()\n")
+    with Store(tmp_path) as store:
+        for path in ("a.py", "lib.py"):
+            store.files.upsert(path, "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="a.py", name="site", kind="function", line=1,
+                   end_line=4, signature=None, decorators=(), doc=None),
+            Symbol(file="lib.py", name="first_thing_it_calls", kind="function",
+                   line=10, end_line=11, signature=None, decorators=(), doc=None),
+            Symbol(file="lib.py", name="second_thing_it_calls", kind="function",
+                   line=20, end_line=21, signature=None, decorators=(), doc=None),
+            Symbol(file="lib.py", name="third_thing_it_calls", kind="function",
+                   line=30, end_line=31, signature=None, decorators=(), doc=None),
+        ])
+        store.chunks.insert([Chunk(file="a.py", kind="function", name="site",
+                                   part=None, start_line=1, end_line=4, text=body,
+                                   breadcrumb="a.py")], None)
+        found = referenced_sites(store, [("a.py", "site", 1, 4)])
+    assert found[0] == ("lib.py", "first_thing_it_calls", 10, 11)
+    assert found[1] == ("lib.py", "second_thing_it_calls", 20, 21)

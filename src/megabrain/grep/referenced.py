@@ -1,18 +1,12 @@
 """What the edit SITES reference — the last file a literal search cannot reach.
 
-MEASURED, and it is the row that survived two rounds of fixing. Adding
-`show_envvar_value` to click needs a key added to the `OptionHelpExtra` TypedDict
-in ANOTHER file, and no literal search finds it: its body never contains the
-string `show_envvar`. The plain-grep arm needed a separate search and paid four
-calls groping for it.
-
-But the site that must change, `Option.get_help_extra`, is declared
-`-> types.OptionHelpExtra`. The index HAS that link. So one hop out from each
-site — resolved by the same uniqueness rule the navigator applies to a jump —
-reaches the file neither grep nor the model named.
-
-ONE hop, deliberately. Following what the referenced file references in turn
-walks the repository, and this render exists to avoid exactly that.
+MEASURED: adding `show_envvar_value` to click needs a key on the
+`OptionHelpExtra` TypedDict in ANOTHER file, and no literal search finds it —
+its body never contains `show_envvar`. But the site that must change is
+declared `-> types.OptionHelpExtra`, the index HAS that link, and one hop out
+from each site (resolved by the navigator's uniqueness rule) reaches the file
+neither grep nor the model named. ONE hop, deliberately: following what the
+referenced file references in turn walks the repository.
 """
 
 from __future__ import annotations
@@ -26,40 +20,67 @@ from .idents import identifiers
 __all__ = ["referenced_sites", "MAX_REFERENCED"]
 
 MAX_REFERENCED = 6
-"""Rows this hop may add.
-
-A site's body names many things; the two filters below drop nearly all of them,
-and this caps what a densely-typed function can still contribute."""
+"""Rows this hop may add — what a densely-typed function can still contribute
+after the two filters below drop nearly everything its body names."""
 
 MAX_REF_SPAN = 40
-"""Lines a referenced symbol may span to count as a CONTRACT worth extending.
-
-Both filters here were MEASURED on the first working version, which added six
-rows and still missed the one that mattered: `Option.__init__`'s 80-line body
-named `_pick_type`, `_validate`, `_resolve_lazy_default` and three more, ate the
-cap, and `OptionHelpExtra` never got in.
-
-What survives is cross-file AND small, which is what a contract looks like — a
-TypedDict, a dataclass, a Protocol. `OptionHelpExtra` is 5 lines in another file
-and had to gain a key; `ParamType` is 174 lines in another file and is only used.
-A same-file helper is dropped outright: the reader is already in that file."""
+"""Lines a referenced symbol may span to count as a target worth listing.
+MEASURED: `Option.__init__`'s 80-line body named six helpers, ate the cap, and
+`OptionHelpExtra` never got in. What survives is SMALL — the shape of a
+contract (a TypedDict, a Protocol) or of a helper worth jumping to."""
 
 _HEADING = re.compile(r"^(h\d+|section)$")
 
 
 def referenced_sites(store: Store, sites: list[tuple[str, str, int, int]],
                      ) -> list[tuple[str, str, int, int]]:
-    """Symbols the bodies of `sites` name, when the index resolves them to one."""
+    """Symbols the bodies of `sites` name, when the index resolves them to one.
+
+    A same-file reference counts when it falls OUTSIDE every shown span — the
+    reader is pointed at a LINE RANGE, not a file. On rails the behaviour
+    behind `assert_enqueued_with` lived 300 lines below in the same module and
+    the old rule ("already there") cost three calls."""
     known = {(path, low, high) for path, _, low, high in sites}
-    found: list[tuple[str, str, int, int]] = []
+    per_site: list[list[tuple[str, str, int, int]]] = []
     for path, _, low, high in sites:
-        for name in identifiers(_body(store, path, low, high)):
+        body = _body(store, path, low, high)
+        rows: list[tuple[str, str, int, int]] = []
+        # READING order, not set order: the body's own order is the ranking
+        # the reader would build — what the site touches first, first.
+        for name in sorted(identifiers(body), key=body.find):
             row = _resolved(store, name)
-            if row is None or row[0] == path:
-                continue          # same file: the reader is already there
-            if (row[0], row[2], row[3]) not in known and row not in found:
-                found.append(row)
-    return found[:MAX_REFERENCED]
+            if row is None or _shown(row, known):
+                continue
+            if (row[0], row[2], row[3]) not in known and row not in rows:
+                rows.append(row)
+        per_site.append(rows)
+    return _fairly(per_site)
+
+
+def _fairly(per_site: list[list[tuple[str, str, int, int]]]
+            ) -> list[tuple[str, str, int, int]]:
+    """One reference per site per round, up to the cap.
+
+    First-come spent the whole cap on whichever sites the map listed FIRST —
+    on rails the lane found `prepare_args_for_assertion` over its own site and
+    the full map never showed it. The cap bounds the render; fairness decides
+    who it starves, and it must never be the site the task is about."""
+    found: list[tuple[str, str, int, int]] = []
+    for round_index in range(MAX_REFERENCED):
+        for rows in per_site:
+            if round_index < len(rows) and rows[round_index] not in found:
+                found.append(rows[round_index])
+                if len(found) == MAX_REFERENCED:
+                    return found
+    return found
+
+
+def _shown(row: tuple[str, str, int, int],
+           known: set[tuple[str, int, int]]) -> bool:
+    """Already inside a span the map gives for that file — not a second place
+    to go. What survives of the old same-file rule: its true half."""
+    path, _, low, high = row
+    return any(a <= low and high <= b for p, a, b in known if p == path)
 
 
 def _body(store: Store, path: str, low: int, high: int) -> str:

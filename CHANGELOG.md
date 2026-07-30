@@ -2,6 +2,28 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
+**The referenced lane reaches the same-file private helper, and shares its
+cap fairly.** Measured on rails#52478, end to end: the map named
+`assert_enqueued_with` L436-482 and the behaviour lived in
+`prepare_args_for_assertion`, a private helper the site CALLS, 300 lines below
+in the same module — re-finding it cost the agent three of its fourteen calls.
+Three defects, each pinned test-first:
+
+- The same-file rule dropped every same-file reference ("the reader is already
+  there"). The reader is pointed at a LINE RANGE, not a file: a helper outside
+  every shown span is as invisible as another file. It now counts, and only a
+  reference INSIDE a shown span stays dropped — the old rule's true half.
+- `MAX_REFERENCED` was spent first-come, so sites from files earlier in the
+  map starved the site the task was about (the lane found the helper when run
+  over its own site alone, and the full map never showed it). One reference
+  per site per round now — the cap bounds the render, fairness decides who it
+  starves.
+- Within a site, which reference won the slot was a set-iteration hash
+  accident. References now come in READING order of the body: what the site
+  touches first, first.
+
+The duel-4 query still names `Core.set` — no regression on the origin rows.
+
 **The grep map now shows the ORIGIN of the state — the fix for why three A/B
 duels in a row produced the less-factored fix.** On rails#57197 the agent
 handed megabrain's map never read `core.rb`, where `set` DERIVES
