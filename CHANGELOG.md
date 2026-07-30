@@ -2,8 +2,8 @@
 
 ## Unreleased — the registry gets its second backend, and its first caller
 
-**The referenced lane reaches the same-file private helper, and shares its
-cap fairly.** Measured on rails#52478, end to end: the map named
+**The referenced lane reaches the same-file private helper, ranks by shared
+use, and says so.** Measured on rails#52478, end to end: the map named
 `assert_enqueued_with` L436-482 and the behaviour lived in
 `prepare_args_for_assertion`, a private helper the site CALLS, 300 lines below
 in the same module — re-finding it cost the agent three of its fourteen calls.
@@ -21,6 +21,11 @@ Three defects, each pinned test-first:
 - Within a site, which reference won the slot was a set-iteration hash
   accident. References now come in READING order of the body: what the site
   touches first, first.
+- The cap rose 6 → 15 with a SCORE to keep it honest: rows rank by how many
+  distinct sites reference them (a symbol two edit sites depend on is the
+  task's shared contract; one a single site touches is that site's detail),
+  round-robin as the tie, and the count travels in the note — `used by 2
+  sites above` is a rank the reader can act on.
 
 The duel-4 query still names `Core.set` — no regression on the origin rows.
 

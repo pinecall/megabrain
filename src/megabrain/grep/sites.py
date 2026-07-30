@@ -78,7 +78,11 @@ def _add_mentions(store: Store, task: str,
     # `-> types.OptionHelpExtra`, and that TypedDict had to gain a key.
     settled = sites + [(path, "", low, high)
                        for path, rows in grouped.items() for low, high, _ in rows]
-    _place(grouped, referenced_sites(store, settled), "used by a site above")
+    for row, uses in referenced_sites(store, settled):
+        # The score travels in the note: "used by 3 sites above" is the rank a
+        # reader can act on, and one more word than the row already carried.
+        note = "used by a site above" if uses == 1 else f"used by {uses} sites above"
+        _place(grouped, [row], note)
 
 
 def _place(grouped: dict[str, list[tuple[int, int, str]]],

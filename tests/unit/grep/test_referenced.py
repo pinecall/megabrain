@@ -53,14 +53,14 @@ def test_the_TYPE_a_site_declares_is_reached(tmp_path) -> None:
     that a literal search for the task's identifiers can never find."""
     with repo(tmp_path) as store:
         found = referenced_sites(store, SITES)
-    assert ("types.py", "OptionHelpExtra", 1, 2) in found
+    assert ("types.py", "OptionHelpExtra", 1, 2) in [row for row, _ in found]
 
 
 def test_a_site_ALREADY_listed_is_not_repeated(tmp_path) -> None:
     """One hop out, not a second copy of where we started."""
     with repo(tmp_path) as store:
         found = referenced_sites(store, SITES)
-    assert not any(name == "Option.get_help_extra" for _, name, _, _ in found)
+    assert not any(name == "Option.get_help_extra" for (_, name, _, _), _ in found)
 
 
 def test_an_AMBIGUOUS_name_is_not_followed(tmp_path) -> None:
@@ -87,7 +87,7 @@ def test_it_does_not_hop_TWICE(tmp_path) -> None:
                                    text="class TypedDictBase: pass",
                                    breadcrumb="deep.py")], None)
         found = referenced_sites(store, SITES)
-    assert not any(name == "TypedDictBase" for _, name, _, _ in found)
+    assert not any(name == "TypedDictBase" for (_, name, _, _), _ in found)
 
 
 def test_no_sites_means_no_hops(tmp_path) -> None:
@@ -124,7 +124,7 @@ def test_a_same_file_helper_OUTSIDE_the_shown_spans_is_a_row(tmp_path) -> None:
         ], None)
         found = referenced_sites(
             store, [("test_helper.py", "assert_enqueued_with", 1, 2)])
-    assert ("test_helper.py", "prepare_args_for_assertion", 400, 402) in found
+    assert ("test_helper.py", "prepare_args_for_assertion", 400, 402) in [row for row, _ in found]
 
 
 def test_a_same_file_helper_INSIDE_a_shown_span_stays_dropped(tmp_path) -> None:
@@ -146,7 +146,7 @@ def test_a_same_file_helper_INSIDE_a_shown_span_stays_dropped(tmp_path) -> None:
         ], None)
         # The map already shows L1-5 of this file: inner lives inside it.
         found = referenced_sites(store, [("mod.py", "mod", 1, 5)])
-    assert ("mod.py", "inner", 4, 5) not in found
+    assert ("mod.py", "inner", 4, 5) not in [row for row, _ in found]
 
 
 def test_the_cap_is_shared_round_robin_not_first_come(tmp_path) -> None:
@@ -183,8 +183,9 @@ def test_the_cap_is_shared_round_robin_not_first_come(tmp_path) -> None:
         ], None)
         found = referenced_sites(store, [("a.py", "hoarder", 1, 9),
                                          ("b.py", "starved", 1, 2)])
-    assert len(found) <= 6
-    assert ("lib.py", "the_one_that_matters", 90, 92) in found, \
+    from megabrain.grep.referenced import MAX_REFERENCED
+    assert len(found) <= MAX_REFERENCED
+    assert ("lib.py", "the_one_that_matters", 90, 92) in [row for row, _ in found], \
         "the second site's one reference must survive the first site's eight"
 
 
@@ -213,5 +214,39 @@ def test_within_a_site_references_come_in_READING_order(tmp_path) -> None:
                                    part=None, start_line=1, end_line=4, text=body,
                                    breadcrumb="a.py")], None)
         found = referenced_sites(store, [("a.py", "site", 1, 4)])
-    assert found[0] == ("lib.py", "first_thing_it_calls", 10, 11)
-    assert found[1] == ("lib.py", "second_thing_it_calls", 20, 21)
+    rows = [row for row, _ in found]
+    assert rows[0] == ("lib.py", "first_thing_it_calls", 10, 11)
+    assert rows[1] == ("lib.py", "second_thing_it_calls", 20, 21)
+
+
+def test_a_reference_SHARED_by_more_sites_ranks_first(tmp_path) -> None:
+    """The score: how many distinct SITES reference the symbol. A helper two
+    edit sites depend on is the task's shared contract; a helper only one site
+    touches is that site's detail. Count of sites, not count of mentions — a
+    site that calls the same helper five times still knows it once."""
+    body_a = "def site_a():\n    shared_contract()\n    only_a_uses_this()\n"
+    body_b = "def site_b():\n    shared_contract()\n    shared_contract()\n"
+    with Store(tmp_path) as store:
+        for path in ("a.py", "b.py", "lib.py"):
+            store.files.upsert(path, "sha", "", None)
+        store.symbols.insert([
+            Symbol(file="a.py", name="site_a", kind="function", line=1,
+                   end_line=3, signature=None, decorators=(), doc=None),
+            Symbol(file="b.py", name="site_b", kind="function", line=1,
+                   end_line=3, signature=None, decorators=(), doc=None),
+            Symbol(file="lib.py", name="shared_contract", kind="function",
+                   line=10, end_line=12, signature=None, decorators=(), doc=None),
+            Symbol(file="lib.py", name="only_a_uses_this", kind="function",
+                   line=20, end_line=22, signature=None, decorators=(), doc=None),
+        ])
+        store.chunks.insert([
+            Chunk(file="a.py", kind="function", name="site_a", part=None,
+                  start_line=1, end_line=3, text=body_a, breadcrumb="a.py"),
+            Chunk(file="b.py", kind="function", name="site_b", part=None,
+                  start_line=1, end_line=3, text=body_b, breadcrumb="b.py"),
+        ], None)
+        found = referenced_sites(store, [("a.py", "site_a", 1, 3),
+                                         ("b.py", "site_b", 1, 3)])
+    rows = [(row, uses) for row, uses in found]
+    assert rows[0] == (("lib.py", "shared_contract", 10, 12), 2)
+    assert (("lib.py", "only_a_uses_this", 20, 22), 1) in rows
